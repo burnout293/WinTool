@@ -65,12 +65,12 @@ Tous les scripts officiels vivent à plat dans `Default\`, sans sous-dossiers.
 ```powershell
 ## WINTOOL:START
 ## id            : 3f2b1a9c-7e4d-4c6a-9b0e-1d5f6a8c2e0b
-## lang          : fr
-## title         : Désactiver la veille
-## desc          : Empêche Windows de se mettre en veille ou en hibernation
+## lang          : en
+## title         : Disable sleep
+## desc          : Prevents Windows from sleeping or hibernating
 ## category      : performance
 ## icon          : moon
-## tags          : veille, hibernation, énergie
+## tags          : sleep, hibernation, power
 ## version       : 2.0
 ## admin         : true
 ## risk          : low
@@ -81,14 +81,14 @@ Tous les scripts officiels vivent à plat dans `Default\`, sans sous-dossiers.
 ## engine        : auto
 ## WINTOOL:END
 
-## WINTOOL:LANG en
-## title             : Disable sleep
-## desc              : Prevents Windows from sleeping or hibernating
-## VeilleBranche_Min : Sleep on AC power — 0 = never
+## WINTOOL:LANG fr
+## title         : Désactiver la veille
+## desc          : Empêche Windows de se mettre en veille ou en hibernation
+## SleepOnAC_Min : Veille sur secteur — 0 = jamais
 ## WINTOOL:END
 
 $CONFIG = @{
-    VeilleBranche_Min = 0   # [number] Veille sur secteur — 0 = jamais
+    SleepOnAC_Min = 0   # [number] Sleep on AC power — 0 = never
 }
 
 # --- WinTool override (ne pas supprimer) ---
@@ -100,11 +100,26 @@ if ($env:WINTOOL_CONFIG) {
 # ==============================================================================
 
 Write-Host "[STEP] 1/1 Applying power settings"
-powercfg /change standby-timeout-ac $CONFIG.VeilleBranche_Min
-Write-Host "[OK]   Sleep on AC power: $($CONFIG.VeilleBranche_Min) min"
+powercfg /change standby-timeout-ac $CONFIG.SleepOnAC_Min
+Write-Host "[OK]   Sleep on AC power: $($CONFIG.SleepOnAC_Min) min"
 Write-Host "[DONE] Sleep disabled"
 exit 0
 ```
+
+---
+
+## La langue : code en anglais, commentaires libres
+
+**Tout ce que lit une machine ou un contributeur est en anglais** : noms de fichiers,
+entête de base, clés de `$CONFIG`, libellés d'annotation, noms de variables et de
+fonctions, et la sortie d'exécution.
+
+**Les commentaires peuvent rester en français.** Ils s'adressent à celui qui maintient le
+script, pas à l'application.
+
+Le français arrive par le bloc de traduction `## WINTOOL:LANG fr`, qui fournit à
+l'interface les libellés affichés à l'utilisateur. C'est le seul endroit où il apparaît
+dans un script officiel.
 
 ---
 
@@ -153,19 +168,23 @@ disponible. Ne forcez `pwsh` que si vous utilisez vraiment de la syntaxe PowerSh
 ## Le bloc de traduction
 
 L'application est bilingue (§10). Un second bloc traduit l'entête **et les libellés des
-options** :
+options**, vers une langue **différente** de celle déclarée par `lang` :
 
 ```powershell
-## WINTOOL:LANG en
-## title             : Disable sleep
-## desc              : Prevents Windows from sleeping or hibernating
-## VeilleBranche_Min : Sleep on AC power — 0 = never
+## WINTOOL:LANG fr
+## title         : Désactiver la veille
+## desc          : Empêche Windows de se mettre en veille ou en hibernation
+## SleepOnAC_Min : Veille sur secteur — 0 = jamais
 ## WINTOOL:END
 ```
 
 `title` et `desc` sont obligatoires. Chaque clé de `$CONFIG` devrait y figurer, sinon son
-libellé restera en français dans l'interface anglaise. Une traduction absente retombe
-toujours sur la langue de base — rien ne casse.
+libellé restera dans la langue de base. Une traduction absente retombe toujours sur cette
+langue de base — rien ne casse.
+
+Les scripts officiels sont donc rédigés en anglais et traduits vers le français. Un script
+personnel écrit en français fera l'inverse : le validateur accepte les deux sens, il exige
+seulement qu'une seconde langue existe.
 
 ---
 
@@ -177,10 +196,10 @@ affiche la clé brute** : l'utilisateur lirait `VeilleBranche_Min` au lieu de
 
 ```powershell
 $CONFIG = @{
-    VeilleBranche_Min     = 0      # [number] Veille sur secteur — 0 = jamais
-    DesactiverHibernation = $true  # [bool]   Supprimer l'hibernation — efface hiberfil.sys
-    ServeurDNS            = "CF"   # [string] Fournisseur DNS — Cloudflare, Google, Quad9
-    VerrouillerRegistre   = $true  # [hidden] Verrouiller via le registre
+    SleepOnAC_Min     = 0      # [number] Sleep on AC power — 0 = never
+    RemoveHibernation = $true  # [bool]   Remove hibernation — deletes hiberfil.sys
+    DnsProvider       = "CF"   # [string] DNS provider — Cloudflare, Google, Quad9
+    LockInRegistry    = $true  # [hidden] Lock settings in the registry
 }
 ```
 
@@ -299,10 +318,10 @@ validateur sans l'ajouter ici est un défaut.**
 | `ID_INVALIDE` | erreur | `id` n'est pas un GUID |
 | `ID_COLLISION` | erreur | Deux scripts portent le même `id` |
 | `CATEGORIE_INCONNUE` | avertissement | Catégorie hors catégories d'usine → « Non classé » |
-| `TRADUCTION_ABSENTE` | erreur | Pas de bloc `WINTOOL:LANG en` |
+| `TRADUCTION_ABSENTE` | erreur | Aucun bloc `WINTOOL:LANG` vers une langue autre que `lang` |
 | `TRADUCTION_NON_FERMEE` | erreur | Bloc de traduction non refermé |
 | `TRADUCTION_INCOMPLETE` | erreur | `title` ou `desc` non traduit |
-| `TRADUCTION_OPTION` | avertissement | Une clé de `$CONFIG` sans libellé anglais |
+| `TRADUCTION_OPTION` | avertissement | Une clé de `$CONFIG` sans libellé traduit |
 | `CONFIG_ABSENT` | erreur | Pas de bloc `$CONFIG = @{ }` |
 | `CONFIG_NON_FERME` | erreur | Bloc `$CONFIG` non refermé |
 | `CONFIG_LIGNE_ILLISIBLE` | avertissement | Ligne non reconnue comme « Clé = valeur » |

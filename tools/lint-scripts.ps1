@@ -184,16 +184,25 @@ function Test-Entete {
 }
 
 function Test-Traduction {
-    param([string] $Fichier, [string[]] $Lignes, [string[]] $ClesConfig)
+    param([string] $Fichier, [string[]] $Lignes, [string[]] $ClesConfig, [string] $LangBase)
 
-    $debut = -1; $fin = -1
+    # L'application est bilingue (§10). On exige donc un bloc de traduction vers une
+    # langue DIFFÉRENTE de celle de l'entête — et non un bloc 'en' en dur : les scripts
+    # officiels sont rédigés en anglais et traduits vers le français, les scripts
+    # personnels feront souvent l'inverse. La règle doit tenir dans les deux sens.
+    if (-not $LangBase) { $LangBase = 'fr' }
+
+    $debut = -1; $fin = -1; $langTrouvee = ''
     for ($i = 0; $i -lt $Lignes.Count; $i++) {
-        if ($debut -lt 0 -and $Lignes[$i] -match '^\s*##\s*WINTOOL:LANG\s+en\s*$') { $debut = $i; continue }
-        if ($debut -ge 0 -and $Lignes[$i] -match '^\s*##\s*WINTOOL:END\s*$')       { $fin = $i; break }
+        if ($debut -lt 0 -and $Lignes[$i] -match '^\s*##\s*WINTOOL:LANG\s+([A-Za-z]{2})\s*$') {
+            if ($Matches[1].ToLower() -ne $LangBase.ToLower()) { $debut = $i; $langTrouvee = $Matches[1].ToLower() }
+            continue
+        }
+        if ($debut -ge 0 -and $Lignes[$i] -match '^\s*##\s*WINTOOL:END\s*$') { $fin = $i; break }
     }
 
     if ($debut -lt 0) {
-        Add-Constat $Fichier 1 'erreur' 'TRADUCTION_ABSENTE' "Aucun bloc '## WINTOOL:LANG en'. L'application est bilingue (§10) : les métadonnées doivent l'être."
+        Add-Constat $Fichier 1 'erreur' 'TRADUCTION_ABSENTE' "Aucun bloc de traduction. L'entête est en '$LangBase' : il faut un bloc '## WINTOOL:LANG <autre langue>' (§10)."
         return
     }
     if ($fin -lt 0) {
@@ -210,13 +219,13 @@ function Test-Traduction {
 
     foreach ($obligatoire in @('title', 'desc')) {
         if ($traduits -notcontains $obligatoire) {
-            Add-Constat $Fichier ($debut + 1) 'erreur' 'TRADUCTION_INCOMPLETE' "Le bloc anglais ne traduit pas '$obligatoire'."
+            Add-Constat $Fichier ($debut + 1) 'erreur' 'TRADUCTION_INCOMPLETE' "Le bloc '$langTrouvee' ne traduit pas '$obligatoire'."
         }
     }
 
     foreach ($cle in $ClesConfig) {
         if ($traduits -notcontains $cle) {
-            Add-Constat $Fichier ($debut + 1) 'avertissement' 'TRADUCTION_OPTION' "L'option '$cle' n'a pas de libellé anglais ; elle s'affichera en français dans l'interface anglaise."
+            Add-Constat $Fichier ($debut + 1) 'avertissement' 'TRADUCTION_OPTION' "L'option '$cle' n'a pas de libellé '$langTrouvee' ; elle s'affichera en '$LangBase' dans cette langue."
         }
     }
 }
@@ -386,7 +395,8 @@ foreach ($f in $fichiers) {
     Test-Encodage               $relatif $f.FullName
     $champs = Test-Entete       $relatif $lignes
     $cles   = Test-Config       $relatif $lignes
-    Test-Traduction             $relatif $lignes $cles
+    if ($champs.ContainsKey('lang')) { $langBase = $champs['lang'].Valeur } else { $langBase = 'fr' }
+    Test-Traduction             $relatif $lignes $cles $langBase
     Test-Override               $relatif $lignes
     Test-Marqueurs              $relatif $lignes
     Test-SortieAnglaise         $relatif $lignes
