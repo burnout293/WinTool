@@ -22,6 +22,44 @@ Un script non conforme **s'exécute quand même** : WinTool signale, il ne bloqu
 
 ---
 
+## Nommer le fichier
+
+**Cette norme ne s'applique qu'aux scripts officiels**, ceux livrés dans `Default\`.
+Vos scripts personnels se nomment comme vous voulez : l'application ne regarde jamais le
+nom de fichier, elle ne connaît que le champ `id`.
+
+Format : `NNN_NOM_EN_ANGLAIS.ps1` — trois chiffres, tiret bas, nom en majuscules.
+
+```
+126_CLEAR_REGISTRY.ps1
+200_DISABLE_SLEEP.ps1
+501_CHECK_DISK_HEALTH.ps1
+```
+
+Le nombre situe le script dans une plage thématique, ce qui garde le dossier lisible quand
+la bibliothèque grandit :
+
+| Plage | Domaine |
+|---|---|
+| `1xx` | Nettoyage |
+| `2xx` | Performance |
+| `3xx` | Vie privée |
+| `4xx` | Applications |
+| `5xx` | Santé |
+| `6xx` | Outillage |
+| `7xx` – `8xx` | Réservé |
+| `9xx` | Diagnostics internes |
+
+**Le numéro ne détermine rien d'autre que le tri du dossier.** Il ne fixe ni l'ordre
+d'exécution — c'est le classement manuel du mode Expert qui décide — ni l'identité du
+script, qui vient de son `id`. Ne renumérotez donc jamais un fichier pour réorganiser un
+affichage : cela ne changerait rien dans l'application et casserait les références du
+dépôt.
+
+Tous les scripts officiels vivent à plat dans `Default\`, sans sous-dossiers.
+
+---
+
 ## Le squelette
 
 ```powershell
