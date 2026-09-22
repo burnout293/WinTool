@@ -9,6 +9,11 @@
     c'est exactement la dérive qui a rendu la v3 inexploitable (une convention soigneusement
     documentée, et zéro script sur treize qui la respectait).
 
+    Structure attendue (style B) : tout ce qui s'adresse à un humain vit dans des blocs ##,
+    et $CONFIG ne contient que des clés et des valeurs par défaut. Le nom d'une clé apparaît
+    donc dans trois endroits — OPTIONS, LANG et $CONFIG — et ce validateur croise les trois
+    dans les deux sens. C'est ce croisement qui rend la dérive impossible.
+
     Deux usages, deux exigences :
       · En intégration continue sur scripts/Default/ — tolérance zéro, code de sortie 1
         à la moindre erreur. Ces scripts-là, on les maîtrise.
@@ -39,7 +44,6 @@ if (-not $Path) { $Path = Join-Path (Split-Path $PSScriptRoot -Parent) 'scripts'
 # Référentiel — la seule source de vérité sur les valeurs admises
 # ==============================================================================
 
-# Champs d'entête obligatoires. 'tags' est volontairement absent : il est facultatif.
 $CHAMPS_REQUIS = @(
     'id', 'lang', 'title', 'desc', 'category', 'icon', 'version',
     'admin', 'risk', 'duration', 'reversible', 'interruptible', 'reboot', 'engine'
@@ -55,14 +59,12 @@ $VALEURS_ADMISES = @{
     reboot        = @('true', 'false')
 }
 
-# Marqueurs de sortie normalisés (§5.3). Toute balise proche mais absente de cette
-# liste est signalée avec une suggestion — c'est le cas [REBBOT] → [REBOOT].
 $MARQUEURS = @('INFO', 'OK', 'WARN', 'ERR', 'STEP', 'CKPT', 'REBOOT', 'DONE')
 
-$TYPES_CONFIG = @('bool', 'number', 'string', 'hidden')
+# Types d'option. 'select' et 'multi' exigent des choix déclarés en sous-lignes.
+$TYPES_OPTION     = @('bool', 'number', 'string', 'hidden', 'select', 'multi')
+$TYPES_AVEC_CHOIX = @('select', 'multi')
 
-# Catégories d'usine. Une valeur hors liste n'est pas une faute : le script part
-# simplement en « Non classé » (§5.1). D'où un avertissement, pas une erreur.
 $CATEGORIES_USINE = @(
     'menage', 'performance', 'vieprivee', 'applications', 'sante', 'outillage'
 )
@@ -81,7 +83,7 @@ if (Test-Path $FICHIER_ICONES) {
 # ==============================================================================
 
 function Get-Distance {
-    <# Distance de Levenshtein, pour suggérer la balise correcte. #>
+    <# Distance de Levenshtein, pour suggérer l'orthographe correcte. #>
     param([string] $A, [string] $B)
 
     $A = $A.ToUpper(); $B = $B.ToUpper()
@@ -116,41 +118,63 @@ function Add-Constat {
         [string] $Message
     )
     $script:Constats += [pscustomobject]@{
-        Fichier = $Fichier
-        Ligne   = $Ligne
-        Gravite = $Gravite
-        Code    = $Code
-        Message = $Message
+        Fichier = $Fichier; Ligne = $Ligne; Gravite = $Gravite
+        Code = $Code; Message = $Message
     }
+}
+
+function Find-Bloc {
+    <# Renvoie @{Debut; Fin} des lignes d'un bloc ## WINTOOL:<Motif> ... ## WINTOOL:END #>
+    param([string[]] $Lignes, [string] $Motif)
+
+    $debut = -1
+    for ($i = 0; $i -lt $Lignes.Count; $i++) {
+        if ($debut -lt 0 -and $Lignes[$i] -match $Motif) { $debut = $i; continue }
+        if ($debut -ge 0 -and $Lignes[$i] -match '^\s*##\s*WINTOOL:END\s*$') {
+            return @{ Debut = $debut; Fin = $i }
+        }
+    }
+    if ($debut -ge 0) { return @{ Debut = $debut; Fin = -1 } }
+    return $null
 }
 
 # ==============================================================================
 # Contrôles
 # ==============================================================================
 
+function Test-Encodage {
+    param([string] $Fichier, [string] $CheminComplet)
+
+    # Piège rencontré lors de l'écriture de ce validateur lui-même : PowerShell 5.1
+    # — celui livré nativement avec Windows, donc celui qui exécutera la plupart des
+    # scripts — lit un .ps1 SANS BOM comme de l'ANSI, pas de l'UTF-8. Un fichier
+    # contenant des accents est alors mal décodé, et le script casse à l'analyse.
+    $octets = [System.IO.File]::ReadAllBytes($CheminComplet)
+    if ($octets.Length -lt 3) { return }
+    if ($octets[0] -eq 0xEF -and $octets[1] -eq 0xBB -and $octets[2] -eq 0xBF) { return }
+
+    if ([System.Text.Encoding]::UTF8.GetString($octets) -match '[^\x00-\x7F]') {
+        Add-Constat $Fichier 1 'erreur' 'BOM_ABSENT' 'Fichier UTF-8 sans BOM contenant des caractères non-ASCII : PowerShell 5.1 le lira en ANSI et le script cassera. Enregistrez-le en UTF-8 avec BOM.'
+    }
+}
+
 function Test-Entete {
     param([string] $Fichier, [string[]] $Lignes)
 
-    $debut = -1; $fin = -1
-    for ($i = 0; $i -lt $Lignes.Count; $i++) {
-        if ($debut -lt 0 -and $Lignes[$i] -match '^\s*##\s*WINTOOL:START\s*$') { $debut = $i; continue }
-        if ($debut -ge 0 -and $Lignes[$i] -match '^\s*##\s*WINTOOL:END\s*$')   { $fin = $i; break }
-    }
-
-    if ($debut -lt 0) {
+    $bloc = Find-Bloc $Lignes '^\s*##\s*WINTOOL:START\s*$'
+    if (-not $bloc) {
         Add-Constat $Fichier 1 'erreur' 'ENTETE_ABSENT' 'Aucun bloc ## WINTOOL:START ... ## WINTOOL:END.'
         return @{}
     }
-    if ($fin -lt 0) {
-        Add-Constat $Fichier ($debut + 1) 'erreur' 'ENTETE_NON_FERME' 'Bloc WINTOOL:START jamais refermé par WINTOOL:END.'
+    if ($bloc.Fin -lt 0) {
+        Add-Constat $Fichier ($bloc.Debut + 1) 'erreur' 'ENTETE_NON_FERME' 'Bloc WINTOOL:START jamais refermé par WINTOOL:END.'
         return @{}
     }
 
     $champs = @{}
-    for ($i = $debut + 1; $i -lt $fin; $i++) {
-        if ($Lignes[$i] -match '^\s*##\s*([A-Za-z_]+)\s*:\s*(.*?)\s*(#.*)?$') {
-            $cle = $Matches[1].ToLower()
-            $val = $Matches[2].Trim()
+    for ($i = $bloc.Debut + 1; $i -lt $bloc.Fin; $i++) {
+        if ($Lignes[$i] -match '^\s*##\s*([A-Za-z_]+)\s*:\s*(.*?)\s*$') {
+            $cle = $Matches[1].ToLower(); $val = $Matches[2].Trim()
             if ($champs.ContainsKey($cle)) {
                 Add-Constat $Fichier ($i + 1) 'avertissement' 'CHAMP_DOUBLON' "Le champ '$cle' est déclaré plusieurs fois ; seule la première valeur compte."
             } else {
@@ -161,7 +185,7 @@ function Test-Entete {
 
     foreach ($requis in $CHAMPS_REQUIS) {
         if (-not $champs.ContainsKey($requis)) {
-            Add-Constat $Fichier ($debut + 1) 'erreur' 'CHAMP_MANQUANT' "Champ obligatoire absent de l'entête : '$requis'."
+            Add-Constat $Fichier ($bloc.Debut + 1) 'erreur' 'CHAMP_MANQUANT' "Champ obligatoire absent de l'entête : '$requis'."
         }
     }
 
@@ -169,15 +193,14 @@ function Test-Entete {
         if ($champs.ContainsKey($cle)) {
             $v = $champs[$cle].Valeur.ToLower()
             if ($VALEURS_ADMISES[$cle] -notcontains $v) {
-                $attendu = $VALEURS_ADMISES[$cle] -join ' | '
-                Add-Constat $Fichier $champs[$cle].Ligne 'erreur' 'VALEUR_INVALIDE' "'$cle' vaut '$v' ; valeurs admises : $attendu."
+                Add-Constat $Fichier $champs[$cle].Ligne 'erreur' 'VALEUR_INVALIDE' "'$cle' vaut '$v' ; valeurs admises : $($VALEURS_ADMISES[$cle] -join ' | ')."
             }
         }
     }
 
     if ($champs.ContainsKey('id')) {
-        $guid = [ref]([guid]::Empty)
-        if (-not [guid]::TryParse($champs['id'].Valeur, $guid)) {
+        $g = [ref]([guid]::Empty)
+        if (-not [guid]::TryParse($champs['id'].Valeur, $g)) {
             Add-Constat $Fichier $champs['id'].Ligne 'erreur' 'ID_INVALIDE' "'id' n'est pas un GUID valide. Générez-en un avec New-Guid."
         }
     }
@@ -191,21 +214,17 @@ function Test-Entete {
 
     if ($champs.ContainsKey('icon') -and $ICONES.Count -gt 0) {
         $ic = $champs['icon'].Valeur.Trim()
-
-        # Les emojis sont proscrits : rendus par la police système, ils changent
-        # d'aspect sur chaque machine, ne peuvent pas hériter de la couleur du texte
-        # et ne s'alignent pas sur la grille. C'était le défaut de la v3.
         if ($ic -match '[\uD800-\uDBFF]|[←-⯿]|[️]') {
             Add-Constat $Fichier $champs['icon'].Ligne 'erreur' 'ICONE_EMOJI' "'icon' contient un emoji. Utilisez un nom d'icône Lucide, par exemple 'moon'."
         }
         elseif ($ICONES -notcontains $ic) {
-            $meilleur = $null; $meilleureDistance = 99
+            $meilleur = $null; $dMin = 99
             foreach ($connu in $ICONES) {
                 if ([Math]::Abs($connu.Length - $ic.Length) -gt 3) { continue }
                 $d = Get-Distance $ic $connu
-                if ($d -lt $meilleureDistance) { $meilleureDistance = $d; $meilleur = $connu }
+                if ($d -lt $dMin) { $dMin = $d; $meilleur = $connu }
             }
-            if ($meilleureDistance -le 3) {
+            if ($dMin -le 3) {
                 Add-Constat $Fichier $champs['icon'].Ligne 'erreur' 'ICONE_INCONNUE' "Icône '$ic' absente de Lucide — vouliez-vous dire '$meilleur' ?"
             } else {
                 Add-Constat $Fichier $champs['icon'].Ligne 'erreur' 'ICONE_INCONNUE' "Icône '$ic' absente de Lucide. Voir la liste dans tools/lucide-icon-names.txt."
@@ -216,13 +235,188 @@ function Test-Entete {
     return $champs
 }
 
-function Test-Traduction {
-    param([string] $Fichier, [string[]] $Lignes, [string[]] $ClesConfig, [string] $LangBase)
+function Read-BlocOptions {
+    <#
+      Lit un bloc de déclarations. Une ligne dont le contenu après ## commence par UN
+      espace déclare une option ; deux espaces ou plus déclarent un choix rattaché à
+      l'option précédente. C'est l'indentation, et elle seule, qui fait la différence.
+      Renvoie @{ Options = <ordonné cle -> @{Type;Libelle;Ligne;Choix=@{}}> ; Erreurs }
+    #>
+    param([string[]] $Lignes, [int] $Debut, [int] $Fin, [bool] $AvecType)
 
-    # L'application est bilingue (§10). On exige donc un bloc de traduction vers une
-    # langue DIFFÉRENTE de celle de l'entête — et non un bloc 'en' en dur : les scripts
-    # officiels sont rédigés en anglais et traduits vers le français, les scripts
-    # personnels feront souvent l'inverse. La règle doit tenir dans les deux sens.
+    $options = [ordered]@{}
+    $derniere = $null
+
+    for ($i = $Debut + 1; $i -lt $Fin; $i++) {
+        $ligne = $Lignes[$i]
+        if ($ligne -notmatch '^\s*##(\s+)(\S+)\s*:\s*(.*?)\s*$') { continue }
+
+        $indent = $Matches[1].Length
+        $nom    = $Matches[2]
+        $reste  = $Matches[3]
+
+        if ($indent -ge 2 -and $derniere) {
+            $options[$derniere].Choix[$nom] = @{ Libelle = $reste; Ligne = $i + 1 }
+            continue
+        }
+
+        $type = ''
+        if ($AvecType) {
+            if ($reste -match '^\[([a-z]+)\]\s*(.*)$') {
+                $type  = $Matches[1]
+                $reste = $Matches[2].Trim()
+            }
+        }
+        $options[$nom] = @{ Type = $type; Libelle = $reste; Ligne = $i + 1; Choix = [ordered]@{} }
+        $derniere = $nom
+    }
+    return $options
+}
+
+function Test-Options {
+    param([string] $Fichier, [string[]] $Lignes)
+
+    $bloc = Find-Bloc $Lignes '^\s*##\s*WINTOOL:OPTIONS\s*$'
+    if (-not $bloc) {
+        Add-Constat $Fichier 1 'erreur' 'OPTIONS_ABSENT' "Aucun bloc '## WINTOOL:OPTIONS'. C'est lui qui donne aux options leur type et leur libellé ; sans lui l'interface afficherait les clés brutes."
+        return [ordered]@{}
+    }
+    if ($bloc.Fin -lt 0) {
+        Add-Constat $Fichier ($bloc.Debut + 1) 'erreur' 'OPTIONS_NON_FERME' 'Bloc WINTOOL:OPTIONS jamais refermé par WINTOOL:END.'
+        return [ordered]@{}
+    }
+
+    $options = Read-BlocOptions $Lignes $bloc.Debut $bloc.Fin $true
+
+    foreach ($nom in $options.Keys) {
+        $o = $options[$nom]
+
+        if (-not $o.Type) {
+            Add-Constat $Fichier $o.Ligne 'erreur' 'TYPE_ABSENT' "L'option '$nom' n'a pas de type. Attendu : # [type] Libellé — Description."
+        }
+        elseif ($TYPES_OPTION -notcontains $o.Type) {
+            Add-Constat $Fichier $o.Ligne 'erreur' 'TYPE_INVALIDE' "Type '[$($o.Type)]' inconnu pour '$nom' ; types admis : $($TYPES_OPTION -join ' | ')."
+        }
+
+        if (-not $o.Libelle) {
+            Add-Constat $Fichier $o.Ligne 'erreur' 'LIBELLE_VIDE' "L'option '$nom' est déclarée sans libellé."
+        }
+
+        if ($TYPES_AVEC_CHOIX -contains $o.Type) {
+            if ($o.Choix.Count -lt 2) {
+                Add-Constat $Fichier $o.Ligne 'erreur' 'CHOIX_MANQUANT' "'$nom' est de type [$($o.Type)] mais déclare $($o.Choix.Count) choix. Il en faut au moins deux, en sous-lignes indentées."
+            }
+            foreach ($c in $o.Choix.Keys) {
+                if (-not $o.Choix[$c].Libelle) {
+                    Add-Constat $Fichier $o.Choix[$c].Ligne 'erreur' 'LIBELLE_VIDE' "Le choix '$c' de '$nom' n'a pas de libellé."
+                }
+            }
+        }
+        elseif ($o.Choix.Count -gt 0) {
+            Add-Constat $Fichier $o.Ligne 'erreur' 'CHOIX_INATTENDU' "'$nom' est de type [$($o.Type)] et ne peut pas avoir de choix. Utilisez [select] ou [multi]."
+        }
+    }
+
+    return $options
+}
+
+function Test-Config {
+    <# Lit $CONFIG : uniquement des clés et des valeurs par défaut (style B). #>
+    param([string] $Fichier, [string[]] $Lignes)
+
+    $debut = -1
+    for ($i = 0; $i -lt $Lignes.Count; $i++) {
+        if ($Lignes[$i] -match '^\s*\$CONFIG\s*=\s*@\{') { $debut = $i; break }
+    }
+    if ($debut -lt 0) {
+        Add-Constat $Fichier 1 'erreur' 'CONFIG_ABSENT' 'Aucun bloc $CONFIG = @{ ... }.'
+        return [ordered]@{}
+    }
+
+    $fin = -1
+    for ($i = $debut + 1; $i -lt $Lignes.Count; $i++) {
+        if ($Lignes[$i] -match '^\s*\}\s*$') { $fin = $i; break }
+    }
+    if ($fin -lt 0) {
+        Add-Constat $Fichier ($debut + 1) 'erreur' 'CONFIG_NON_FERME' 'Bloc $CONFIG jamais refermé.'
+        return [ordered]@{}
+    }
+
+    $config = [ordered]@{}
+    for ($i = $debut + 1; $i -lt $fin; $i++) {
+        $ligne = $Lignes[$i]
+        if ($ligne -match '^\s*$' -or $ligne -match '^\s*#') { continue }
+
+        if ($ligne -notmatch '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*$') {
+            Add-Constat $Fichier ($i + 1) 'avertissement' 'CONFIG_LIGNE_ILLISIBLE' 'Ligne non reconnue comme « Clé = valeur » dans le bloc $CONFIG.'
+            continue
+        }
+        $cle    = $Matches[1]
+        $valeur = ($Matches[2] -split '#')[0].Trim().TrimEnd(',')
+
+        $estTableau = $valeur -match '^@\('
+        $elements   = @()
+        if ($estTableau) {
+            foreach ($m in [regex]::Matches($valeur, '"([^"]*)"|''([^'']*)''')) {
+                if ($m.Groups[1].Success) { $elements += $m.Groups[1].Value } else { $elements += $m.Groups[2].Value }
+            }
+        }
+        $config[$cle] = @{ Valeur = $valeur; EstTableau = $estTableau; Elements = $elements; Ligne = $i + 1 }
+    }
+    return $config
+}
+
+function Test-Coherence {
+    <# Croise le bloc OPTIONS et $CONFIG dans les DEUX sens, et valide les défauts. #>
+    param([string] $Fichier, $Options, $Config)
+
+    foreach ($cle in $Config.Keys) {
+        if (-not $Options.Contains($cle)) {
+            Add-Constat $Fichier $Config[$cle].Ligne 'erreur' 'OPTION_NON_DECLAREE' "'$cle' est dans `$CONFIG mais absente du bloc OPTIONS : l'interface afficherait la clé brute."
+        }
+    }
+    foreach ($nom in $Options.Keys) {
+        if (-not $Config.Contains($nom)) {
+            Add-Constat $Fichier $Options[$nom].Ligne 'erreur' 'OPTION_ORPHELINE' "'$nom' est déclarée dans OPTIONS mais absente de `$CONFIG : elle n'a pas de valeur par défaut."
+            continue
+        }
+
+        $o = $Options[$nom]; $c = $Config[$nom]
+
+        switch ($o.Type) {
+            'bool'   { if ($c.Valeur -notmatch '^\$(true|false)$') { Add-Constat $Fichier $c.Ligne 'avertissement' 'TYPE_INCOHERENT' "'$nom' est [bool] mais vaut '$($c.Valeur)'." } }
+            'number' { if ($c.Valeur -notmatch '^-?\d+(\.\d+)?$')  { Add-Constat $Fichier $c.Ligne 'avertissement' 'TYPE_INCOHERENT' "'$nom' est [number] mais vaut '$($c.Valeur)'." } }
+            'select' {
+                if ($c.EstTableau) {
+                    Add-Constat $Fichier $c.Ligne 'erreur' 'DEFAUT_INVALIDE' "'$nom' est [select] : sa valeur par défaut doit être UN choix, pas un tableau. Utilisez [multi] pour plusieurs."
+                } else {
+                    $v = $c.Valeur.Trim('"', "'")
+                    if ($o.Choix.Count -gt 0 -and -not $o.Choix.Contains($v)) {
+                        Add-Constat $Fichier $c.Ligne 'erreur' 'DEFAUT_INVALIDE' "'$nom' vaut '$v', qui ne fait pas partie des choix déclarés : $($o.Choix.Keys -join ', ')."
+                    }
+                }
+            }
+            'multi' {
+                if (-not $c.EstTableau) {
+                    Add-Constat $Fichier $c.Ligne 'erreur' 'DEFAUT_INVALIDE' "'$nom' est [multi] : sa valeur par défaut doit être un tableau, par exemple @(`"temp`", `"cache`") ou @() pour aucun."
+                } else {
+                    foreach ($e in $c.Elements) {
+                        if ($o.Choix.Count -gt 0 -and -not $o.Choix.Contains($e)) {
+                            Add-Constat $Fichier $c.Ligne 'erreur' 'DEFAUT_INVALIDE' "'$nom' inclut '$e' par défaut, qui ne fait pas partie des choix déclarés : $($o.Choix.Keys -join ', ')."
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+function Test-Traduction {
+    param([string] $Fichier, [string[]] $Lignes, $Options, [string] $LangBase)
+
+    # On exige une traduction vers une langue DIFFÉRENTE de celle de l'entête — et non
+    # un bloc 'en' en dur : les scripts officiels sont rédigés en anglais et traduits
+    # vers le français, un script personnel fera souvent l'inverse.
     if (-not $LangBase) { $LangBase = 'fr' }
 
     $debut = -1; $fin = -1; $langTrouvee = ''
@@ -239,102 +433,62 @@ function Test-Traduction {
         return
     }
     if ($fin -lt 0) {
-        Add-Constat $Fichier ($debut + 1) 'erreur' 'TRADUCTION_NON_FERMEE' 'Bloc WINTOOL:LANG jamais refermé par WINTOOL:END.'
+        Add-Constat $Fichier ($debut + 1) 'erreur' 'TRADUCTION_NON_FERMEE' 'Bloc de traduction jamais refermé par WINTOOL:END.'
         return
     }
 
-    $traduits = @()
-    for ($i = $debut + 1; $i -lt $fin; $i++) {
-        if ($Lignes[$i] -match '^\s*##\s*([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(.+?)\s*$') {
-            $traduits += $Matches[1]
-        }
-    }
+    $traduits = Read-BlocOptions $Lignes $debut $fin $false
 
     foreach ($obligatoire in @('title', 'desc')) {
-        if ($traduits -notcontains $obligatoire) {
+        if (-not $traduits.Contains($obligatoire)) {
             Add-Constat $Fichier ($debut + 1) 'erreur' 'TRADUCTION_INCOMPLETE' "Le bloc '$langTrouvee' ne traduit pas '$obligatoire'."
         }
     }
 
-    foreach ($cle in $ClesConfig) {
-        if ($traduits -notcontains $cle) {
-            Add-Constat $Fichier ($debut + 1) 'avertissement' 'TRADUCTION_OPTION' "L'option '$cle' n'a pas de libellé '$langTrouvee' ; elle s'affichera en '$LangBase' dans cette langue."
-        }
-    }
-}
-
-function Test-Config {
-    param([string] $Fichier, [string[]] $Lignes)
-
-    $debut = -1
-    for ($i = 0; $i -lt $Lignes.Count; $i++) {
-        if ($Lignes[$i] -match '^\s*\$CONFIG\s*=\s*@\{') { $debut = $i; break }
-    }
-    if ($debut -lt 0) {
-        Add-Constat $Fichier 1 'erreur' 'CONFIG_ABSENT' 'Aucun bloc $CONFIG = @{ ... }.'
-        return @()
-    }
-
-    $fin = -1
-    for ($i = $debut + 1; $i -lt $Lignes.Count; $i++) {
-        if ($Lignes[$i] -match '^\s*\}\s*$') { $fin = $i; break }
-    }
-    if ($fin -lt 0) {
-        Add-Constat $Fichier ($debut + 1) 'erreur' 'CONFIG_NON_FERME' 'Bloc $CONFIG jamais refermé.'
-        return @()
-    }
-
-    $cles = @()
-    for ($i = $debut + 1; $i -lt $fin; $i++) {
-        $ligne = $Lignes[$i]
-        if ($ligne -match '^\s*$' -or $ligne -match '^\s*#') { continue }
-
-        if ($ligne -notmatch '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+?)\s*$') {
-            Add-Constat $Fichier ($i + 1) 'avertissement' 'CONFIG_LIGNE_ILLISIBLE' 'Ligne non reconnue comme « Clé = valeur » dans le bloc $CONFIG.'
+    # Sens 1 : chaque option déclarée doit être traduite.
+    foreach ($nom in $Options.Keys) {
+        if (-not $traduits.Contains($nom)) {
+            Add-Constat $Fichier ($debut + 1) 'avertissement' 'TRADUCTION_OPTION' "L'option '$nom' n'a pas de libellé '$langTrouvee' ; elle s'affichera en '$LangBase'."
             continue
         }
-        $cle = $Matches[1]
-        $reste = $Matches[2]
-        $cles += $cle
-
-        if ($reste -notmatch '#\s*\[([a-z]+)\]\s*(.*)$') {
-            Add-Constat $Fichier ($i + 1) 'erreur' 'ANNOTATION_ABSENTE' "L'option '$cle' n'a pas d'annotation « # [type] Libellé — Description » ; l'interface afficherait la clé brute."
-            continue
-        }
-        $type    = $Matches[1]
-        $libelle = $Matches[2].Trim()
-
-        if ($TYPES_CONFIG -notcontains $type) {
-            $attendu = $TYPES_CONFIG -join ' | '
-            Add-Constat $Fichier ($i + 1) 'erreur' 'TYPE_INVALIDE' "Type '[$type]' inconnu pour '$cle' ; types admis : $attendu."
-        }
-        if (-not $libelle) {
-            Add-Constat $Fichier ($i + 1) 'erreur' 'LIBELLE_VIDE' "L'option '$cle' est annotée sans libellé."
-        }
-
-        # Cohérence entre le type déclaré et la valeur par défaut
-        $valeur = ($reste -split '#')[0].Trim().TrimEnd(',')
-        if ($type -eq 'bool'   -and $valeur -notmatch '^\$(true|false)$') {
-            Add-Constat $Fichier ($i + 1) 'avertissement' 'TYPE_INCOHERENT' "'$cle' est déclarée [bool] mais vaut '$valeur'."
-        }
-        if ($type -eq 'number' -and $valeur -notmatch '^-?\d+(\.\d+)?$') {
-            Add-Constat $Fichier ($i + 1) 'avertissement' 'TYPE_INCOHERENT' "'$cle' est déclarée [number] mais vaut '$valeur'."
+        foreach ($c in $Options[$nom].Choix.Keys) {
+            if (-not $traduits[$nom].Choix.Contains($c)) {
+                Add-Constat $Fichier $traduits[$nom].Ligne 'avertissement' 'TRADUCTION_CHOIX' "Le choix '$c' de '$nom' n'a pas de libellé '$langTrouvee'."
+            }
         }
     }
 
-    return $cles
+    # Sens 2 : toute traduction doit correspondre à quelque chose. C'est ce contrôle
+    # qui manquait et par lequel la dérive s'installait — une clé renommée d'un côté
+    # laissait derrière elle une traduction orpheline que rien ne signalait.
+    foreach ($nom in $traduits.Keys) {
+        if ($nom -in @('title', 'desc')) { continue }
+        if (-not $Options.Contains($nom)) {
+            $meilleur = $null; $dMin = 99
+            foreach ($connu in $Options.Keys) {
+                $d = Get-Distance $nom $connu
+                if ($d -lt $dMin) { $dMin = $d; $meilleur = $connu }
+            }
+            if ($dMin -le 3 -and $meilleur) {
+                Add-Constat $Fichier $traduits[$nom].Ligne 'erreur' 'TRADUCTION_ORPHELINE' "Le bloc '$langTrouvee' traduit '$nom', qui n'existe pas dans OPTIONS — vouliez-vous dire '$meilleur' ?"
+            } else {
+                Add-Constat $Fichier $traduits[$nom].Ligne 'erreur' 'TRADUCTION_ORPHELINE' "Le bloc '$langTrouvee' traduit '$nom', qui n'existe dans aucune option déclarée."
+            }
+            continue
+        }
+        foreach ($c in $traduits[$nom].Choix.Keys) {
+            if (-not $Options[$nom].Choix.Contains($c)) {
+                Add-Constat $Fichier $traduits[$nom].Choix[$c].Ligne 'erreur' 'TRADUCTION_ORPHELINE' "Le bloc '$langTrouvee' traduit le choix '$c' de '$nom', qui n'existe pas dans OPTIONS."
+            }
+        }
+    }
 }
 
 function Test-Override {
     param([string] $Fichier, [string[]] $Lignes)
 
-    $trouve = $false
-    for ($i = 0; $i -lt $Lignes.Count; $i++) {
-        if ($Lignes[$i] -match '\$env:WINTOOL_CONFIG') { $trouve = $true; break }
-    }
-    if (-not $trouve) {
-        Add-Constat $Fichier 1 'erreur' 'OVERRIDE_ABSENT' "Ligne d'override absente : sans elle, les réglages choisis dans l'interface sont ignorés et le script tourne toujours avec ses valeurs par défaut."
-    }
+    foreach ($l in $Lignes) { if ($l -match '\$env:WINTOOL_CONFIG') { return } }
+    Add-Constat $Fichier 1 'erreur' 'OVERRIDE_ABSENT' "Ligne d'override absente : sans elle, les réglages choisis dans l'interface sont ignorés et le script tourne toujours avec ses valeurs par défaut."
 }
 
 function Test-Marqueurs {
@@ -356,36 +510,15 @@ function Test-Marqueurs {
                 }
                 continue
             }
-            # Balise inconnue : proche d'un marqueur connu ?
-            $meilleur = $null; $meilleureDistance = 99
+            $meilleur = $null; $dMin = 99
             foreach ($connu in $MARQUEURS) {
                 $d = Get-Distance $balise $connu
-                if ($d -lt $meilleureDistance) { $meilleureDistance = $d; $meilleur = $connu }
+                if ($d -lt $dMin) { $dMin = $d; $meilleur = $connu }
             }
-            if ($meilleureDistance -le 2) {
+            if ($dMin -le 2) {
                 Add-Constat $Fichier ($i + 1) 'erreur' 'MARQUEUR_INCONNU' "Marqueur '[$balise]' inconnu — vouliez-vous dire '[$meilleur]' ?"
             }
         }
-    }
-}
-
-function Test-Encodage {
-    param([string] $Fichier, [string] $CheminComplet)
-
-    # Piège rencontré lors de l'écriture de ce validateur lui-même : PowerShell 5.1
-    # — celui livré nativement avec Windows, donc celui qui exécutera la plupart des
-    # scripts — lit un .ps1 SANS BOM comme de l'ANSI, pas de l'UTF-8. Un fichier
-    # contenant des accents est alors mal décodé, et le script casse à l'analyse ou
-    # affiche du charabia. Le BOM est donc obligatoire dès qu'il y a un accent.
-    $octets = [System.IO.File]::ReadAllBytes($CheminComplet)
-    if ($octets.Length -lt 3) { return }
-
-    $aBom = ($octets[0] -eq 0xEF -and $octets[1] -eq 0xBB -and $octets[2] -eq 0xBF)
-    if ($aBom) { return }
-
-    $texte = [System.Text.Encoding]::UTF8.GetString($octets)
-    if ($texte -match '[^\x00-\x7F]') {
-        Add-Constat $Fichier 1 'erreur' 'BOM_ABSENT' 'Fichier UTF-8 sans BOM contenant des caractères non-ASCII : PowerShell 5.1 le lira en ANSI et le script cassera. Enregistrez-le en UTF-8 avec BOM.'
     }
 }
 
@@ -393,7 +526,8 @@ function Test-SortieAnglaise {
     param([string] $Fichier, [string[]] $Lignes)
 
     # Indice grossier et volontairement conservateur : caractères accentués dans une
-    # chaîne affichée. La sortie brute des scripts est en anglais (§10).
+    # chaîne affichée. La sortie brute des scripts est en anglais (§10), les
+    # commentaires peuvent rester en français.
     for ($i = 0; $i -lt $Lignes.Count; $i++) {
         $ligne = $Lignes[$i]
         if ($ligne -match '^\s*#') { continue }
@@ -425,14 +559,17 @@ foreach ($f in $fichiers) {
     $relatif = $f.FullName.Substring($racine.Length).TrimStart('\', '/')
     $lignes  = @(Get-Content -LiteralPath $f.FullName -Encoding UTF8)
 
-    Test-Encodage               $relatif $f.FullName
-    $champs = Test-Entete       $relatif $lignes
-    $cles   = Test-Config       $relatif $lignes
+    Test-Encodage $relatif $f.FullName
+    $champs  = Test-Entete  $relatif $lignes
+    $options = Test-Options $relatif $lignes
+    $config  = Test-Config  $relatif $lignes
+    Test-Coherence $relatif $options $config
+
     if ($champs.ContainsKey('lang')) { $langBase = $champs['lang'].Valeur } else { $langBase = 'fr' }
-    Test-Traduction             $relatif $lignes $cles $langBase
-    Test-Override               $relatif $lignes
-    Test-Marqueurs              $relatif $lignes
-    Test-SortieAnglaise         $relatif $lignes
+    Test-Traduction     $relatif $lignes $options $langBase
+    Test-Override       $relatif $lignes
+    Test-Marqueurs      $relatif $lignes
+    Test-SortieAnglaise $relatif $lignes
 
     if ($champs.ContainsKey('id')) {
         $id = $champs['id'].Valeur.ToLower()

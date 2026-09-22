@@ -211,13 +211,30 @@ range lui-même** (glisser-déposer, changement manuel en mode Expert), ce class
 une configuration figée : ni un redémarrage ni une Ré-analyse ne le modifient plus, quoi
 que dise `category` par la suite.
 
-### 5.2 Configuration
+### 5.2 Options et configuration
+
+**Principe : tout ce qui s'adresse à un humain vit dans les blocs `##` ; `$CONFIG` ne
+contient que des clés et des valeurs par défaut.** Les deux langues se déclarent donc
+exactement de la même façon, en bloc — c'est cette symétrie qui rend la dérive détectable.
 
 ```powershell
+## WINTOOL:OPTIONS
+## DnsProvider  : [select] DNS provider — the service that resolves website addresses
+##   cloudflare : Cloudflare — 1.1.1.1, fastest on most connections
+##   google     : Google — 8.8.8.8, very reliable
+##   quad9      : Quad9 — 9.9.9.9, blocks known malicious domains
+## CleanTargets : [multi]  What to clean — pick one or more
+##   temp       : Temporary files
+##   cache      : Browser caches
+## ApplyToIPv6  : [bool]   Apply to IPv6 — equivalent resolvers
+## FlushCache   : [hidden] Flush the resolver cache afterwards
+## WINTOOL:END
+
 $CONFIG = @{
-    VeilleBranche_Min     = 0      # [number] Veille sur secteur — 0 = jamais
-    DesactiverHibernation = $true  # [bool]   Supprimer l'hibernation — efface hiberfil.sys
-    VerrouillerRegistre   = $true  # [hidden] Verrouiller via le registre
+    DnsProvider  = "cloudflare"
+    CleanTargets = @("temp", "cache")
+    ApplyToIPv6  = $true
+    FlushCache   = $true
 }
 
 # --- WinTool override (ne pas supprimer) ---
@@ -227,7 +244,20 @@ if ($env:WINTOOL_CONFIG) {
 }
 ```
 
-Types : `bool` · `number` · `string` · `hidden` (visible en Expert seulement).
+Types : `bool` · `number` · `string` · `select` · `multi` · `hidden` (Expert seulement).
+
+**Listes** : `select` et `multi` déclarent leurs choix en **sous-lignes indentées d'au
+moins deux espaces**. C'est l'indentation, et elle seule, qui distingue un choix d'une
+option. Chaque choix porte un libellé et une description, traduits de la même façon dans
+le bloc `LANG`. La valeur par défaut d'un `select` est **un** des choix ; celle d'un
+`multi` est un **tableau** de choix — `@()` est accepté pour aucune sélection initiale.
+Un tableau JSON injecté par l'override redevient bien un tableau PowerShell.
+
+**Le nom d'une clé apparaît dans trois endroits** — `OPTIONS`, `LANG` et `$CONFIG`. C'est
+le prix de cette structure, et il est couvert : le validateur croise les trois **dans les
+deux sens**. Une option sans valeur par défaut, une valeur sans option déclarée, une
+traduction qui ne correspond à rien — chacune est une erreur, signalée avec son numéro de
+ligne. La v3 ne vérifiait rien de tout cela.
 
 **Pourquoi la ligne d'override est décisive.** La v3 reconstruisait le bloc `$CONFIG` par
 expression régulière, écrivait un `.ps1` temporaire et l'exécutait — mécanisme fragile et

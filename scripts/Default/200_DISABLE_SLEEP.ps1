@@ -16,6 +16,17 @@
 ## engine        : auto
 ## WINTOOL:END
 
+## WINTOOL:OPTIONS
+## SleepOnAC_Min          : [number] Sleep on AC power — 0 = never
+## SleepOnBattery_Min     : [number] Sleep on battery — 0 = never
+## HibernateAfter_Min     : [number] Hibernate after — 0 = never
+## ScreenOffOnAC_Min      : [number] Turn off screen on AC power — 0 = never
+## ScreenOffOnBattery_Min : [number] Turn off screen on battery — 0 = never
+## RemoveHibernation      : [bool]   Remove hibernation — deletes hiberfil.sys, frees several GB
+## LockInRegistry         : [hidden] Lock settings in the registry — survives Windows updates
+## PrintSummary           : [hidden] Print a summary when finished
+## WINTOOL:END
+
 ## WINTOOL:LANG fr
 ## title                  : Désactiver la veille
 ## desc                   : Empêche Windows de se mettre en veille ou en hibernation
@@ -30,14 +41,14 @@
 ## WINTOOL:END
 
 $CONFIG = @{
-    SleepOnAC_Min          = 0      # [number] Sleep on AC power — 0 = never
-    SleepOnBattery_Min     = 0      # [number] Sleep on battery — 0 = never
-    HibernateAfter_Min     = 0      # [number] Hibernate after — 0 = never
-    ScreenOffOnAC_Min      = 0      # [number] Turn off screen on AC power — 0 = never
-    ScreenOffOnBattery_Min = 0      # [number] Turn off screen on battery — 0 = never
-    RemoveHibernation      = $true  # [bool]   Remove hibernation — deletes hiberfil.sys, frees several GB
-    LockInRegistry         = $true  # [hidden] Lock settings in the registry — survives Windows updates
-    PrintSummary           = $true  # [hidden] Print a summary when finished
+    SleepOnAC_Min          = 0
+    SleepOnBattery_Min     = 0
+    HibernateAfter_Min     = 0
+    ScreenOffOnAC_Min      = 0
+    ScreenOffOnBattery_Min = 0
+    RemoveHibernation      = $true
+    LockInRegistry         = $true
+    PrintSummary           = $true
 }
 
 # --- WinTool override (ne pas supprimer) ---

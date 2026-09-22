@@ -13,12 +13,33 @@ Référence normative : `docs/SPECIFICATION.md` §5.
 
 1. Copiez le squelette ci-dessous dans un fichier `.ps1`.
 2. Générez un identifiant : `New-Guid`, collez-le dans `id`.
-3. **Enregistrez en UTF-8 *avec BOM*** (voir la section Encodage — c'est le piège n°1).
+3. **Enregistrez en UTF-8 *avec BOM*** (voir Encodage — c'est le piège n°1).
 4. Déposez-le dans `%LOCALAPPDATA%\WinTool\scripts\` (sous-dossiers libres).
 5. Vérifiez : `.\tools\lint-scripts.ps1`
 
 Un script non conforme **s'exécute quand même** : WinTool signale, il ne bloque pas
 (§5.4). La seule exception est l'approbation de sécurité (§12.1), qui, elle, bloque.
+
+---
+
+## Le principe : trois blocs, un rôle chacun
+
+```
+## WINTOOL:START     ce qu'est le script          ─┐
+## WINTOOL:OPTIONS   ses réglages, typés et nommés ├─ pour les humains et l'interface
+## WINTOOL:LANG fr   les mêmes, traduits          ─┘
+
+$CONFIG = @{ ... }   les valeurs par défaut        ─── du PowerShell pur
+```
+
+**Tout ce qui s'adresse à un humain vit dans les blocs `##`.** `$CONFIG` ne contient que
+des clés et des valeurs : pas d'annotation, pas de libellé, pas de traduction. Les deux
+langues se déclarent donc **exactement de la même façon**, en bloc — c'est cette symétrie
+qui rend la dérive détectable.
+
+Le nom d'une clé apparaît dans trois endroits. Le validateur **croise les trois dans les
+deux sens** : une option sans valeur par défaut, une valeur sans option déclarée, une
+traduction qui ne correspond à rien — tout est signalé, avec le numéro de ligne.
 
 ---
 
@@ -36,9 +57,6 @@ Format : `NNN_NOM_EN_ANGLAIS.ps1` — trois chiffres, tiret bas, nom en majuscul
 501_CHECK_DISK_HEALTH.ps1
 ```
 
-Le nombre situe le script dans une plage thématique, ce qui garde le dossier lisible quand
-la bibliothèque grandit :
-
 | Plage | Domaine |
 |---|---|
 | `1xx` | Nettoyage |
@@ -50,11 +68,9 @@ la bibliothèque grandit :
 | `7xx` – `8xx` | Réservé |
 | `9xx` | Diagnostics internes |
 
-**Le numéro ne détermine rien d'autre que le tri du dossier.** Il ne fixe ni l'ordre
-d'exécution — c'est le classement manuel du mode Expert qui décide — ni l'identité du
-script, qui vient de son `id`. Ne renumérotez donc jamais un fichier pour réorganiser un
-affichage : cela ne changerait rien dans l'application et casserait les références du
-dépôt.
+**Le numéro ne détermine rien d'autre que le tri du dossier.** Ni l'ordre d'exécution —
+c'est le classement manuel du mode Expert qui décide — ni l'identité du script, qui vient
+de son `id`. Ne renumérotez donc jamais un fichier pour réorganiser un affichage.
 
 Tous les scripts officiels vivent à plat dans `Default\`, sans sous-dossiers.
 
@@ -66,14 +82,14 @@ Tous les scripts officiels vivent à plat dans `Default\`, sans sous-dossiers.
 ## WINTOOL:START
 ## id            : 3f2b1a9c-7e4d-4c6a-9b0e-1d5f6a8c2e0b
 ## lang          : en
-## title         : Disable sleep
-## desc          : Prevents Windows from sleeping or hibernating
+## title         : Set fast DNS
+## desc          : Speeds up browsing with a faster resolver
 ## category      : performance
-## icon          : moon
-## tags          : sleep, hibernation, power
+## icon          : zap
+## tags          : dns, network, latency
 ## version       : 2.0
 ## admin         : true
-## risk          : low
+## risk          : medium
 ## duration      : fast
 ## reversible    : true
 ## interruptible : true
@@ -81,14 +97,30 @@ Tous les scripts officiels vivent à plat dans `Default\`, sans sous-dossiers.
 ## engine        : auto
 ## WINTOOL:END
 
+## WINTOOL:OPTIONS
+## DnsProvider  : [select] DNS provider — the service that resolves website addresses
+##   cloudflare : Cloudflare — 1.1.1.1, fastest on most connections
+##   google     : Google — 8.8.8.8, very reliable
+##   quad9      : Quad9 — 9.9.9.9, blocks known malicious domains
+## ApplyToIPv6  : [bool]   Apply to IPv6 — equivalent resolvers
+## FlushCache   : [hidden] Flush the resolver cache afterwards
+## WINTOOL:END
+
 ## WINTOOL:LANG fr
-## title         : Désactiver la veille
-## desc          : Empêche Windows de se mettre en veille ou en hibernation
-## SleepOnAC_Min : Veille sur secteur — 0 = jamais
+## title        : Utiliser un Internet plus rapide
+## desc         : Accélère la navigation avec un résolveur plus rapide
+## DnsProvider  : Fournisseur DNS — le service qui traduit les adresses des sites
+##   cloudflare : Cloudflare — 1.1.1.1, le plus rapide sur la plupart des connexions
+##   google     : Google — 8.8.8.8, très fiable
+##   quad9      : Quad9 — 9.9.9.9, bloque les domaines malveillants connus
+## ApplyToIPv6  : Appliquer à l'IPv6 — résolveurs équivalents
+## FlushCache   : Vider le cache de résolution ensuite
 ## WINTOOL:END
 
 $CONFIG = @{
-    SleepOnAC_Min = 0   # [number] Sleep on AC power — 0 = never
+    DnsProvider = "cloudflare"
+    ApplyToIPv6 = $true
+    FlushCache  = $true
 }
 
 # --- WinTool override (ne pas supprimer) ---
@@ -99,10 +131,9 @@ if ($env:WINTOOL_CONFIG) {
 
 # ==============================================================================
 
-Write-Host "[STEP] 1/1 Applying power settings"
-powercfg /change standby-timeout-ac $CONFIG.SleepOnAC_Min
-Write-Host "[OK]   Sleep on AC power: $($CONFIG.SleepOnAC_Min) min"
-Write-Host "[DONE] Sleep disabled"
+Write-Host "[STEP] 1/1 Applying DNS settings"
+Write-Host "[OK]   Provider set to $($CONFIG.DnsProvider)"
+Write-Host "[DONE] Done"
 exit 0
 ```
 
@@ -111,15 +142,11 @@ exit 0
 ## La langue : code en anglais, commentaires libres
 
 **Tout ce que lit une machine ou un contributeur est en anglais** : noms de fichiers,
-entête de base, clés de `$CONFIG`, libellés d'annotation, noms de variables et de
-fonctions, et la sortie d'exécution.
+entête de base, clés, libellés d'options, noms de variables et de fonctions, et la sortie
+d'exécution.
 
 **Les commentaires peuvent rester en français.** Ils s'adressent à celui qui maintient le
 script, pas à l'application.
-
-Le français arrive par le bloc de traduction `## WINTOOL:LANG fr`, qui fournit à
-l'interface les libellés affichés à l'utilisateur. C'est le seul endroit où il apparaît
-dans un script officiel.
 
 ---
 
@@ -130,11 +157,11 @@ Tous ces champs sont **obligatoires**. `tags` est le seul facultatif.
 | Champ | Valeurs | Rôle |
 |---|---|---|
 | `id` | GUID (`New-Guid`) | **Identifie le script pour toujours.** Un chemin change au moindre renommage ; l'`id` survit, et avec lui la configuration, le classement et l'historique. |
-| `lang` | `fr`, `en`… | Langue dans laquelle cet entête est rédigé |
+| `lang` | `en`, `fr`… | Langue dans laquelle cet entête est rédigé |
 | `title` | texte court | Nom affiché |
 | `desc` | une phrase | Description affichée |
 | `category` | voir ci-dessous | **Suggestion de rangement, pas un ordre** |
-| `icon` | nom d'icône | Choisie dans le jeu de l'application |
+| `icon` | nom Lucide | Voir la section Icônes |
 | `tags` | liste, virgules | Facultatif, alimente la recherche |
 | `version` | `2.0` | Version du script lui-même |
 | `admin` | `true` / `false` | Nécessite les droits administrateur |
@@ -150,7 +177,7 @@ Tous ces champs sont **obligatoires**. `tags` est le seul facultatif.
 À la découverte du fichier, si la catégorie existe, le script y est rangé ; sinon il part
 en **« Non classé »**. Tant que personne ne l'a déplacé à la main, une ré-analyse le
 replacera en suivant `category`. **Dès que l'utilisateur le range lui-même, c'est terminé** :
-son classement devient figé et plus rien ne l'écrase. Le script propose, l'humain dispose.
+son classement devient figé. Le script propose, l'humain dispose.
 
 La même règle vaut pour `reversible` et `reboot` : ils **pré-cochent** une case que
 l'utilisateur peut décocher, et son choix l'emporte ensuite définitivement.
@@ -159,18 +186,15 @@ l'utilisateur peut décocher, et son choix l'emporte ensuite définitivement.
 
 **Aucun emoji, jamais.** Un emoji est rendu par la police du système : il change d'aspect
 d'une machine à l'autre, ne peut pas hériter de la couleur du texte, et ne s'aligne pas sur
-la grille. C'était le défaut de la v3, et le validateur le refuse désormais.
+la grille. Le validateur le refuse.
 
 `icon` prend un **nom d'icône [Lucide](https://lucide.dev)**, en minuscules avec tirets.
-Les 2 112 icônes sont embarquées dans l'application, donc disponibles hors ligne. Le
-validateur vérifie le nom contre `tools/lucide-icon-names.txt` et suggère la bonne
-orthographe en cas de faute : `mon` → *vouliez-vous dire `moon` ?*
+Les 2 112 icônes sont embarquées, donc disponibles hors ligne. Le validateur vérifie le nom
+et suggère la bonne orthographe : `mon` → *vouliez-vous dire `moon` ?*
 
-Ces icônes sont dessinées en `stroke="currentColor"` : **elles héritent de la couleur du
-texte** au lieu d'en porter une. Une même icône devient donc automatiquement sombre sur
-l'aplat accent, claire en thème sombre et neutre au repos, sans aucun réglage.
-
-Sélection courante par domaine — tous ces noms sont vérifiés :
+Ces icônes sont en `stroke="currentColor"` : **elles héritent de la couleur du texte**.
+Une même icône devient donc sombre sur l'aplat accent, claire en thème sombre et neutre au
+repos, sans aucun réglage.
 
 | Domaine | Icônes |
 |---|---|
@@ -182,9 +206,8 @@ Sélection courante par domaine — tous ces noms sont vérifiés :
 | Outillage | `wrench` · `settings` · `calendar-clock` · `download` · `hammer` |
 | Divers | `moon` · `sun` · `wifi` · `network` · `globe` · `folder` · `file-text` · `database` · `monitor` · `power` · `refresh-cw` · `bell-off` |
 
-Rien n'oblige à s'y tenir : n'importe lequel des 2 112 noms fonctionne. Cette table sert
-à choisir vite et à rester cohérent. En revanche **un script ne peut pas fournir sa propre
-image** — c'est ce qui garantit l'uniformité du jeu d'icônes.
+N'importe lequel des 2 112 noms fonctionne ; cette table sert à choisir vite. En revanche
+**un script ne peut pas fournir sa propre image** — c'est ce qui garantit l'uniformité.
 
 ### Le cas de `engine`
 
@@ -196,53 +219,95 @@ disponible. Ne forcez `pwsh` que si vous utilisez vraiment de la syntaxe PowerSh
 
 ---
 
-## Le bloc de traduction
+## Le bloc `OPTIONS`
 
-L'application est bilingue (§10). Un second bloc traduit l'entête **et les libellés des
-options**, vers une langue **différente** de celle déclarée par `lang` :
+Une ligne par réglage : `## Clé : [type] Libellé — Description`.
 
 ```powershell
-## WINTOOL:LANG fr
-## title         : Désactiver la veille
-## desc          : Empêche Windows de se mettre en veille ou en hibernation
-## SleepOnAC_Min : Veille sur secteur — 0 = jamais
+## WINTOOL:OPTIONS
+## TimeoutSeconds : [number] Operation timeout — in seconds
+## CreateBackup   : [bool]   Create a backup first — recommended
 ## WINTOOL:END
-```
-
-`title` et `desc` sont obligatoires. Chaque clé de `$CONFIG` devrait y figurer, sinon son
-libellé restera dans la langue de base. Une traduction absente retombe toujours sur cette
-langue de base — rien ne casse.
-
-Les scripts officiels sont donc rédigés en anglais et traduits vers le français. Un script
-personnel écrit en français fera l'inverse : le validateur accepte les deux sens, il exige
-seulement qu'une seconde langue existe.
-
----
-
-## Le bloc `$CONFIG`
-
-Chaque ligne s'annote `# [type] Libellé — Description`. **Sans annotation, l'interface
-affiche la clé brute** : l'utilisateur lirait `VeilleBranche_Min` au lieu de
-« Veille sur secteur ».
-
-```powershell
-$CONFIG = @{
-    SleepOnAC_Min     = 0      # [number] Sleep on AC power — 0 = never
-    RemoveHibernation = $true  # [bool]   Remove hibernation — deletes hiberfil.sys
-    DnsProvider       = "CF"   # [string] DNS provider — Cloudflare, Google, Quad9
-    LockInRegistry    = $true  # [hidden] Lock settings in the registry
-}
 ```
 
 | Type | Contrôle affiché |
 |---|---|
 | `bool` | interrupteur |
 | `number` | champ numérique |
-| `string` | champ texte |
+| `string` | champ texte libre |
+| `select` | **liste déroulante, un seul choix** |
+| `multi` | **cases à cocher, plusieurs choix** |
 | `hidden` | **visible en mode Expert seulement** |
 
 Le séparateur entre libellé et description est un tiret cadratin `—`. La description est
 facultative ; le libellé ne l'est pas.
+
+### Listes et multi-listes
+
+`select` et `multi` déclarent leurs choix en **sous-lignes indentées d'au moins deux
+espaces**. C'est l'indentation, et elle seule, qui distingue un choix d'une option.
+
+```powershell
+## WINTOOL:OPTIONS
+## DnsProvider  : [select] DNS provider — the service that resolves website addresses
+##   cloudflare : Cloudflare — 1.1.1.1, fastest on most connections
+##   google     : Google — 8.8.8.8, very reliable
+##   quad9      : Quad9 — 9.9.9.9, blocks known malicious domains
+## CleanTargets : [multi]  What to clean — pick one or more
+##   temp       : Temporary files
+##   cache      : Browser caches
+##   logs       : Old log files
+## WINTOOL:END
+```
+
+Chaque choix reçoit un libellé et une description, traduits dans le bloc `LANG` de la même
+façon. Et dans `$CONFIG` :
+
+```powershell
+$CONFIG = @{
+    DnsProvider  = "cloudflare"          # select : UN des choix déclarés
+    CleanTargets = @("temp", "cache")    # multi  : un TABLEAU de choix déclarés
+}
+```
+
+Le validateur vérifie que chaque valeur par défaut fait bien partie des choix, qu'un
+`select` n'est pas un tableau, qu'un `multi` en est un, et qu'une liste déclare au moins
+deux choix. `@()` est accepté pour un `multi` sans sélection initiale.
+
+Côté script, un `multi` se parcourt comme n'importe quel tableau :
+
+```powershell
+foreach ($target in $CONFIG.CleanTargets) {
+    Write-Host "[OK]   Cleaned: $target"
+}
+```
+
+---
+
+## Le bloc de traduction
+
+L'application est bilingue (§10). Le bloc traduit l'entête, les options **et les choix**,
+vers une langue **différente** de celle déclarée par `lang` :
+
+```powershell
+## WINTOOL:LANG fr
+## title        : Utiliser un Internet plus rapide
+## desc         : Accélère la navigation avec un résolveur plus rapide
+## DnsProvider  : Fournisseur DNS — le service qui traduit les adresses des sites
+##   cloudflare : Cloudflare — 1.1.1.1, le plus rapide
+## WINTOOL:END
+```
+
+`title` et `desc` sont obligatoires. Une traduction absente retombe sur la langue de base —
+rien ne casse, le validateur émet un avertissement.
+
+**En revanche, une traduction qui ne correspond à aucune option ou à aucun choix est une
+erreur.** C'est le contrôle qui manquait à la v3 : renommez une clé et laissez sa
+traduction derrière vous, et plus rien ne le signalait.
+
+Les scripts officiels sont rédigés en anglais et traduits vers le français. Un script
+personnel écrit en français fera l'inverse : le validateur accepte les deux sens, il exige
+seulement qu'une seconde langue existe.
 
 ---
 
@@ -264,8 +329,8 @@ d'expression régulière, écrivait un `.ps1` temporaire et exécutait *celui-l�
 et déjà cassé au moment de la refonte. Désormais WinTool écrit un fichier JSON, pose la
 variable `WINTOOL_CONFIG`, et exécute **votre fichier, tel quel**.
 
-Bénéfice secondaire : sans cette variable d'environnement, votre script reste parfaitement
-exécutable seul, en double-clic, avec ses valeurs par défaut.
+Bénéfice secondaire : sans cette variable, votre script reste parfaitement exécutable seul,
+en double-clic, avec ses valeurs par défaut.
 
 ---
 
@@ -326,12 +391,12 @@ Dans VS Code : *Sélectionner l'encodage → Enregistrer avec l'encodage → UTF
 ## Valider
 
 ```powershell
-.\tools\lint-scripts.ps1                              # tout le dossier scripts/
+.\tools\lint-scripts.ps1                                   # tout le dossier scripts/
 .\tools\lint-scripts.ps1 -Path .\scripts\Default -Strict   # exigence CI
 ```
 
 `-Strict` traite les avertissements comme des erreurs. Les scripts livrés dans `Default\`
-doivent passer en `-Strict` : ceux-là, on les maîtrise.
+doivent passer en `-Strict`.
 
 ### Les contrôles, un par un
 
@@ -351,17 +416,26 @@ validateur sans l'ajouter ici est un défaut.**
 | `CATEGORIE_INCONNUE` | avertissement | Catégorie hors catégories d'usine → « Non classé » |
 | `ICONE_EMOJI` | erreur | `icon` contient un emoji |
 | `ICONE_INCONNUE` | erreur | Nom d'icône absent de Lucide — suggestion si proche |
-| `TRADUCTION_ABSENTE` | erreur | Aucun bloc `WINTOOL:LANG` vers une langue autre que `lang` |
-| `TRADUCTION_NON_FERMEE` | erreur | Bloc de traduction non refermé |
-| `TRADUCTION_INCOMPLETE` | erreur | `title` ou `desc` non traduit |
-| `TRADUCTION_OPTION` | avertissement | Une clé de `$CONFIG` sans libellé traduit |
+| `OPTIONS_ABSENT` | erreur | Pas de bloc `WINTOOL:OPTIONS` |
+| `OPTIONS_NON_FERME` | erreur | Bloc `OPTIONS` non refermé |
+| `TYPE_ABSENT` | erreur | Option déclarée sans `[type]` |
+| `TYPE_INVALIDE` | erreur | Type inconnu |
+| `LIBELLE_VIDE` | erreur | Option ou choix sans libellé |
+| `CHOIX_MANQUANT` | erreur | `select` ou `multi` avec moins de deux choix |
+| `CHOIX_INATTENDU` | erreur | Choix déclarés sur un type qui n'en accepte pas |
 | `CONFIG_ABSENT` | erreur | Pas de bloc `$CONFIG = @{ }` |
 | `CONFIG_NON_FERME` | erreur | Bloc `$CONFIG` non refermé |
 | `CONFIG_LIGNE_ILLISIBLE` | avertissement | Ligne non reconnue comme « Clé = valeur » |
-| `ANNOTATION_ABSENTE` | erreur | Option sans `# [type] Libellé` |
-| `TYPE_INVALIDE` | erreur | Type d'annotation inconnu |
+| `OPTION_NON_DECLAREE` | erreur | Clé dans `$CONFIG` absente du bloc `OPTIONS` |
+| `OPTION_ORPHELINE` | erreur | Option déclarée sans valeur par défaut dans `$CONFIG` |
 | `TYPE_INCOHERENT` | avertissement | `[bool]` sur une valeur non booléenne, `[number]` sur du texte |
-| `LIBELLE_VIDE` | erreur | Annotation sans libellé |
+| `DEFAUT_INVALIDE` | erreur | Défaut hors des choix, `select` en tableau, `multi` qui n'en est pas un |
+| `TRADUCTION_ABSENTE` | erreur | Aucun bloc `WINTOOL:LANG` vers une langue autre que `lang` |
+| `TRADUCTION_NON_FERMEE` | erreur | Bloc de traduction non refermé |
+| `TRADUCTION_INCOMPLETE` | erreur | `title` ou `desc` non traduit |
+| `TRADUCTION_OPTION` | avertissement | Une option sans libellé traduit |
+| `TRADUCTION_CHOIX` | avertissement | Un choix sans libellé traduit |
+| `TRADUCTION_ORPHELINE` | erreur | Traduction d'une option ou d'un choix qui n'existe pas |
 | `OVERRIDE_ABSENT` | erreur | Ligne d'override manquante |
 | `MARQUEUR_INCONNU` | erreur | Balise proche d'un marqueur connu — `[REBBOT]` → `[REBOOT]` |
 | `MARQUEUR_CASSE` | avertissement | Marqueur pas en majuscules |
