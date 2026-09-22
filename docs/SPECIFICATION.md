@@ -607,3 +607,27 @@ collision avec le vert « réussi ».
 **Seuil de contraste** : 4,5 pour tout texte. Vérifié par mesure, pas à l'œil. Deux
 valeurs ont dû être corrigées à ce titre — `#7C8FA0` en sous-libellé (3,3 sur blanc)
 remplacé par `#54697A` (5,2).
+
+### 15.5 Icônes — Lucide, embarqué, sans exception
+
+**Aucun emoji dans l'interface, nulle part.** Un emoji est rendu par la police du système :
+son aspect change d'une machine à l'autre, il ne peut pas hériter de la couleur du texte et
+ne s'aligne pas sur la grille. La v3 en utilisait (🧹 ⚡ 🛡️ 😴) ; c'est proscrit.
+
+| Décision | Détail |
+|---|---|
+| Bibliothèque | **Lucide** — 2 112 icônes, 999 Ko de SVG, licence ISC |
+| Pourquoi celle-là | C'est exactement l'idiome des maquettes. Les 22 icônes dessinées à la main pendant la phase 0 existent toutes chez Lucide, aux mêmes métriques — l'adopter ne change pas l'apparence validée, elle remplace des approximations par les tracés officiels. |
+| Distribution | **Intégralement embarquée**, chargée à la demande. Aucune récupération réseau : WinTool sert précisément quand la machine va mal, parfois sans connexion, et c'est une application élevée en administrateur. |
+| Icônes personnalisées | **Interdites.** Avec 2 112 icônes le besoin est nul, et un SVG arbitraire affiché par une application administrateur est une surface d'attaque. C'est ce qui garantit l'uniformité. |
+| Sélecteur (Expert) | Une cinquantaine d'icônes curées mises en avant, recherche pour atteindre les 2 112 |
+
+**La propriété qui rend cette famille indispensable à Marée** : les tracés sont en
+`stroke="currentColor"`, donc l'icône **hérite de la couleur du texte** au lieu d'en porter
+une. La même icône devient automatiquement sombre sur l'aplat accent, claire en thème
+sombre, neutre au repos et accent quand la bouée est choisie — sans une ligne de code par
+icône, et sans jeu d'icônes en double pour le thème sombre.
+
+**Outillage** : `tools/lucide-icon-names.txt` versionne la liste des noms valides pour que
+le validateur fonctionne hors ligne et en intégration continue. Les SVG eux-mêmes arrivent
+par npm (`lucide-static`) côté frontend — ils ne sont pas versionnés dans le dépôt.

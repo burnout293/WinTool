@@ -67,6 +67,15 @@ $CATEGORIES_USINE = @(
     'menage', 'performance', 'vieprivee', 'applications', 'sante', 'outillage'
 )
 
+# Noms d'icônes Lucide valides. La liste est versionnée à côté de ce script pour que
+# la vérification fonctionne hors ligne — WinTool sert justement quand la machine va
+# mal, et le validateur tourne en CI. Les SVG eux-mêmes arrivent par npm côté frontend.
+$FICHIER_ICONES = Join-Path $PSScriptRoot 'lucide-icon-names.txt'
+$ICONES = @()
+if (Test-Path $FICHIER_ICONES) {
+    $ICONES = @(Get-Content $FICHIER_ICONES -Encoding UTF8 | Where-Object { $_ -and $_ -notmatch '^\s*#' })
+}
+
 # ==============================================================================
 # Outils
 # ==============================================================================
@@ -177,6 +186,30 @@ function Test-Entete {
         $cat = $champs['category'].Valeur.ToLower()
         if ($CATEGORIES_USINE -notcontains $cat) {
             Add-Constat $Fichier $champs['category'].Ligne 'avertissement' 'CATEGORIE_INCONNUE' "Catégorie '$cat' hors des catégories d'usine ; le script arrivera dans « Non classé »."
+        }
+    }
+
+    if ($champs.ContainsKey('icon') -and $ICONES.Count -gt 0) {
+        $ic = $champs['icon'].Valeur.Trim()
+
+        # Les emojis sont proscrits : rendus par la police système, ils changent
+        # d'aspect sur chaque machine, ne peuvent pas hériter de la couleur du texte
+        # et ne s'alignent pas sur la grille. C'était le défaut de la v3.
+        if ($ic -match '[\uD800-\uDBFF]|[←-⯿]|[️]') {
+            Add-Constat $Fichier $champs['icon'].Ligne 'erreur' 'ICONE_EMOJI' "'icon' contient un emoji. Utilisez un nom d'icône Lucide, par exemple 'moon'."
+        }
+        elseif ($ICONES -notcontains $ic) {
+            $meilleur = $null; $meilleureDistance = 99
+            foreach ($connu in $ICONES) {
+                if ([Math]::Abs($connu.Length - $ic.Length) -gt 3) { continue }
+                $d = Get-Distance $ic $connu
+                if ($d -lt $meilleureDistance) { $meilleureDistance = $d; $meilleur = $connu }
+            }
+            if ($meilleureDistance -le 3) {
+                Add-Constat $Fichier $champs['icon'].Ligne 'erreur' 'ICONE_INCONNUE' "Icône '$ic' absente de Lucide — vouliez-vous dire '$meilleur' ?"
+            } else {
+                Add-Constat $Fichier $champs['icon'].Ligne 'erreur' 'ICONE_INCONNUE' "Icône '$ic' absente de Lucide. Voir la liste dans tools/lucide-icon-names.txt."
+            }
         }
     }
 

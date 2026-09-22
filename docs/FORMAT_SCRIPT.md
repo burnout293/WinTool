@@ -155,6 +155,37 @@ son classement devient figé et plus rien ne l'écrase. Le script propose, l'hum
 La même règle vaut pour `reversible` et `reboot` : ils **pré-cochent** une case que
 l'utilisateur peut décocher, et son choix l'emporte ensuite définitivement.
 
+### Le cas de `icon`
+
+**Aucun emoji, jamais.** Un emoji est rendu par la police du système : il change d'aspect
+d'une machine à l'autre, ne peut pas hériter de la couleur du texte, et ne s'aligne pas sur
+la grille. C'était le défaut de la v3, et le validateur le refuse désormais.
+
+`icon` prend un **nom d'icône [Lucide](https://lucide.dev)**, en minuscules avec tirets.
+Les 2 112 icônes sont embarquées dans l'application, donc disponibles hors ligne. Le
+validateur vérifie le nom contre `tools/lucide-icon-names.txt` et suggère la bonne
+orthographe en cas de faute : `mon` → *vouliez-vous dire `moon` ?*
+
+Ces icônes sont dessinées en `stroke="currentColor"` : **elles héritent de la couleur du
+texte** au lieu d'en porter une. Une même icône devient donc automatiquement sombre sur
+l'aplat accent, claire en thème sombre et neutre au repos, sans aucun réglage.
+
+Sélection courante par domaine — tous ces noms sont vérifiés :
+
+| Domaine | Icônes |
+|---|---|
+| Nettoyage | `broom` · `sparkles` · `trash-2` · `eraser` · `recycle` |
+| Performance | `zap` · `gauge` · `rocket` · `timer` · `cpu` |
+| Vie privée | `shield` · `shield-check` · `eye-off` · `lock` · `user-x` |
+| Applications | `app-window` · `package` · `package-minus` · `layout-grid` · `box` |
+| Santé | `activity` · `heart-pulse` · `stethoscope` · `hard-drive` · `scan-line` |
+| Outillage | `wrench` · `settings` · `calendar-clock` · `download` · `hammer` |
+| Divers | `moon` · `sun` · `wifi` · `network` · `globe` · `folder` · `file-text` · `database` · `monitor` · `power` · `refresh-cw` · `bell-off` |
+
+Rien n'oblige à s'y tenir : n'importe lequel des 2 112 noms fonctionne. Cette table sert
+à choisir vite et à rester cohérent. En revanche **un script ne peut pas fournir sa propre
+image** — c'est ce qui garantit l'uniformité du jeu d'icônes.
+
 ### Le cas de `engine`
 
 Un `.ps1` ne peut pas choisir son interpréteur — sous Windows c'est le processus appelant
@@ -318,6 +349,8 @@ validateur sans l'ajouter ici est un défaut.**
 | `ID_INVALIDE` | erreur | `id` n'est pas un GUID |
 | `ID_COLLISION` | erreur | Deux scripts portent le même `id` |
 | `CATEGORIE_INCONNUE` | avertissement | Catégorie hors catégories d'usine → « Non classé » |
+| `ICONE_EMOJI` | erreur | `icon` contient un emoji |
+| `ICONE_INCONNUE` | erreur | Nom d'icône absent de Lucide — suggestion si proche |
 | `TRADUCTION_ABSENTE` | erreur | Aucun bloc `WINTOOL:LANG` vers une langue autre que `lang` |
 | `TRADUCTION_NON_FERMEE` | erreur | Bloc de traduction non refermé |
 | `TRADUCTION_INCOMPLETE` | erreur | `title` ou `desc` non traduit |
