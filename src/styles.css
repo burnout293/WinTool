@@ -209,15 +209,74 @@ svg { display: block; }
 }
 body.inactive .water { animation-play-state: paused; }
 
-/* --- Contenu provisoire --------------------------------------------------- */
-.hello {
-  position: relative; z-index: 1;
-  height: 100%; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 14px; text-align: center;
-  padding: 0 32px;
+/* --- Liste des scripts ---------------------------------------------------- */
+.scroll { position: relative; z-index: 1; height: 100%; overflow-y: auto; }
+.scroll::-webkit-scrollbar { width: 9px; }
+.scroll::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 5px; }
+
+.wrap { max-width: 900px; margin: 0 auto; padding: 26px 24px 40px; }
+.head { margin-bottom: 20px; }
+.head h1 { font-size: 26px; font-weight: 800; letter-spacing: -.8px; }
+.mono { font-family: var(--mono); font-size: 11.5px; }
+.muted { color: var(--text-3); }
+
+.list { display: flex; flex-direction: column; gap: 11px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 18px;
+  box-shadow: var(--sh);
 }
-.hello h1 { font-size: 30px; font-weight: 800; letter-spacing: -1px; }
-.hello p { font-size: 15px; color: var(--text-2); max-width: 520px; }
-.hello .facts {
-  margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+.card-top { display: flex; align-items: flex-start; gap: 14px; }
+.card-icon {
+  width: 42px; height: 42px; border-radius: 13px; flex-shrink: 0;
+  display: grid; place-items: center;
+  background: var(--surface-2); color: var(--text-2);
+  border: 1px solid var(--border);
 }
+.card-icon svg { width: 21px; height: 21px; }
+.card-title { font-size: 16px; font-weight: 750; letter-spacing: -.3px; }
+.card-desc { font-size: 13px; color: var(--text-2); margin-top: 2px; }
+.card-path { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); margin-top: 5px; }
+
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 650; padding: 3px 9px; border-radius: 7px;
+  border: 1px solid var(--border); color: var(--text-2); background: var(--surface-2);
+}
+.badge.low  { color: var(--ok);   background: var(--ok-s);   border-color: color-mix(in srgb, var(--ok) 34%, transparent); }
+.badge.med  { color: var(--warn); background: var(--warn-s); border-color: color-mix(in srgb, var(--warn) 34%, transparent); }
+.badge.high { color: var(--err);  background: var(--err-s);  border-color: color-mix(in srgb, var(--err) 34%, transparent); }
+.badge.acc  { color: var(--acc-on); background: color-mix(in srgb, var(--acc) 12%, transparent);
+              border-color: color-mix(in srgb, var(--acc) 38%, transparent); }
+
+.opts { margin-top: 13px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.opt {
+  padding: 9px 12px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 10px;
+}
+.opt-key { font-family: var(--mono); font-size: 10px; color: var(--text-3); }
+.opt-label { font-size: 12.5px; font-weight: 650; margin-top: 2px; }
+.opt-desc { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+.opt-choices { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 5px; }
+.chip {
+  font-family: var(--mono); font-size: 10px; padding: 2px 7px; border-radius: 6px;
+  background: var(--surface); border: 1px solid var(--border); color: var(--text-2);
+}
+.chip.on { color: var(--acc-on); border-color: color-mix(in srgb, var(--acc) 40%, transparent);
+           background: color-mix(in srgb, var(--acc) 10%, transparent); }
+
+.findings { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+.finding { display: flex; gap: 9px; font-size: 12px; padding: 3px 0; align-items: baseline; }
+.finding .ln { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); flex-shrink: 0; }
+.finding .code { font-family: var(--mono); font-size: 10.5px; flex-shrink: 0; }
+.finding.error .code { color: var(--err); }
+.finding.warning .code { color: var(--warn); }
+.finding .msg { color: var(--text-2); }
+
+.empty { padding: 40px 0; text-align: center; color: var(--text-3); font-size: 14px; }
+
+@media (max-width: 760px) { .opts { grid-template-columns: 1fr; } }

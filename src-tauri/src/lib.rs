@@ -1,3 +1,6 @@
+mod contract;
+mod discovery;
+
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -39,11 +42,25 @@ fn is_elevated() -> bool {
     false
 }
 
+/// Liste les scripts trouves sur le disque, avec leur contrat lu et leurs
+/// anomalies de conformite. Constater, jamais bloquer : un script non conforme
+/// est renvoye quand meme, ses anomalies dans `meta.findings`.
+#[tauri::command]
+fn list_scripts(app: tauri::AppHandle) -> Result<discovery::DiscoveryResult, String> {
+    discovery::discover(&app)
+}
+
+/// Chemin de la racine des scripts, pour le bouton « Ouvrir le dossier ».
+#[tauri::command]
+fn scripts_root(app: tauri::AppHandle) -> Result<String, String> {
+    discovery::scripts_root(&app).map(|p| p.to_string_lossy().to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![app_info])
+        .invoke_handler(tauri::generate_handler![app_info, list_scripts, scripts_root])
         .run(tauri::generate_context!())
         .expect("erreur au lancement de l'application Tauri");
 }

@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
@@ -26,6 +26,16 @@
           <svg class="ico i14" aria-hidden="true"><use href="#shield" /></svg>
           Administrateur
         </span>
+
+        <button class="iconbtn" id="btnFolder" type="button" title="Ouvrir le dossier des scripts"
+                aria-label="Ouvrir le dossier des scripts">
+          <svg class="ico i17" aria-hidden="true"><use href="#file-text" /></svg>
+        </button>
+
+        <button class="iconbtn" id="btnReload" type="button" title="Ré-analyser les scripts"
+                aria-label="Ré-analyser les scripts">
+          <svg class="ico i17" aria-hidden="true"><use href="#chevron" /></svg>
+        </button>
 
         <button class="iconbtn" id="themeBtn" type="button" title="Thème clair ou sombre"
                 aria-label="Basculer le thème clair ou sombre">
@@ -67,16 +77,14 @@
               fill="none" stroke="var(--acc)" stroke-width="2.5" opacity="0.55" />
       </svg>
 
-      <div class="hello">
-        <h1>Le socle tient</h1>
-        <p>
-          Fenêtre sans décoration native, barre de titre maison, eau animée sans raccord,
-          et la version ci-dessous remontée depuis Rust.
-        </p>
-        <div class="facts">
-          <span class="pill" id="factVersion">version …</span>
-          <span class="pill" id="factElevation">élévation …</span>
-          <span class="pill" id="factTheme">thème …</span>
+      <div class="scroll">
+        <div class="wrap">
+          <div class="head">
+            <h1>Scripts découverts</h1>
+            <p id="rootPath" class="mono muted">…</p>
+          </div>
+          <div id="problems"></div>
+          <div id="list" class="list"></div>
         </div>
       </div>
     </main>
