@@ -1,5 +1,17 @@
-﻿target/
+# Dependances
 node_modules/
+
+# Artefacts de compilation Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# Icones : generees depuis lucide-static par tools/sync-icons.mjs.
+# Elles ne sont pas versionnees (2112 fichiers, 999 Ko) - seule la liste des
+# noms l'est, dans tools/lucide-icon-names.txt, pour que le validateur
+# fonctionne hors ligne. Regenerer avec : npm run icons:sync
+src/icons/
+src/icons.svg
+
+# Divers
 dist/
 *.log
-

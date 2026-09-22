@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Manifeste applicatif Windows.
+
+  requireAdministrator : WinTool demande l'elevation UNE SEULE FOIS, au lancement.
+  Tous les scripts qu'il execute heritent ensuite de ces droits. C'est ce qui
+  supprime la rafale d'invites UAC de la v3, qui elevait chaque script separement
+  (une categorie de quatre scripts = quatre invites).
+
+  Voir docs/SPECIFICATION.md - elevation.
+-->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+
+  <assemblyIdentity type="win32" name="com.wintool.app" version="4.0.0.0" />
+
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <!-- Windows 10 et 11 -->
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" />
+    </application>
+  </compatibility>
+
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <!-- Sans cela l'interface est floue sur un ecran a forte densite. -->
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+      <!-- Necessaire : les chemins de cache navigateur depassent souvent 260 caracteres. -->
+      <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+    </windowsSettings>
+  </application>
+
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="*"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+
+</assembly>

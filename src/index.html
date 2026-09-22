@@ -1,0 +1,88 @@
+﻿<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WinTool</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <div class="app">
+
+    <!-- data-tauri-drag-region rend la barre saisissable : la decoration
+         native est desactivee, c'est nous qui fournissons tout le chrome. -->
+    <header class="titlebar" data-tauri-drag-region>
+      <span class="brand-mark">
+        <svg class="ico i17" style="stroke-width:2.4" aria-hidden="true">
+          <use href="#logo" />
+        </svg>
+      </span>
+      <span class="brand-name" data-tauri-drag-region>WinTool</span>
+      <span class="brand-ver" id="version">…</span>
+
+      <div class="tb-right">
+        <span class="pill ok" id="adminPill" hidden>
+          <svg class="ico i14" aria-hidden="true"><use href="#shield" /></svg>
+          Administrateur
+        </span>
+
+        <button class="iconbtn" id="themeBtn" type="button" title="Thème clair ou sombre"
+                aria-label="Basculer le thème clair ou sombre">
+          <svg class="ico i17" aria-hidden="true"><use href="#sun" /></svg>
+        </button>
+
+        <div class="winctl">
+          <button type="button" id="btnMin" class="min" aria-label="Réduire">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 12h16" /></svg>
+          </button>
+          <button type="button" id="btnMax" class="max" aria-label="Agrandir">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><rect x="4.5" y="4.5" width="15" height="15" rx="1.5" /></svg>
+          </button>
+          <button type="button" id="btnClose" class="close" aria-label="Fermer">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19" /></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="stage">
+      <!-- Nappe de fond : une periode par motif, la plus lente. -->
+      <svg class="water fond" viewBox="0 0 2360 760" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="eau" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="var(--acc)" />
+            <stop offset="1" stop-color="var(--acc-2)" />
+          </linearGradient>
+        </defs>
+        <path d="M0,486 C147.5,436 442.5,536 590,486 C737.5,436 1032.5,536 1180,486 C1327.5,436 1622.5,536 1770,486 C1917.5,436 2212.5,536 2360,486 L2360,760 L0,760 Z"
+              fill="url(#eau)" opacity="0.16" />
+      </svg>
+
+      <!-- Nappe de surface : deux periodes par motif, plus vive. -->
+      <svg class="water surface" viewBox="0 0 2360 760" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0,452 C98,402 197,402 295,452 C393,502 492,502 590,452 C688,402 787,402 885,452 C983,502 1082,502 1180,452 C1278,402 1377,402 1475,452 C1573,502 1672,502 1770,452 C1868,402 1967,402 2065,452 C2163,502 2262,502 2360,452 L2360,760 L0,760 Z"
+              fill="url(#eau)" opacity="0.26" />
+        <path d="M0,452 C98,402 197,402 295,452 C393,502 492,502 590,452 C688,402 787,402 885,452 C983,502 1082,502 1180,452 C1278,402 1377,402 1475,452 C1573,502 1672,502 1770,452 C1868,402 1967,402 2065,452 C2163,502 2262,502 2360,452"
+              fill="none" stroke="var(--acc)" stroke-width="2.5" opacity="0.55" />
+      </svg>
+
+      <div class="hello">
+        <h1>Le socle tient</h1>
+        <p>
+          Fenêtre sans décoration native, barre de titre maison, eau animée sans raccord,
+          et la version ci-dessous remontée depuis Rust.
+        </p>
+        <div class="facts">
+          <span class="pill" id="factVersion">version …</span>
+          <span class="pill" id="factElevation">élévation …</span>
+          <span class="pill" id="factTheme">thème …</span>
+        </div>
+      </div>
+    </main>
+
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

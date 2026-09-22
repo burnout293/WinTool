@@ -1,0 +1,21 @@
+{
+  "name": "wintool",
+  "private": true,
+  "version": "4.0.0",
+  "description": "Outil de maintenance Windows - interface Tauri, scripts PowerShell",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "lint:scripts": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/lint-scripts.ps1 -Path ./scripts/Default -Strict",
+    "icons:sync": "node ./tools/sync-icons.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "lucide-static": "^1.47.0"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2"
+  }
+}

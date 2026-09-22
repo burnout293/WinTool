@@ -1,0 +1,223 @@
+/* ==========================================================================
+   WinTool - tokens et base
+   Issus de docs/mockups/reference.html, section 15 de la specification.
+   Regle absolue : aucune couleur en dur hors de ce bloc de tokens.
+   ========================================================================== */
+
+/* --- Theme clair (defaut) ------------------------------------------------ */
+:root {
+  --bg: #F3F6F9;
+  --surface: #FFFFFF;
+  --surface-2: #EDF2F6;
+  --surface-3: #E0E8EF;
+  --border: #DDE5EC;
+  --border-2: #C3D0DA;
+  --text: #0F1A24;
+  --text-2: #4E6172;
+  --text-3: #54697A;
+  --ink: #06121A;
+
+  --ok: #14915C;
+  --warn: #9A650F;
+  --err: #B8382F;
+  --ok-s: #E6F5EC;
+  --warn-s: #FBF3E2;
+  --err-s: #FBEBEA;
+
+  /* Accent unique : la couleur ne decore pas, elle signale. */
+  --acc: #22D39A;
+  --acc-2: #35C8E8;
+  --acc-on: #0B7D59;
+
+  --term-bg: #0A2A33;
+  --term-text: #C7D9DE;
+  --term-dim: #5B7C86;
+
+  --sh: 0 1px 2px rgba(15, 26, 36, .05), 0 6px 18px rgba(15, 26, 36, .05);
+  --sh-2: 0 10px 34px rgba(15, 26, 36, .10);
+
+  --ui: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', 'Cascadia Mono', Consolas, monospace;
+
+  --titlebar-h: 54px;
+}
+
+/* --- Theme sombre --------------------------------------------------------
+   La @media est de PREMIER niveau, pas imbriquee : aucune dependance au CSS
+   Nesting selon la version de WebView2 installee sur la machine.
+     . la @media    suit le reglage de Windows quand rien n'a ete choisi
+     . [data-theme] la bascule manuelle, qui l'emporte dans les deux sens
+   ------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0A0C10;
+    --surface: #13171E;
+    --surface-2: #1B212A;
+    --surface-3: #242C38;
+    --border: #232B36;
+    --border-2: #333D4B;
+    --text: #F2F6FA;
+    --text-2: #9BA9B9;
+    --text-3: #8397A6;
+    --ok: #22D39A;
+    --warn: #FFB340;
+    --err: #FF6B6B;
+    --ok-s: #0E2A22;
+    --warn-s: #2C2113;
+    --err-s: #2E1717;
+    --acc-on: #4BE8B8;
+    --term-bg: #060A0F;
+    --term-text: #C7D3DE;
+    --term-dim: #5B6C7C;
+    --sh: 0 2px 10px rgba(0, 0, 0, .35);
+    --sh-2: 0 16px 46px rgba(0, 0, 0, .55);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0A0C10;
+  --surface: #13171E;
+  --surface-2: #1B212A;
+  --surface-3: #242C38;
+  --border: #232B36;
+  --border-2: #333D4B;
+  --text: #F2F6FA;
+  --text-2: #9BA9B9;
+  --text-3: #8397A6;
+  --ok: #22D39A;
+  --warn: #FFB340;
+  --err: #FF6B6B;
+  --ok-s: #0E2A22;
+  --warn-s: #2C2113;
+  --err-s: #2E1717;
+  --acc-on: #4BE8B8;
+  --term-bg: #060A0F;
+  --term-text: #C7D3DE;
+  --term-dim: #5B6C7C;
+  --sh: 0 2px 10px rgba(0, 0, 0, .35);
+  --sh-2: 0 16px 46px rgba(0, 0, 0, .55);
+}
+
+/* ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--ui);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  /* Une application n'est pas une page web : pas de selection de texte ni de
+     menu contextuel par defaut, sauf la ou c'est explicitement voulu. */
+  user-select: none;
+  cursor: default;
+}
+
+button { font-family: inherit; color: inherit; border: none; background: none; cursor: pointer; }
+svg { display: block; }
+
+.ico { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.9;
+       stroke-linecap: round; stroke-linejoin: round; }
+.i14 { width: 14px; height: 14px; }
+.i17 { width: 17px; height: 17px; }
+
+.app { height: 100vh; display: flex; flex-direction: column; }
+
+/* --- Barre de titre personnalisee ---------------------------------------- */
+.titlebar {
+  height: var(--titlebar-h);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-left: 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 10;
+}
+
+.brand-mark {
+  width: 30px; height: 30px; border-radius: 10px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--acc), var(--acc-2));
+  color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+}
+.brand-name { font-size: 15.5px; font-weight: 800; letter-spacing: -.4px; }
+.brand-ver {
+  font-family: var(--mono); font-size: 10px; color: var(--text-3);
+  padding: 2px 7px; border: 1px solid var(--border); border-radius: 6px;
+}
+
+.tb-right { margin-left: auto; display: flex; align-items: center; gap: 9px; height: 100%; }
+
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11.5px; font-weight: 650; padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--text-2); background: var(--surface-2);
+}
+.pill.ok {
+  color: var(--ok); background: var(--ok-s);
+  border-color: color-mix(in srgb, var(--ok) 36%, transparent);
+}
+
+.iconbtn {
+  width: 34px; height: 34px; border-radius: 10px;
+  display: grid; place-items: center;
+  color: var(--text-2); border: 1px solid var(--border);
+  transition: background .15s, color .15s;
+}
+.iconbtn:hover { background: var(--surface-2); color: var(--text); }
+
+/* Commandes de fenetre : dessinees par nous, la decoration native est desactivee. */
+.winctl { display: flex; height: 100%; }
+.winctl button {
+  width: 44px; display: grid; place-items: center; color: var(--text-3);
+  transition: background .12s, color .12s;
+}
+.winctl button:hover { background: var(--surface-2); color: var(--text); }
+.winctl button.close:hover { background: var(--err); color: #fff; }
+.winctl svg { width: 11px; height: 11px; stroke-width: 1.7; }
+
+/* --- Scene et eau --------------------------------------------------------- */
+.stage { flex: 1; position: relative; overflow: hidden; }
+
+.water { position: absolute; left: 0; top: 0; width: 200%; height: 100%; pointer-events: none; }
+
+/*
+  Derive tres lente. Chaque nappe fait deux fois la largeur de la fenetre et
+  contient deux motifs identiques : la translater d'exactement une largeur la
+  ramene sur elle-meme, donc la boucle est sans raccord visible.
+*/
+@keyframes derive {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.water.fond    { animation: derive 46s linear infinite; }
+.water.surface { animation: derive 29s linear infinite; }
+
+/* Deux obligations de la specification, section 15.3. */
+@media (prefers-reduced-motion: reduce) {
+  .water { animation: none !important; }
+}
+body.inactive .water { animation-play-state: paused; }
+
+/* --- Contenu provisoire --------------------------------------------------- */
+.hello {
+  position: relative; z-index: 1;
+  height: 100%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px; text-align: center;
+  padding: 0 32px;
+}
+.hello h1 { font-size: 30px; font-weight: 800; letter-spacing: -1px; }
+.hello p { font-size: 15px; color: var(--text-2); max-width: 520px; }
+.hello .facts {
+  margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;
+}
