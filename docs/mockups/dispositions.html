@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="fr" data-layout="cockpit" data-mode="simple">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WinTool v4 — Comparateur de dispositions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════════
+   PALETTE VERROUILLÉE — « Bloc opératoire ».
+   Identique pour les 4 dispositions : ce qui varie ici, ce sont
+   les FORMES et les DISPOSITIONS, pas les couleurs.
+   ══════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#F4F7F8;      --surface:#FFFFFF;  --surface-2:#EFF3F5;  --surface-3:#E4EBEE;
+  --border:#DEE5E9;  --border-2:#C7D3D9; --ink:#0F1E28;
+  --text:#12212B;    --text-2:#54666F;   --text-3:#8A9AA4;
+  --accent:#0F7B7B;  --accent-2:#0B5F5F; --accent-fg:#FFFFFF;
+  --accent-soft:#E6F1F1; --accent-line:#A8D0D0;
+  --ok:#2E9E5B;      --warn:#B87A15;     --err:#C4453C;   --info:#2D6FA8;
+  --ok-soft:#E8F5ED; --warn-soft:#FBF2E3; --err-soft:#FAEBEA;
+  --term-bg:#0F1E28; --term-text:#C6D4DC; --term-dim:#5E7482;
+  --ui:'Inter',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  --sh-1:0 1px 2px rgba(15,30,40,.05);
+  --sh-2:0 2px 4px rgba(15,30,40,.05), 0 8px 20px rgba(15,30,40,.06);
+  --sh-3:0 12px 40px rgba(15,30,40,.13);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--ui);background:var(--bg);color:var(--text);font-size:14px;
+  line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input{font-family:inherit;color:inherit;border:none;outline:none;background:none;cursor:pointer}
+svg{display:block}
+.ico{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.75;
+  stroke-linecap:round;stroke-linejoin:round}
+.i14{width:14px;height:14px}.i16{width:16px;height:16px}
+.i22{width:22px;height:22px}.i26{width:26px;height:26px}
+.mono{font-family:var(--mono)}
+
+/* Un seul layout visible à la fois */
+.layout{display:none;height:100vh;padding-bottom:62px;flex-direction:column}
+html[data-layout="cockpit"] #L-cockpit,
+html[data-layout="rail"]    #L-rail,
+html[data-layout="master"]  #L-master,
+html[data-layout="bandes"]  #L-bandes{display:flex}
+html[data-mode="simple"] [data-m="expert"],
+html[data-mode="expert"] [data-m="simple"]{display:none!important}
+
+/* ══════════ ÉLÉMENTS PARTAGÉS ══════════════════════════════ */
+.mark{width:26px;height:26px;border-radius:7px;background:var(--accent);color:#fff;
+  display:grid;place-items:center;flex-shrink:0}
+.mark svg{width:15px;height:15px;stroke-width:2.2}
+.wordmark{font-size:14.5px;font-weight:800;letter-spacing:-.3px}
+.ver{font-family:var(--mono);font-size:10px;color:var(--text-3)}
+
+.seg{display:flex;gap:2px;padding:3px;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:9px}
+.seg button{padding:5px 15px;border-radius:6px;font-size:12px;font-weight:600;
+  color:var(--text-2);transition:all .15s;white-space:nowrap}
+.seg button[aria-selected="true"]{background:var(--surface);color:var(--accent);box-shadow:var(--sh-1)}
+
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;
+  padding:4px 10px;border-radius:999px;border:1px solid var(--border);
+  color:var(--text-2);background:var(--surface)}
+.pill.ok{color:var(--ok);border-color:#BCE2CA;background:var(--ok-soft)}
+.pill.acc{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;
+  padding:3px 9px;border-radius:6px;border:1px solid var(--border);
+  color:var(--text-2);background:var(--surface-2)}
+.badge.low{color:var(--ok);border-color:#BCE2CA;background:var(--ok-soft)}
+.badge.med{color:var(--warn);border-color:#E8D3A8;background:var(--warn-soft)}
+.badge.high{color:var(--err);border-color:#EDC4C1;background:var(--err-soft)}
+.badge.acc{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+
+.winctl{display:flex}
+.winctl button{width:42px;height:100%;display:grid;place-items:center;color:var(--text-3)}
+.winctl button:hover{background:var(--surface-2);color:var(--text)}
+.winctl button:last-child:hover{background:var(--err);color:#fff}
+.winctl svg{width:11px;height:11px;stroke-width:1.6}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:10px 18px;border-radius:9px;font-size:13px;font-weight:700;
+  background:var(--accent);color:var(--accent-fg);box-shadow:var(--sh-1)}
+.btn:hover{background:var(--accent-2)}
+.btn.ghost{background:var(--surface);color:var(--text-2);border:1px solid var(--border);
+  font-weight:600;box-shadow:none}
+.btn.ghost:hover{border-color:var(--accent-line);color:var(--accent);background:var(--accent-soft)}
+.spin{width:14px;height:14px;border-radius:50%;border:2.2px solid rgba(255,255,255,.35);
+  border-top-color:#fff;animation:spin .75s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+
+.bar{height:5px;border-radius:3px;background:var(--surface-3);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:3px}
+
+/* Terminal — markup identique partout, habillage propre à chaque disposition */
+.term{background:var(--term-bg);overflow:hidden}
+.term-h{display:flex;align-items:center;justify-content:space-between;
+  padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.07)}
+.term-h span{font-family:var(--mono);font-size:10px;color:var(--term-dim);
+  letter-spacing:.09em;text-transform:uppercase}
+.term-h button{font-family:var(--mono);font-size:10px;color:var(--term-dim)}
+.term-h button:hover{color:#fff}
+.term-b{font-family:var(--mono);font-size:11.5px;line-height:1.85;padding:10px 14px;
+  overflow-y:auto;color:var(--term-text)}
+.term-b::-webkit-scrollbar{width:4px}
+.term-b::-webkit-scrollbar-thumb{background:#2B3E4A;border-radius:2px}
+.ln{display:flex;gap:11px;white-space:pre}
+.ts{color:var(--term-dim);flex-shrink:0}
+.t-ok{color:#4ADE80}.t-err{color:#F87171}.t-warn{color:#FBBF24}
+.t-info{color:#7DB8E8}.t-step{color:#2DD4BF;font-weight:500}.t-done{color:#4ADE80;font-weight:500}
+.cur{display:inline-block;width:7px;height:12px;background:#2DD4BF;vertical-align:-2px;
+  animation:blink 1s steps(2) infinite}
+
+.cfg{display:grid;gap:9px}
+.cfg-row{display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 13px;background:var(--surface-2);border:1px solid var(--border);border-radius:9px}
+.cfg-n{font-size:12.5px;font-weight:600;line-height:1.35}
+.cfg-s{font-size:10.5px;color:var(--text-3);margin-top:2px}
+.tgl{position:relative;width:36px;height:20px;flex-shrink:0}
+.tgl input{position:absolute;opacity:0}
+.tgl span{position:absolute;inset:0;border-radius:999px;background:var(--surface-3);
+  border:1px solid var(--border-2);cursor:pointer;transition:all .2s}
+.tgl span::after{content:'';position:absolute;width:12px;height:12px;border-radius:50%;
+  background:var(--text-3);top:3px;left:3px;transition:all .2s}
+.tgl input:checked + span{background:var(--accent);border-color:var(--accent)}
+.tgl input:checked + span::after{transform:translateX(16px);background:#fff}
+.inp{padding:5px 9px;border-radius:7px;background:var(--surface);border:1px solid var(--border-2);
+  font-family:var(--mono);font-size:11.5px;flex-shrink:0}
+.inp.num{width:58px;text-align:right}.inp.sel{width:116px}
+
+/* ══════════════════════════════════════════════════════════════
+   ① COCKPIT — pas de barre latérale. Grille de tuiles + tiroir.
+   ══════════════════════════════════════════════════════════════ */
+#L-cockpit .top{height:52px;flex-shrink:0;display:flex;align-items:center;gap:16px;
+  padding-left:18px;background:var(--surface);border-bottom:1px solid var(--border)}
+#L-cockpit .top .seg{margin:0 auto}
+#L-cockpit .top .right{display:flex;align-items:center;gap:10px;height:100%}
+#L-cockpit .scroll{flex:1;overflow-y:auto;padding:22px 26px 30px}
+
+#L-cockpit .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:26px}
+#L-cockpit .stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:14px 16px}
+#L-cockpit .stat .k{font-size:10.5px;font-weight:600;color:var(--text-3);
+  text-transform:uppercase;letter-spacing:.07em}
+#L-cockpit .stat .v{font-size:21px;font-weight:800;letter-spacing:-.6px;margin-top:5px}
+#L-cockpit .stat .u{font-size:11px;color:var(--text-3);margin-top:2px}
+
+#L-cockpit .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+#L-cockpit .tile{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:18px;min-height:158px;display:flex;flex-direction:column;
+  cursor:pointer;transition:all .18s;box-shadow:var(--sh-1);position:relative;overflow:hidden}
+#L-cockpit .tile:hover{border-color:var(--accent-line);box-shadow:var(--sh-2);transform:translateY(-2px)}
+#L-cockpit .tile .ti{width:42px;height:42px;border-radius:11px;background:var(--accent-soft);
+  color:var(--accent);display:grid;place-items:center;margin-bottom:13px}
+#L-cockpit .tile .tn{font-size:15px;font-weight:700;letter-spacing:-.2px}
+#L-cockpit .tile .td{font-size:12px;color:var(--text-2);margin-top:3px;line-height:1.45}
+#L-cockpit .tile .tf{margin-top:auto;padding-top:13px;display:flex;align-items:center;
+  justify-content:space-between;gap:10px}
+#L-cockpit .tile .tc{font-family:var(--mono);font-size:10.5px;color:var(--text-3)}
+#L-cockpit .tile.run{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+#L-cockpit .tile.run .ti{background:var(--accent);color:#fff}
+#L-cockpit .tile .go{width:30px;height:30px;border-radius:8px;background:var(--accent-soft);
+  color:var(--accent);display:grid;place-items:center;opacity:0;transition:opacity .18s}
+#L-cockpit .tile:hover .go{opacity:1}
+
+#L-cockpit .drawer{flex-shrink:0;background:var(--term-bg);border-top:1px solid var(--border)}
+#L-cockpit .drawer .handle{display:flex;align-items:center;gap:12px;padding:10px 18px;
+  cursor:pointer;color:var(--term-text)}
+#L-cockpit .drawer .handle .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--term-dim)}
+#L-cockpit .drawer .handle .now{font-family:var(--mono);font-size:11.5px;color:#2DD4BF}
+#L-cockpit .drawer .handle .rest{margin-left:auto;font-family:var(--mono);font-size:10.5px;
+  color:var(--term-dim)}
+#L-cockpit .drawer .term-b{max-height:186px;border-top:1px solid rgba(255,255,255,.07)}
+
+#L-cockpit .detail{background:var(--surface);border:1px solid var(--border);
+  border-radius:14px;box-shadow:var(--sh-1);overflow:hidden}
+#L-cockpit .back{display:inline-flex;align-items:center;gap:7px;font-size:12px;
+  font-weight:600;color:var(--accent);margin-bottom:14px}
+#L-cockpit .sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+#L-cockpit .stile{background:var(--surface);border:1px solid var(--border);border-radius:11px;
+  padding:14px;cursor:pointer;transition:all .16s}
+#L-cockpit .stile:hover{border-color:var(--accent-line);box-shadow:var(--sh-1)}
+#L-cockpit .stile.sel{border-color:var(--accent);background:var(--accent-soft)}
+#L-cockpit .stile .num{font-family:var(--mono);font-size:10.5px;color:var(--accent)}
+#L-cockpit .stile .nm{font-size:13px;font-weight:650;margin-top:5px;line-height:1.3}
+
+/* ══════════════════════════════════════════════════════════════
+   ② RAIL — rail d'icônes 62px, colonne centrale, journal fixe à droite.
+   ══════════════════════════════════════════════════════════════ */
+#L-rail{flex-direction:row}
+#L-rail .rail{width:62px;flex-shrink:0;background:var(--ink);display:flex;
+  flex-direction:column;align-items:center;padding:12px 0;gap:4px}
+#L-rail .rail .mark{margin-bottom:12px}
+#L-rail .ri{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;
+  color:#7C919D;cursor:pointer;transition:all .16s;position:relative}
+#L-rail .ri:hover{background:rgba(255,255,255,.07);color:#fff}
+#L-rail .ri[aria-current="true"]{background:var(--accent);color:#fff}
+#L-rail .ri[aria-current="true"]::after{content:'';position:absolute;left:-12px;top:50%;
+  transform:translateY(-50%);width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--accent)}
+#L-rail .rail .sp{flex:1}
+#L-rail .rail .dv{width:24px;height:1px;background:rgba(255,255,255,.12);margin:8px 0}
+
+#L-rail .mid{flex:1;display:flex;flex-direction:column;min-width:0}
+#L-rail .cmd{height:56px;flex-shrink:0;display:flex;align-items:center;gap:12px;
+  padding:0 20px;background:var(--surface);border-bottom:1px solid var(--border)}
+#L-rail .search{flex:1;max-width:520px;display:flex;align-items:center;gap:10px;
+  height:36px;padding:0 13px;background:var(--surface-2);border:1px solid var(--border);
+  border-radius:10px;color:var(--text-3);font-size:13px}
+#L-rail .search kbd{margin-left:auto;font-family:var(--mono);font-size:10px;
+  border:1px solid var(--border-2);border-radius:5px;padding:2px 6px;color:var(--text-3)}
+#L-rail .cmd .seg{margin-left:auto}
+#L-rail .col{flex:1;overflow-y:auto;padding:26px 20px 30px}
+#L-rail .inner{max-width:720px;margin:0 auto}
+#L-rail .eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:7px}
+#L-rail h1{font-size:26px;font-weight:800;letter-spacing:-.7px;line-height:1.2}
+#L-rail .sub{font-size:13.5px;color:var(--text-2);margin-top:6px}
+#L-rail .steps{display:flex;flex-direction:column;gap:2px;margin:22px 0}
+#L-rail .step{display:flex;align-items:center;gap:13px;padding:13px 15px;
+  border:1px solid var(--border);border-radius:11px;background:var(--surface)}
+#L-rail .step + .step{margin-top:-1px}
+#L-rail .step .sn{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+  font-family:var(--mono);font-size:10.5px;flex-shrink:0;
+  background:var(--surface-2);color:var(--text-3);border:1px solid var(--border)}
+#L-rail .step.done .sn{background:var(--ok-soft);color:var(--ok);border-color:#BCE2CA}
+#L-rail .step.now{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+#L-rail .step.now .sn{background:var(--accent);color:#fff;border-color:var(--accent)}
+#L-rail .step .st{flex:1;font-size:13.5px;font-weight:600}
+#L-rail .step .sx{font-family:var(--mono);font-size:10.5px;color:var(--text-3)}
+#L-rail .logpane{width:352px;flex-shrink:0;background:var(--term-bg);display:flex;
+  flex-direction:column}
+#L-rail .logpane .term-b{flex:1}
+
+/* ══════════════════════════════════════════════════════════════
+   ③ MASTER-DÉTAIL — liste unique filtrable à gauche, détail à droite.
+   ══════════════════════════════════════════════════════════════ */
+#L-master .top{height:48px;flex-shrink:0;display:flex;align-items:center;gap:14px;
+  padding-left:16px;background:var(--surface);border-bottom:1px solid var(--border)}
+#L-master .top .seg{margin-left:auto}
+#L-master .top .winctl{height:48px}
+#L-master .split{flex:1;display:flex;min-height:0}
+#L-master .list{width:296px;flex-shrink:0;background:var(--surface);
+  border-right:1px solid var(--border);display:flex;flex-direction:column}
+#L-master .filter{padding:11px;border-bottom:1px solid var(--border)}
+#L-master .filter div{display:flex;align-items:center;gap:9px;height:34px;padding:0 11px;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:9px;
+  color:var(--text-3);font-size:12.5px}
+#L-master .rows{flex:1;overflow-y:auto}
+#L-master .ghead{position:sticky;top:0;background:var(--surface);z-index:2;
+  padding:13px 14px 7px;font-size:10px;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--text-3);border-bottom:1px solid var(--border)}
+#L-master .row{display:flex;align-items:center;gap:11px;padding:10px 14px;cursor:pointer;
+  border-left:3px solid transparent;transition:background .14s}
+#L-master .row:hover{background:var(--surface-2)}
+#L-master .row[aria-current="true"]{background:var(--accent-soft);border-left-color:var(--accent)}
+#L-master .row .ri{width:22px;flex-shrink:0;color:var(--text-3);display:grid;place-items:center}
+#L-master .row[aria-current="true"] .ri{color:var(--accent)}
+#L-master .row .rn{width:20px;flex-shrink:0;font-family:var(--mono);font-size:10.5px;color:var(--text-3)}
+#L-master .row .rt{flex:1;font-size:12.5px;font-weight:600;color:var(--text-2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#L-master .row[aria-current="true"] .rt{color:var(--accent)}
+#L-master .row .rc{font-family:var(--mono);font-size:10px;color:var(--text-3)}
+#L-master .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:transparent}
+#L-master .dot.ok{background:var(--ok)}#L-master .dot.err{background:var(--err)}
+#L-master .dot.run{background:var(--accent);animation:blink 1.1s infinite}
+#L-master .detail{flex:1;display:flex;flex-direction:column;min-width:0}
+#L-master .dscroll{flex:1;overflow-y:auto;padding:24px 26px}
+#L-master .dhead{display:flex;align-items:flex-start;gap:14px;margin-bottom:8px}
+#L-master .dhead .di{width:44px;height:44px;border-radius:11px;background:var(--accent-soft);
+  color:var(--accent);display:grid;place-items:center;flex-shrink:0}
+#L-master h2{font-size:20px;font-weight:800;letter-spacing:-.45px}
+#L-master .dsub{font-size:13px;color:var(--text-2);margin-top:3px}
+#L-master .dmeta{font-family:var(--mono);font-size:10.5px;color:var(--text-3);margin-top:5px}
+#L-master .dact{margin-left:auto;display:flex;gap:9px;flex-shrink:0}
+#L-master .box{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  margin-top:16px;overflow:hidden}
+#L-master .box-h{padding:11px 15px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+#L-master .box-b{padding:14px 15px}
+#L-master .srow{display:flex;align-items:center;gap:12px;padding:11px 0}
+#L-master .srow + .srow{border-top:1px solid var(--border)}
+#L-master .srow .sn{font-family:var(--mono);font-size:10.5px;color:var(--text-3);width:20px}
+#L-master .srow .st{flex:1;font-size:13px;font-weight:600}
+#L-master .termwrap{flex-shrink:0;height:196px;border-top:1px solid var(--border);
+  display:flex;flex-direction:column}
+#L-master .termwrap .term{flex:1;display:flex;flex-direction:column}
+#L-master .termwrap .term-b{flex:1}
+
+/* ══════════════════════════════════════════════════════════════
+   ④ BANDES — aucun chrome latéral, colonne centrée, accordéon.
+   ══════════════════════════════════════════════════════════════ */
+#L-bandes{background:var(--bg)}
+#L-bandes .scroll{flex:1;overflow-y:auto}
+#L-bandes .wrap{max-width:940px;margin:0 auto;padding:30px 24px 40px}
+#L-bandes .hd{display:flex;align-items:center;gap:12px;margin-bottom:30px}
+#L-bandes .hd .seg{margin-left:auto}
+#L-bandes .intro{margin-bottom:26px}
+#L-bandes .intro h1{font-size:30px;font-weight:800;letter-spacing:-.9px;line-height:1.15}
+#L-bandes .intro p{font-size:14px;color:var(--text-2);margin-top:8px}
+#L-bandes .intro .st{display:flex;gap:22px;margin-top:18px}
+#L-bandes .intro .st div{display:flex;flex-direction:column;gap:2px}
+#L-bandes .intro .st .k{font-size:10.5px;font-weight:600;color:var(--text-3);
+  text-transform:uppercase;letter-spacing:.07em}
+#L-bandes .intro .st .v{font-size:16px;font-weight:700}
+
+#L-bandes .band{background:var(--surface);border:1px solid var(--border);border-radius:16px;
+  margin-bottom:12px;overflow:hidden;transition:all .18s;box-shadow:var(--sh-1)}
+#L-bandes .band:hover{border-color:var(--border-2)}
+#L-bandes .band.open{border-color:var(--accent);box-shadow:var(--sh-2)}
+#L-bandes .bh{display:flex;align-items:center;gap:17px;padding:20px 22px;cursor:pointer}
+#L-bandes .bh .bi{width:46px;height:46px;border-radius:13px;background:var(--surface-2);
+  color:var(--text-2);display:grid;place-items:center;flex-shrink:0;transition:all .18s}
+#L-bandes .band.open .bh .bi{background:var(--accent);color:#fff}
+#L-bandes .bh .bt{font-size:16.5px;font-weight:750;letter-spacing:-.3px}
+#L-bandes .bh .bd{font-size:12.5px;color:var(--text-2);margin-top:2px}
+#L-bandes .bh .br{margin-left:auto;display:flex;align-items:center;gap:14px;flex-shrink:0}
+#L-bandes .bh .bc{font-family:var(--mono);font-size:11px;color:var(--text-3)}
+#L-bandes .bb{display:none;padding:0 22px 22px;border-top:1px solid var(--border);margin-top:2px}
+#L-bandes .band.open .bb{display:block}
+#L-bandes .bb-in{padding-top:20px}
+#L-bandes .slist{display:flex;flex-direction:column;gap:9px;margin-bottom:18px}
+#L-bandes .sitem{display:flex;align-items:center;gap:13px;padding:13px 15px;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:11px}
+#L-bandes .sitem.now{background:var(--accent-soft);border-color:var(--accent-line)}
+#L-bandes .sitem .sn{font-family:var(--mono);font-size:10.5px;color:var(--text-3);width:20px}
+#L-bandes .sitem .st{flex:1;font-size:13.5px;font-weight:600}
+#L-bandes .termcard{border-radius:12px;overflow:hidden;border:1px solid var(--border);margin-top:16px}
+#L-bandes .termcard .term-b{max-height:172px}
+
+/* ══════════════════════════════════════════════════════════════
+   BARRE DE COMPARAISON
+   ══════════════════════════════════════════════════════════════ */
+.mockbar{position:fixed;left:50%;bottom:13px;transform:translateX(-50%);z-index:900;
+  display:flex;align-items:center;gap:13px;padding:8px 11px 8px 15px;
+  background:#0E1116;border:1px solid #262C34;border-radius:11px;
+  box-shadow:0 14px 42px rgba(0,0,0,.42);font-family:var(--mono)}
+.mockbar .lbl{font-size:9.5px;letter-spacing:.14em;color:#67717D;text-transform:uppercase}
+.mockbar .grp{display:flex;gap:3px;padding:3px;background:#181D24;border-radius:8px}
+.mockbar .grp button{padding:6px 12px;border-radius:5px;font-family:inherit;font-size:11px;
+  color:#94A0AC;transition:all .15s;white-space:nowrap}
+.mockbar .grp button:hover{color:#E6ECF2}
+.mockbar .grp button[aria-pressed="true"]{background:#0F7B7B;color:#fff}
+.mockbar .sep{width:1px;height:25px;background:#262C34}
+.mockbar kbd{font-size:9.5px;color:#67717D;border:1px solid #262C34;border-radius:4px;padding:2px 5px}
+
+@media (max-width:1180px){
+  #L-cockpit .stats{grid-template-columns:repeat(2,1fr)}
+  #L-cockpit .grid{grid-template-columns:repeat(2,1fr)}
+  #L-cockpit .sgrid{grid-template-columns:repeat(3,1fr)}
+  #L-rail .logpane{display:none}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><path d="M4 7h7M4 12h16M4 17h11"/><circle cx="17" cy="7" r="2"/><circle cx="19" cy="17" r="2"/></symbol>
+  <symbol id="i-clean" viewBox="0 0 24 24"><path d="M12 3l1.7 4.3L18 9l-4.3 1.7L12 15l-1.7-4.3L6 9l4.3-1.7z"/><path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></symbol>
+  <symbol id="i-apps" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M15 17.5h5M17.5 15v5"/></symbol>
+  <symbol id="i-perf" viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12z"/></symbol>
+  <symbol id="i-sec" viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.2c0 4.6-3.2 8.6-7.5 9.5-4.3-.9-7.5-4.9-7.5-9.5V6z"/><path d="M9.2 12l2 2 3.6-3.8"/></symbol>
+  <symbol id="i-health" viewBox="0 0 24 24"><path d="M2.5 12H7l2.2-6.5L13 18.5l2.3-6.5h6.2"/></symbol>
+  <symbol id="i-tools" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-hist" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.4 2"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.2c0 4.6-3.2 8.6-7.5 9.5-4.3-.9-7.5-4.9-7.5-9.5V6z"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.8-3.8"/></symbol>
+  <symbol id="i-chevR" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-chevL" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-chevU" viewBox="0 0 24 24"><path d="M5 15l7-7 7 7"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></symbol>
+  <symbol id="i-min" viewBox="0 0 24 24"><path d="M4 12h16"/></symbol>
+  <symbol id="i-max" viewBox="0 0 24 24"><rect x="4.5" y="4.5" width="15" height="15" rx="1.5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19"/></symbol>
+  <symbol id="i-set" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M22 12h-3M5 12H2M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1M18.4 18.4l-2.1-2.1M7.7 7.7L5.6 5.6"/></symbol>
+</svg>
+
+
+<!-- ══════════════ ① COCKPIT ══════════════════════════════════ -->
+<div class="layout" id="L-cockpit">
+  <header class="top">
+    <div class="mark"><svg class="ico"><use href="#i-logo"/></svg></div>
+    <span class="wordmark">WinTool</span><span class="ver">4.0.0</span>
+    <div class="seg"><button data-mode-btn="simple" aria-selected="true">Simple</button><button data-mode-btn="expert" aria-selected="false">Expert</button></div>
+    <div class="right">
+      <span class="pill ok"><svg class="ico i14"><use href="#i-shield"/></svg>Admin</span>
+      <span class="pill acc"><svg class="ico i14"><use href="#i-down"/></svg>4.0.1</span>
+      <div class="winctl"><button><svg class="ico"><use href="#i-min"/></svg></button><button><svg class="ico"><use href="#i-max"/></svg></button><button><svg class="ico"><use href="#i-close"/></svg></button></div>
+    </div>
+  </header>
+
+  <div class="scroll">
+    <div class="stats">
+      <div class="stat"><div class="k">Disque C:</div><div class="v">312 <span style="font-size:13px;font-weight:600;color:var(--text-3)">Go</span></div><div class="u">libres sur 953 Go</div></div>
+      <div class="stat"><div class="k">Dernière maintenance</div><div class="v">21 <span style="font-size:13px;font-weight:600;color:var(--text-3)">sept.</span></div><div class="u">il y a 3 heures</div></div>
+      <div class="stat"><div class="k">Scripts</div><div class="v">13</div><div class="u">6 catégories</div></div>
+      <div class="stat"><div class="k">Santé disques</div><div class="v" style="color:var(--ok)">OK</div><div class="u">2 disques · SMART bon</div></div>
+    </div>
+
+    <!-- SIMPLE : tuiles de catégories -->
+    <div data-m="simple">
+      <div class="grid">
+        <div class="tile"><div class="ti"><svg class="ico i22"><use href="#i-clean"/></svg></div><div class="tn">Nettoyage</div><div class="td">Fichiers temporaires et caches navigateurs</div><div class="tf"><span class="tc">2 scripts · ~3 min</span><div class="go"><svg class="ico i16"><use href="#i-play"/></svg></div></div></div>
+        <div class="tile"><div class="ti"><svg class="ico i22"><use href="#i-apps"/></svg></div><div class="tn">Applications</div><div class="td">Bloatwares et applications Microsoft</div><div class="tf"><span class="tc">2 scripts · ~6 min</span><div class="go"><svg class="ico i16"><use href="#i-play"/></svg></div></div></div>
+        <div class="tile run"><div class="ti"><svg class="ico i22"><use href="#i-perf"/></svg></div><div class="tn">Performance</div><div class="td">Veille, DNS et optimisation des disques</div><div class="tf" style="flex-direction:column;align-items:stretch;gap:8px"><div class="bar"><i style="width:66%"></i></div><span class="tc" style="color:var(--accent)">2/3 · Configurer DNS…</span></div></div>
+        <div class="tile"><div class="ti"><svg class="ico i22"><use href="#i-sec"/></svg></div><div class="tn">Sécurité</div><div class="td">Télémétrie et notifications intrusives</div><div class="tf"><span class="tc">2 scripts · ~2 min</span><div class="go"><svg class="ico i16"><use href="#i-play"/></svg></div></div></div>
+        <div class="tile"><div class="ti"><svg class="ico i22"><use href="#i-health"/></svg></div><div class="tn">Santé</div><div class="td">Intégrité système et état SMART</div><div class="tf"><span class="tc">2 scripts · ~15 min</span><div class="go"><svg class="ico i16"><use href="#i-play"/></svg></div></div></div>
+        <div class="tile"><div class="ti"><svg class="ico i22"><use href="#i-tools"/></svg></div><div class="tn">Outillage</div><div class="td">VCRedist et maintenance planifiée</div><div class="tf"><span class="tc">2 scripts · ~4 min</span><div class="go"><svg class="ico i16"><use href="#i-play"/></svg></div></div></div>
+      </div>
+    </div>
+
+    <!-- EXPERT : grille des 13 scripts + fiche -->
+    <div data-m="expert">
+      <div class="sgrid" style="margin-bottom:16px">
+        <div class="stile"><div class="num">01</div><div class="nm">Désactiver la veille</div></div>
+        <div class="stile"><div class="num">02</div><div class="nm">Installer VCRedist</div></div>
+        <div class="stile"><div class="num">03</div><div class="nm">Supprimer bloatwares</div></div>
+        <div class="stile"><div class="num">04</div><div class="nm">Désinstaller apps MS</div></div>
+        <div class="stile"><div class="num">05</div><div class="nm">Nettoyage temp</div></div>
+        <div class="stile"><div class="num">06</div><div class="nm">Cache navigateurs</div></div>
+        <div class="stile sel"><div class="num">07</div><div class="nm">Configurer DNS</div></div>
+        <div class="stile"><div class="num">08</div><div class="nm">Désactiver télémétrie</div></div>
+        <div class="stile"><div class="num">09</div><div class="nm">Vérification SFC</div></div>
+        <div class="stile"><div class="num">10</div><div class="nm">Santé disques SMART</div></div>
+        <div class="stile"><div class="num">11</div><div class="nm">Optimiser les disques</div></div>
+        <div class="stile"><div class="num">12</div><div class="nm">Désactiver notifications</div></div>
+      </div>
+      <div class="detail">
+        <div style="padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px">
+          <div style="width:42px;height:42px;border-radius:11px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center"><svg class="ico i22"><use href="#i-perf"/></svg></div>
+          <div><div style="font-size:17px;font-weight:750;letter-spacing:-.3px">Configurer DNS</div><div style="font-size:12.5px;color:var(--text-2);margin-top:2px">Accélère la navigation avec un résolveur rapide</div></div>
+          <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+            <span class="badge med">Risque moyen</span><span class="badge">Rapide</span><span class="badge acc">Réversible</span>
+            <button class="btn" style="margin-left:6px"><svg class="ico i14"><use href="#i-play"/></svg>Exécuter</button>
+          </div>
+        </div>
+        <div style="padding:16px 20px">
+          <div class="cfg" style="grid-template-columns:1fr 1fr">
+            <div class="cfg-row"><div><div class="cfg-n">Fournisseur DNS</div><div class="cfg-s">Cloudflare · Google · Quad9</div></div><input class="inp sel" value="Cloudflare"></div>
+            <div class="cfg-row"><div><div class="cfg-n">Appliquer à l'IPv6</div><div class="cfg-s">résolveurs équivalents</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+            <div class="cfg-row"><div><div class="cfg-n">Toutes les cartes réseau</div><div class="cfg-s">sinon la carte active seule</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+            <div class="cfg-row"><div><div class="cfg-n">Sauvegarder l'ancien DNS</div><div class="cfg-s">export .reg avant modification</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="drawer">
+    <div class="handle" data-drawer>
+      <svg class="ico i16" style="color:var(--term-dim)"><use href="#i-chevU"/></svg>
+      <span class="lbl">Journal</span>
+      <span class="now">Performance · 2/3 · Configurer DNS</span>
+      <span class="rest">1 avertissement · 1 erreur</span>
+    </div>
+    <div class="term-b" data-drawer-body>
+<div class="ln"><span class="ts">14:32:07</span><span class="t-info">[INFO]</span><span>Démarrage — Performance · 3 scripts</span></div>
+<div class="ln"><span class="ts">14:32:07</span><span class="t-step">[STEP]</span><span>1/3  Désactiver la veille</span></div>
+<div class="ln"><span class="ts">14:32:08</span><span class="t-ok">[OK]  </span><span>Veille secteur et batterie : jamais</span></div>
+<div class="ln"><span class="ts">14:32:09</span><span class="t-ok">[OK]  </span><span>Hibernation désactivée — hiberfil.sys supprimé</span></div>
+<div class="ln"><span class="ts">14:32:09</span><span class="t-done">[DONE]</span><span>Désactiver la veille · 2,1 s</span></div>
+<div class="ln"><span class="ts">14:32:10</span><span class="t-step">[STEP]</span><span>2/3  Configurer DNS</span></div>
+<div class="ln"><span class="ts">14:32:11</span><span class="t-ok">[OK]  </span><span>Ethernet → 1.1.1.1 / 1.0.0.1</span></div>
+<div class="ln"><span class="ts">14:32:11</span><span class="t-warn">[WARN]</span><span>Wi-Fi désactivé — carte ignorée</span></div>
+<div class="ln"><span class="ts">14:32:12</span><span class="t-err">[ERR] </span><span>Bluetooth Network : accès refusé</span></div>
+<div class="ln"><span class="ts">14:32:12</span><span class="t-ok">[OK]  </span><span>Cache de résolution vidé<span class="cur"></span></span></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════ ② RAIL ═════════════════════════════════════ -->
+<div class="layout" id="L-rail">
+  <nav class="rail">
+    <div class="mark"><svg class="ico"><use href="#i-logo"/></svg></div>
+    <div class="ri"><svg class="ico"><use href="#i-clean"/></svg></div>
+    <div class="ri"><svg class="ico"><use href="#i-apps"/></svg></div>
+    <div class="ri" aria-current="true"><svg class="ico"><use href="#i-perf"/></svg></div>
+    <div class="ri"><svg class="ico"><use href="#i-sec"/></svg></div>
+    <div class="ri"><svg class="ico"><use href="#i-health"/></svg></div>
+    <div class="ri"><svg class="ico"><use href="#i-tools"/></svg></div>
+    <div class="sp"></div>
+    <div class="dv"></div>
+    <div class="ri"><svg class="ico"><use href="#i-hist"/></svg></div>
+    <div class="ri"><svg class="ico"><use href="#i-set"/></svg></div>
+  </nav>
+
+  <div class="mid">
+    <div class="cmd">
+      <div class="search"><svg class="ico i16"><use href="#i-search"/></svg>Rechercher un script, une action…<kbd>Ctrl K</kbd></div>
+      <div class="seg"><button data-mode-btn="simple" aria-selected="true">Simple</button><button data-mode-btn="expert" aria-selected="false">Expert</button></div>
+    </div>
+
+    <div class="col">
+      <!-- SIMPLE : la catégorie comme séquence d'étapes -->
+      <div class="inner" data-m="simple">
+        <div class="eyebrow">Catégorie · en cours</div>
+        <h1>Performance</h1>
+        <p class="sub">Veille, résolution DNS et optimisation des disques — 3 scripts, environ 4 minutes, aucune action irréversible.</p>
+
+        <div class="steps">
+          <div class="step done"><div class="sn"><svg class="ico i14"><use href="#i-check"/></svg></div><div class="st">Désactiver la veille</div><span class="sx">2,1 s</span></div>
+          <div class="step now"><div class="sn"><span class="spin" style="width:12px;height:12px;border-width:2px"></span></div><div class="st">Configurer DNS</div><span class="sx" style="color:var(--accent)">en cours</span></div>
+          <div class="step"><div class="sn">11</div><div class="st">Optimiser les disques</div><span class="sx">en attente</span></div>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:22px">
+          <button class="btn"><span class="spin"></span>Exécution — 2 / 3</button>
+          <button class="btn ghost"><svg class="ico i14"><use href="#i-set"/></svg>Options</button>
+        </div>
+
+        <div class="cfg" style="grid-template-columns:1fr 1fr">
+          <div class="cfg-row"><div><div class="cfg-n">Veille sur secteur</div><div class="cfg-s">0 = jamais</div></div><input class="inp num" value="0"></div>
+          <div class="cfg-row"><div><div class="cfg-n">Supprimer l'hibernation</div><div class="cfg-s">libère ~8 Go</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+          <div class="cfg-row"><div><div class="cfg-n">Fournisseur DNS</div><div class="cfg-s">Cloudflare · Google · Quad9</div></div><input class="inp sel" value="Cloudflare"></div>
+          <div class="cfg-row"><div><div class="cfg-n">Analyser avant d'optimiser</div><div class="cfg-s">plus lent, plus sûr</div></div><label class="tgl"><input type="checkbox"><span></span></label></div>
+        </div>
+      </div>
+
+      <!-- EXPERT : fiche du script -->
+      <div class="inner" data-m="expert">
+        <div class="eyebrow">scripts / 07_configurer_dns.ps1 · v2.0</div>
+        <h1>Configurer DNS</h1>
+        <p class="sub">Accélère la navigation en remplaçant le résolveur du fournisseur d'accès par un résolveur public rapide.</p>
+        <div style="display:flex;gap:7px;margin:16px 0 22px;flex-wrap:wrap">
+          <span class="badge med">Risque moyen</span><span class="badge">Rapide</span>
+          <span class="badge acc">Réversible</span><span class="badge">Admin requis</span>
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:22px">
+          <button class="btn"><svg class="ico i14"><use href="#i-play"/></svg>Exécuter</button>
+          <button class="btn ghost">Voir le source</button>
+        </div>
+        <div class="cfg">
+          <div class="cfg-row"><div><div class="cfg-n">Fournisseur DNS</div><div class="cfg-s">Cloudflare · Google · Quad9 · AdGuard</div></div><input class="inp sel" value="Cloudflare"></div>
+          <div class="cfg-row"><div><div class="cfg-n">Appliquer à l'IPv6</div><div class="cfg-s">résolveurs IPv6 équivalents</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+          <div class="cfg-row"><div><div class="cfg-n">Toutes les cartes réseau</div><div class="cfg-s">sinon uniquement la carte active</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+          <div class="cfg-row"><div><div class="cfg-n">Tester la latence <span class="mono" style="font-size:9px;color:var(--text-3);border:1px solid var(--border);border-radius:4px;padding:0 4px">avancé</span></div><div class="cfg-s">compare les résolveurs avant d'appliquer</div></div><label class="tgl"><input type="checkbox"><span></span></label></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="logpane">
+    <div class="term-h"><span>Journal en direct</span><button>effacer</button></div>
+    <div class="term-b">
+<div class="ln"><span class="ts">14:32:07</span><span class="t-step">[STEP]</span></div>
+<div class="ln"><span class="ts">        </span><span>1/3 Désactiver la veille</span></div>
+<div class="ln"><span class="ts">14:32:08</span><span class="t-ok">[OK]</span></div>
+<div class="ln"><span class="ts">        </span><span>Veille : jamais</span></div>
+<div class="ln"><span class="ts">14:32:09</span><span class="t-ok">[OK]</span></div>
+<div class="ln"><span class="ts">        </span><span>Hibernation désactivée</span></div>
+<div class="ln"><span class="ts">14:32:09</span><span class="t-done">[DONE]</span></div>
+<div class="ln"><span class="ts">        </span><span>2,1 s</span></div>
+<div class="ln"><span class="ts">14:32:10</span><span class="t-step">[STEP]</span></div>
+<div class="ln"><span class="ts">        </span><span>2/3 Configurer DNS</span></div>
+<div class="ln"><span class="ts">14:32:11</span><span class="t-ok">[OK]</span></div>
+<div class="ln"><span class="ts">        </span><span>Ethernet → 1.1.1.1</span></div>
+<div class="ln"><span class="ts">14:32:11</span><span class="t-warn">[WARN]</span></div>
+<div class="ln"><span class="ts">        </span><span>Wi-Fi ignoré</span></div>
+<div class="ln"><span class="ts">14:32:12</span><span class="t-err">[ERR]</span></div>
+<div class="ln"><span class="ts">        </span><span>Bluetooth : refusé<span class="cur"></span></span></div>
+    </div>
+  </aside>
+</div>
+
+
+<!-- ══════════════ ③ MASTER-DÉTAIL ════════════════════════════ -->
+<div class="layout" id="L-master">
+  <header class="top">
+    <div class="mark"><svg class="ico"><use href="#i-logo"/></svg></div>
+    <span class="wordmark">WinTool</span><span class="ver">4.0.0</span>
+    <span class="pill ok" style="margin-left:10px"><svg class="ico i14"><use href="#i-shield"/></svg>Admin</span>
+    <div class="seg"><button data-mode-btn="simple" aria-selected="true">Simple</button><button data-mode-btn="expert" aria-selected="false">Expert</button></div>
+    <div class="winctl"><button><svg class="ico"><use href="#i-min"/></svg></button><button><svg class="ico"><use href="#i-max"/></svg></button><button><svg class="ico"><use href="#i-close"/></svg></button></div>
+  </header>
+
+  <div class="split">
+    <div class="list">
+      <div class="filter"><div><svg class="ico i16"><use href="#i-search"/></svg>Filtrer lots et scripts…</div></div>
+      <div class="rows">
+        <div class="ghead">Lots</div>
+        <div class="row"><div class="ri"><svg class="ico i16"><use href="#i-clean"/></svg></div><div class="rt">Nettoyage</div><span class="rc">2</span><div class="dot"></div></div>
+        <div class="row"><div class="ri"><svg class="ico i16"><use href="#i-apps"/></svg></div><div class="rt">Applications</div><span class="rc">2</span><div class="dot"></div></div>
+        <div class="row" aria-current="true"><div class="ri"><svg class="ico i16"><use href="#i-perf"/></svg></div><div class="rt">Performance</div><span class="rc">3</span><div class="dot run"></div></div>
+        <div class="row"><div class="ri"><svg class="ico i16"><use href="#i-sec"/></svg></div><div class="rt">Sécurité</div><span class="rc">2</span><div class="dot"></div></div>
+        <div class="row"><div class="ri"><svg class="ico i16"><use href="#i-health"/></svg></div><div class="rt">Santé</div><span class="rc">2</span><div class="dot ok"></div></div>
+        <div class="row"><div class="ri"><svg class="ico i16"><use href="#i-tools"/></svg></div><div class="rt">Outillage</div><span class="rc">2</span><div class="dot"></div></div>
+
+        <div class="ghead">Scripts</div>
+        <div class="row"><span class="rn">01</span><div class="rt">Désactiver la veille</div><div class="dot ok"></div></div>
+        <div class="row"><span class="rn">02</span><div class="rt">Installer VCRedist</div><div class="dot"></div></div>
+        <div class="row"><span class="rn">03</span><div class="rt">Supprimer bloatwares</div><div class="dot"></div></div>
+        <div class="row"><span class="rn">04</span><div class="rt">Désinstaller apps Microsoft</div><div class="dot"></div></div>
+        <div class="row"><span class="rn">05</span><div class="rt">Nettoyage fichiers temp</div><div class="dot ok"></div></div>
+        <div class="row"><span class="rn">06</span><div class="rt">Cache navigateurs</div><div class="dot"></div></div>
+        <div class="row"><span class="rn">07</span><div class="rt">Configurer DNS</div><div class="dot err"></div></div>
+        <div class="row"><span class="rn">08</span><div class="rt">Désactiver télémétrie</div><div class="dot"></div></div>
+        <div class="row"><span class="rn">09</span><div class="rt">Vérification système SFC</div><div class="dot"></div></div>
+        <div class="row"><span class="rn">10</span><div class="rt">Santé des disques SMART</div><div class="dot ok"></div></div>
+        <div class="row"><span class="rn">11</span><div class="rt">Optimiser les disques</div><div class="dot"></div></div>
+        <div class="row"><span class="rn">12</span><div class="rt">Désactiver notifications</div><div class="dot"></div></div>
+        <div class="row"><span class="rn">13</span><div class="rt">Maintenance mensuelle auto</div><div class="dot"></div></div>
+      </div>
+    </div>
+
+    <div class="detail">
+      <div class="dscroll">
+        <!-- SIMPLE : le lot -->
+        <div data-m="simple">
+          <div class="dhead">
+            <div class="di"><svg class="ico i22"><use href="#i-perf"/></svg></div>
+            <div>
+              <h2>Performance</h2>
+              <div class="dsub">Veille, résolution DNS et optimisation des disques</div>
+              <div class="dmeta">3 scripts · ~4 min · aucune action irréversible</div>
+            </div>
+            <div class="dact"><button class="btn"><span class="spin"></span>2 / 3</button></div>
+          </div>
+
+          <div class="box">
+            <div class="box-h"><span>Scripts du lot</span><span>2 terminés · 1 en attente</span></div>
+            <div class="box-b">
+              <div class="srow"><span class="sn">01</span><div class="st">Désactiver la veille</div><span class="badge low">Terminé</span><span class="mono" style="font-size:10.5px;color:var(--text-3)">2,1 s</span></div>
+              <div class="srow"><span class="sn">07</span><div class="st">Configurer DNS</div><div class="bar" style="width:120px"><i style="width:70%"></i></div><span class="badge acc">En cours</span></div>
+              <div class="srow"><span class="sn">11</span><div class="st">Optimiser les disques</div><span class="badge">En attente</span></div>
+            </div>
+          </div>
+
+          <div class="box">
+            <div class="box-h"><span>Options du lot</span><span>6 options</span></div>
+            <div class="box-b">
+              <div class="cfg" style="grid-template-columns:1fr 1fr">
+                <div class="cfg-row"><div><div class="cfg-n">Veille sur secteur</div><div class="cfg-s">0 = jamais</div></div><input class="inp num" value="0"></div>
+                <div class="cfg-row"><div><div class="cfg-n">Veille sur batterie</div><div class="cfg-s">en minutes</div></div><input class="inp num" value="0"></div>
+                <div class="cfg-row"><div><div class="cfg-n">Supprimer l'hibernation</div><div class="cfg-s">libère ~8 Go</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+                <div class="cfg-row"><div><div class="cfg-n">Fournisseur DNS</div><div class="cfg-s">Cloudflare · Google · Quad9</div></div><input class="inp sel" value="Cloudflare"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- EXPERT : le script -->
+        <div data-m="expert">
+          <div class="dhead">
+            <div class="di"><svg class="ico i22"><use href="#i-perf"/></svg></div>
+            <div>
+              <h2>Configurer DNS</h2>
+              <div class="dsub">Accélère la navigation avec un résolveur rapide</div>
+              <div class="dmeta">scripts/07_configurer_dns.ps1 · v2.0</div>
+            </div>
+            <div class="dact"><button class="btn ghost">Voir le source</button><button class="btn"><svg class="ico i14"><use href="#i-play"/></svg>Exécuter</button></div>
+          </div>
+          <div style="display:flex;gap:7px;margin-top:14px;flex-wrap:wrap">
+            <span class="badge med">Risque moyen</span><span class="badge">Rapide</span>
+            <span class="badge acc">Réversible</span><span class="badge">Admin requis</span>
+          </div>
+          <div class="box">
+            <div class="box-h"><span>Configuration</span><span>6 options · 2 avancées</span></div>
+            <div class="box-b">
+              <div class="cfg" style="grid-template-columns:1fr 1fr">
+                <div class="cfg-row"><div><div class="cfg-n">Fournisseur DNS</div><div class="cfg-s">Cloudflare · Google · Quad9</div></div><input class="inp sel" value="Cloudflare"></div>
+                <div class="cfg-row"><div><div class="cfg-n">Appliquer à l'IPv6</div><div class="cfg-s">résolveurs équivalents</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+                <div class="cfg-row"><div><div class="cfg-n">Toutes les cartes réseau</div><div class="cfg-s">sinon la carte active seule</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+                <div class="cfg-row"><div><div class="cfg-n">Vider le cache après</div><div class="cfg-s">ipconfig /flushdns</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+                <div class="cfg-row"><div><div class="cfg-n">Tester la latence <span class="mono" style="font-size:9px;color:var(--text-3);border:1px solid var(--border);border-radius:4px;padding:0 4px">avancé</span></div><div class="cfg-s">compare avant d'appliquer</div></div><label class="tgl"><input type="checkbox"><span></span></label></div>
+                <div class="cfg-row"><div><div class="cfg-n">Sauvegarder l'ancien DNS <span class="mono" style="font-size:9px;color:var(--text-3);border:1px solid var(--border);border-radius:4px;padding:0 4px">avancé</span></div><div class="cfg-s">export .reg</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="termwrap">
+        <div class="term">
+          <div class="term-h"><span>Journal</span><button>fichier complet · effacer</button></div>
+          <div class="term-b">
+<div class="ln"><span class="ts">14:32:07</span><span class="t-step">[STEP]</span><span>1/3  Désactiver la veille</span></div>
+<div class="ln"><span class="ts">14:32:08</span><span class="t-ok">[OK]  </span><span>Veille secteur et batterie : jamais</span></div>
+<div class="ln"><span class="ts">14:32:09</span><span class="t-done">[DONE]</span><span>Désactiver la veille · 2,1 s</span></div>
+<div class="ln"><span class="ts">14:32:10</span><span class="t-step">[STEP]</span><span>2/3  Configurer DNS</span></div>
+<div class="ln"><span class="ts">14:32:11</span><span class="t-ok">[OK]  </span><span>Ethernet → 1.1.1.1 / 1.0.0.1</span></div>
+<div class="ln"><span class="ts">14:32:11</span><span class="t-warn">[WARN]</span><span>Wi-Fi désactivé — carte ignorée</span></div>
+<div class="ln"><span class="ts">14:32:12</span><span class="t-err">[ERR] </span><span>Bluetooth Network : accès refusé<span class="cur"></span></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════ ④ BANDES ═══════════════════════════════════ -->
+<div class="layout" id="L-bandes">
+  <div class="scroll">
+    <div class="wrap">
+      <div class="hd">
+        <div class="mark"><svg class="ico"><use href="#i-logo"/></svg></div>
+        <span class="wordmark">WinTool</span><span class="ver">4.0.0</span>
+        <div class="seg"><button data-mode-btn="simple" aria-selected="true">Simple</button><button data-mode-btn="expert" aria-selected="false">Expert</button></div>
+      </div>
+
+      <div class="intro">
+        <h1>Maintenance de Windows</h1>
+        <p>Choisissez un domaine, ajustez si besoin, lancez. Chaque action est journalisée.</p>
+        <div class="st">
+          <div><span class="k">Scripts</span><span class="v">13</span></div>
+          <div><span class="k">Dernière exécution</span><span class="v">21 sept. · 14:32</span></div>
+          <div><span class="k">Disque C:</span><span class="v">312 Go libres</span></div>
+          <div><span class="k">Santé disques</span><span class="v" style="color:var(--ok)">Bonne</span></div>
+        </div>
+      </div>
+
+      <!-- SIMPLE : bandes de catégories -->
+      <div data-m="simple">
+        <div class="band">
+          <div class="bh" data-band><div class="bi"><svg class="ico i26"><use href="#i-clean"/></svg></div>
+            <div><div class="bt">Nettoyage</div><div class="bd">Fichiers temporaires, cache Windows Update, caches navigateurs</div></div>
+            <div class="br"><span class="bc">2 scripts · ~3 min</span><svg class="ico" style="color:var(--text-3)"><use href="#i-chevR"/></svg></div>
+          </div>
+        </div>
+
+        <div class="band open">
+          <div class="bh" data-band><div class="bi"><svg class="ico i26"><use href="#i-perf"/></svg></div>
+            <div><div class="bt">Performance</div><div class="bd">Veille, résolution DNS et optimisation des disques</div></div>
+            <div class="br"><span class="badge acc">En cours · 2/3</span><svg class="ico" style="color:var(--accent)"><use href="#i-chevU"/></svg></div>
+          </div>
+          <div class="bb"><div class="bb-in">
+            <div class="slist">
+              <div class="sitem"><span class="sn">01</span><div class="st">Désactiver la veille</div><span class="badge low">Terminé · 2,1 s</span></div>
+              <div class="sitem now"><span class="sn">07</span><div class="st">Configurer DNS</div><div class="bar" style="width:110px"><i style="width:70%"></i></div><span class="badge acc">En cours</span></div>
+              <div class="sitem"><span class="sn">11</span><div class="st">Optimiser les disques</div><span class="badge">En attente</span></div>
+            </div>
+
+            <div class="cfg" style="grid-template-columns:1fr 1fr">
+              <div class="cfg-row"><div><div class="cfg-n">Veille sur secteur</div><div class="cfg-s">0 = jamais</div></div><input class="inp num" value="0"></div>
+              <div class="cfg-row"><div><div class="cfg-n">Supprimer l'hibernation</div><div class="cfg-s">efface hiberfil.sys, libère ~8 Go</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+              <div class="cfg-row"><div><div class="cfg-n">Fournisseur DNS</div><div class="cfg-s">Cloudflare · Google · Quad9</div></div><input class="inp sel" value="Cloudflare"></div>
+              <div class="cfg-row"><div><div class="cfg-n">Analyser avant d'optimiser</div><div class="cfg-s">plus lent, évite les passes inutiles</div></div><label class="tgl"><input type="checkbox"><span></span></label></div>
+            </div>
+
+            <div class="termcard">
+              <div class="term">
+                <div class="term-h"><span>Journal · Performance</span><button>fichier complet</button></div>
+                <div class="term-b">
+<div class="ln"><span class="ts">14:32:07</span><span class="t-step">[STEP]</span><span>1/3  Désactiver la veille</span></div>
+<div class="ln"><span class="ts">14:32:08</span><span class="t-ok">[OK]  </span><span>Veille secteur et batterie : jamais</span></div>
+<div class="ln"><span class="ts">14:32:09</span><span class="t-done">[DONE]</span><span>Désactiver la veille · 2,1 s</span></div>
+<div class="ln"><span class="ts">14:32:10</span><span class="t-step">[STEP]</span><span>2/3  Configurer DNS</span></div>
+<div class="ln"><span class="ts">14:32:11</span><span class="t-ok">[OK]  </span><span>Ethernet → 1.1.1.1 / 1.0.0.1</span></div>
+<div class="ln"><span class="ts">14:32:11</span><span class="t-warn">[WARN]</span><span>Wi-Fi désactivé — carte ignorée</span></div>
+<div class="ln"><span class="ts">14:32:12</span><span class="t-err">[ERR] </span><span>Bluetooth Network : accès refusé<span class="cur"></span></span></div>
+                </div>
+              </div>
+            </div>
+          </div></div>
+        </div>
+
+        <div class="band">
+          <div class="bh" data-band><div class="bi"><svg class="ico i26"><use href="#i-apps"/></svg></div>
+            <div><div class="bt">Applications</div><div class="bd">Bloatwares préinstallés et applications Microsoft imposées</div></div>
+            <div class="br"><span class="badge high">Risque élevé</span><span class="bc">2 scripts</span><svg class="ico" style="color:var(--text-3)"><use href="#i-chevR"/></svg></div>
+          </div>
+        </div>
+        <div class="band">
+          <div class="bh" data-band><div class="bi"><svg class="ico i26"><use href="#i-sec"/></svg></div>
+            <div><div class="bt">Sécurité</div><div class="bd">Télémétrie, publicités et notifications intrusives</div></div>
+            <div class="br"><span class="bc">2 scripts · ~2 min</span><svg class="ico" style="color:var(--text-3)"><use href="#i-chevR"/></svg></div>
+          </div>
+        </div>
+        <div class="band">
+          <div class="bh" data-band><div class="bi"><svg class="ico i26"><use href="#i-health"/></svg></div>
+            <div><div class="bt">Santé</div><div class="bd">Intégrité des fichiers système et état SMART des disques</div></div>
+            <div class="br"><span class="badge low">Vérifié le 21/09</span><span class="bc">2 scripts</span><svg class="ico" style="color:var(--text-3)"><use href="#i-chevR"/></svg></div>
+          </div>
+        </div>
+        <div class="band">
+          <div class="bh" data-band><div class="bi"><svg class="ico i26"><use href="#i-tools"/></svg></div>
+            <div><div class="bt">Outillage</div><div class="bd">Librairies Visual C++ et maintenance mensuelle planifiée</div></div>
+            <div class="br"><span class="bc">2 scripts · ~4 min</span><svg class="ico" style="color:var(--text-3)"><use href="#i-chevR"/></svg></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EXPERT : bandes de scripts -->
+      <div data-m="expert">
+        <div class="band">
+          <div class="bh" data-band><div class="bi" style="font-family:var(--mono);font-size:13px;font-weight:500">01</div>
+            <div><div class="bt">Désactiver la veille</div><div class="bd">Empêche Windows de se mettre en veille ou en hibernation</div></div>
+            <div class="br"><span class="badge low">Risque faible</span><svg class="ico" style="color:var(--text-3)"><use href="#i-chevR"/></svg></div>
+          </div>
+        </div>
+        <div class="band open">
+          <div class="bh" data-band><div class="bi" style="font-family:var(--mono);font-size:13px;font-weight:500">07</div>
+            <div><div class="bt">Configurer DNS</div><div class="bd">Accélère la navigation avec un résolveur rapide</div></div>
+            <div class="br"><span class="badge med">Risque moyen</span><span class="badge acc">Réversible</span><svg class="ico" style="color:var(--accent)"><use href="#i-chevU"/></svg></div>
+          </div>
+          <div class="bb"><div class="bb-in">
+            <div style="display:flex;gap:10px;margin-bottom:18px">
+              <button class="btn"><svg class="ico i14"><use href="#i-play"/></svg>Exécuter</button>
+              <button class="btn ghost">Voir le source</button>
+              <span class="mono" style="font-size:10.5px;color:var(--text-3);align-self:center;margin-left:auto">scripts/07_configurer_dns.ps1 · v2.0</span>
+            </div>
+            <div class="cfg" style="grid-template-columns:1fr 1fr">
+              <div class="cfg-row"><div><div class="cfg-n">Fournisseur DNS</div><div class="cfg-s">Cloudflare · Google · Quad9</div></div><input class="inp sel" value="Cloudflare"></div>
+              <div class="cfg-row"><div><div class="cfg-n">Appliquer à l'IPv6</div><div class="cfg-s">résolveurs équivalents</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+              <div class="cfg-row"><div><div class="cfg-n">Toutes les cartes réseau</div><div class="cfg-s">sinon la carte active seule</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+              <div class="cfg-row"><div><div class="cfg-n">Sauvegarder l'ancien DNS <span class="mono" style="font-size:9px;color:var(--text-3);border:1px solid var(--border);border-radius:4px;padding:0 4px">avancé</span></div><div class="cfg-s">export .reg avant modification</div></div><label class="tgl"><input type="checkbox" checked><span></span></label></div>
+            </div>
+          </div></div>
+        </div>
+        <div class="band">
+          <div class="bh" data-band><div class="bi" style="font-family:var(--mono);font-size:13px;font-weight:500">03</div>
+            <div><div class="bt">Supprimer bloatwares</div><div class="bd">Retire les applications inutiles préinstallées</div></div>
+            <div class="br"><span class="badge high">Risque élevé</span><svg class="ico" style="color:var(--text-3)"><use href="#i-chevR"/></svg></div>
+          </div>
+        </div>
+        <div class="band">
+          <div class="bh" data-band><div class="bi" style="font-family:var(--mono);font-size:13px;font-weight:500">09</div>
+            <div><div class="bt">Vérification système SFC</div><div class="bd">Lance SFC et DISM pour réparer les fichiers corrompus</div></div>
+            <div class="br"><span class="badge">Lent · ~15 min</span><svg class="ico" style="color:var(--text-3)"><use href="#i-chevR"/></svg></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════ BARRE DE COMPARAISON ═══════════════════════ -->
+<div class="mockbar">
+  <span class="lbl">Disposition</span>
+  <div class="grp">
+    <button data-l="cockpit" aria-pressed="true">① Cockpit</button>
+    <button data-l="rail"    aria-pressed="false">② Rail</button>
+    <button data-l="master"  aria-pressed="false">③ Master-détail</button>
+    <button data-l="bandes"  aria-pressed="false">④ Bandes</button>
+  </div>
+  <div class="sep"></div>
+  <span class="lbl">Mode</span>
+  <div class="grp">
+    <button data-mb="simple" aria-pressed="true">Simple</button>
+    <button data-mb="expert" aria-pressed="false">Expert</button>
+  </div>
+  <div class="sep"></div>
+  <kbd>1-4</kbd><kbd>S E</kbd>
+</div>
+
+<script>
+const H = document.documentElement;
+
+function setLayout(v){
+  H.dataset.layout = v;
+  document.querySelectorAll('[data-l]').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.l === v)));
+}
+function setMode(v){
+  H.dataset.mode = v;
+  document.querySelectorAll('[data-mb]').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.mb === v)));
+  document.querySelectorAll('[data-mode-btn]').forEach(b =>
+    b.setAttribute('aria-selected', String(b.dataset.modeBtn === v)));
+}
+
+document.querySelectorAll('[data-l]').forEach(b => b.onclick = () => setLayout(b.dataset.l));
+document.querySelectorAll('[data-mb]').forEach(b => b.onclick = () => setMode(b.dataset.mb));
+// Les bascules Simple/Expert de chaque disposition sont réellement câblées
+document.querySelectorAll('[data-mode-btn]').forEach(b => b.onclick = () => setMode(b.dataset.modeBtn));
+
+// Tiroir du Cockpit
+const handle = document.querySelector('[data-drawer]');
+const dbody  = document.querySelector('[data-drawer-body]');
+handle.onclick = () => { dbody.hidden = !dbody.hidden; };
+
+// Accordéon des Bandes
+document.querySelectorAll('[data-band]').forEach(h => h.onclick = () => {
+  const band = h.closest('.band'), wasOpen = band.classList.contains('open');
+  band.parentElement.querySelectorAll('.band.open').forEach(b => b.classList.remove('open'));
+  if (!wasOpen) band.classList.add('open');
+});
+
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  const map = {'1':'cockpit','2':'rail','3':'master','4':'bandes'};
+  const k = e.key.toLowerCase();
+  if (map[k]) setLayout(map[k]);
+  if (k === 's') setMode('simple');
+  if (k === 'e') setMode('expert');
+});
+
+document.querySelectorAll('.term-b').forEach(t => t.scrollTop = t.scrollHeight);
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+==============================================================
+  WINTOOL — Comment créer un script compatible
+==============================================================
+
+1. NOMMER LE FICHIER
+──────────────────────────────────────────
+  Format : XX_nom_du_script.ps1
+  Exemple: 14_mon_nouveau_script.ps1
+
+  Le XX (numéro) détermine l'ordre d'affichage dans l'interface.
+  Pas besoin de modifier quoi que ce soit dans WinTool :
+  le script apparaît automatiquement au prochain démarrage.
+
+
+2. STRUCTURE OBLIGATOIRE DU FICHIER
+──────────────────────────────────────────
+
+  ┌─────────────────────────────────────────────────────────┐
+  │  ## WINTOOL:START                                       │
+  │  ## title    : Nom affiché dans l'interface             │
+  │  ## desc     : Description courte (1 ligne)             │
+  │  ## category : nettoyage | performance | securite |     │
+  │  ##            sante | appli | outillage | divers       │
+  │  ## icon     : 🔧  (un seul emoji)                     │
+  │  ## tags     : tag1, tag2, tag3                         │
+  │  ## version  : 1.0                                      │
+  │  ## WINTOOL:END                                         │
+  │                                                         │
+  │  $CONFIG = @{                                           │
+  │      MaOption   = $true    # [bool]   Mon option        │
+  │      MonNombre  = 30       # [number] Délai en secondes │
+  │      MonTexte   = "valeur" # [string] Texte libre       │
+  │      OptionInterne = $false # [hidden] Pas dans Simple  │
+  │  }                                                      │
+  │                                                         │
+  │  # ... reste du script ...                              │
+  └─────────────────────────────────────────────────────────┘
+
+
+3. ANNOTER LE $CONFIG — SYNTAXE DU COMMENTAIRE
+──────────────────────────────────────────
+  Chaque ligne du $CONFIG peut avoir un commentaire :
+
+    CLE = valeur    # [type] Label — Sous-description
+
+  Exemples :
+    ViderTemp   = $true   # [bool]   Vider le dossier temp — %TEMP%
+    Delai_Min   = 30      # [number] Délai en minutes — 0 = jamais
+    ServeurDNS  = "CF"    # [string] Fournisseur DNS
+    Option_Dev  = $false  # [hidden] Option avancée cachée en mode simple
+
+  Types disponibles :
+    [bool]   → toggle on/off dans l'interface
+    [number] → champ numérique
+    [string] → champ texte
+    [hidden] → visible en mode Expert uniquement
+
+
+4. EXEMPLE COMPLET
+──────────────────────────────────────────
+
+## WINTOOL:START
+## title    : Désactiver l'impression
+## desc     : Arrête le spouleur d'impression pour libérer des ressources
+## category : performance
+## icon     : 🖨️
+## tags     : imprimante, spouleur, ressources, service
+## version  : 1.0
+## WINTOOL:END
+
+$CONFIG = @{
+    ArreterService      = $true    # [bool]   Arrêter le service — Spouleur d'impression
+    DesactiverDemarrage = $true    # [bool]   Désactiver au démarrage
+    Confirmation        = $false   # [hidden] Demander confirmation avant
+}
+
+# ============================================================
+Write-Host "Désactivation du spouleur d'impression..." -ForegroundColor Cyan
+
+if ($CONFIG.ArreterService) {
+    Stop-Service -Name Spooler -Force -ErrorAction SilentlyContinue
+    Write-Host "[OK] Service arrêté" -ForegroundColor Green
+}
+
+if ($CONFIG.DesactiverDemarrage) {
+    Set-Service -Name Spooler -StartupType Disabled -ErrorAction SilentlyContinue
+    Write-Host "[OK] Démarrage désactivé" -ForegroundColor Green
+}
+
+Write-Host "[DONE] Terminé." -ForegroundColor Green
+
+
+5. METTRE À JOUR VIA GITHUB
+──────────────────────────────────────────
+  → Déposer le fichier dans scripts/ sur GitHub
+  → Incrémenter version.txt
+  → Au prochain démarrage de WinTool chez l'ami,
+    le script apparaît automatiquement.
+
+==============================================================

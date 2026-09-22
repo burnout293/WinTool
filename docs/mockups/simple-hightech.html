@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="fr" data-layout="console" data-step="1" data-theme="dark" data-gauge="batterie">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WinTool v4 — Mode Simple, pistes high-tech</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════════════════════
+   WINTOOL v4 — MODE SIMPLE, TROIS PISTES HIGH-TECH / SPATIAL
+   Suite à retour du 22/09/2026 : garder la carte de récap « à lèvre ondulée »
+   (validée), remplacer le placement organique désordonné par une disposition
+   ORDONNÉE (grille nette ou cercle parfaitement symétrique), et proposer
+   plusieurs métaphores de jauge d'étape 3 (batterie / éclair / engrenage /
+   bouclier / mur) sur la piste ③ Réacteur.
+     ① Console — panneau de contrôle, tuiles à coins coupés, mur de briques
+     ② Orbite  — sélection en orbite symétrique, radar de progression
+     ③ Réacteur — cellules d'énergie, jauge d'étape 3 interchangeable
+   ══════════════════════════════════════════════════════════════════════════ */
+:root{
+  --bg:#0A0C10;     --surface:#12161D;  --surface-2:#1A2029;  --surface-3:#232B36;
+  --border:#232B36; --border-2:#33404E;
+  --text:#F2F6FA;   --text-2:#9BA9B9;   --text-3:#67768A;
+  --ok:#22D39A;     --warn:#FFB340;     --err:#FF6B6B;
+  --acc:#22D39A;    --acc-2:#35C8E8;    --acc-on:#4BE8B8;
+  --sh:0 2px 10px rgba(0,0,0,.35);      --sh-2:0 16px 46px rgba(0,0,0,.55);
+}
+:root[data-theme="light"]{
+  --bg:#F3F6F9;     --surface:#FFFFFF;  --surface-2:#EDF2F6;  --surface-3:#E0E8EF;
+  --border:#DDE5EC; --border-2:#C3D0DA;
+  --text:#0F1A24;   --text-2:#4E6172;   --text-3:#7C8FA0;
+  --acc-on:#0B7D59; --sh:0 1px 2px rgba(15,26,36,.05),0 6px 18px rgba(15,26,36,.05); --sh-2:0 10px 34px rgba(15,26,36,.10);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);
+  font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;overflow:hidden}
+button{font-family:inherit;color:inherit;border:none;outline:none;background:none;cursor:pointer}
+svg{display:block}
+.ico{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.i14{width:14px;height:14px}.i16{width:16px;height:16px}.i18{width:18px;height:18px}.i22{width:22px;height:22px}
+.mono{font-family:'IBM Plex Mono',monospace}
+.hud{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--text-3)}
+
+.h1{font-size:26px;font-weight:800;letter-spacing:-.7px;line-height:1.2;text-align:center}
+.lead{font-size:14px;color:var(--text-2);margin-top:8px;text-align:center;line-height:1.55;max-width:520px;margin-inline:auto}
+.nav{display:flex;gap:12px;justify-content:center;margin-top:24px;position:relative;z-index:1}
+.big{display:inline-flex;align-items:center;justify-content:center;gap:12px;height:56px;padding:0 28px;
+  font-size:15px;font-weight:800;letter-spacing:-.1px;color:var(--bg);cursor:pointer;transition:all .2s;
+  background:linear-gradient(135deg,var(--acc),var(--acc-2));box-shadow:0 8px 24px color-mix(in srgb,var(--acc) 30%,transparent);border-radius:12px}
+.big:hover{transform:translateY(-2px)}
+.big.quiet{background:var(--surface);color:var(--text);border:1.5px solid var(--border-2);box-shadow:none;font-weight:700}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;padding:3px 10px;
+  border-radius:999px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);color:var(--acc-on);background:color-mix(in srgb,var(--acc) 14%,transparent)}
+
+.layout{display:none;height:100vh;flex-direction:column;padding-bottom:66px;position:relative}
+html[data-layout="console"] #P-console,
+html[data-layout="orbite"]  #P-orbite,
+html[data-layout="reacteur"] #P-reacteur{display:flex}
+
+.pane{display:none;flex:1;overflow-y:auto;position:relative}
+html[data-step="1"] .pane[data-s="1"],
+html[data-step="2"] .pane[data-s="2"],
+html[data-step="3"] .pane[data-s="3"]{display:block}
+
+.miniHead{flex-shrink:0;display:flex;align-items:center;gap:10px;padding:14px 22px;position:relative;z-index:2}
+.miniHead .mark{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--acc),var(--acc-2));
+  display:grid;place-items:center;color:var(--bg)}
+.miniHead .word{font-size:14px;font-weight:800}
+.miniHead .tag{margin-left:auto}
+
+/* ── Rail d'étapes partagé (Console + Réacteur) ─────────────────────────── */
+.rail-head{padding:20px 24px 6px}
+.rail-line{max-width:400px;margin:0 auto;height:2px;background:var(--border-2);position:relative;border-radius:2px}
+.rail-line i{position:absolute;top:0;left:0;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc-2));border-radius:2px}
+.rail-nodes{max-width:400px;margin:-8px auto 0;display:flex;justify-content:space-between;position:relative}
+.rail-node{width:14px;height:14px;background:var(--surface);border:2px solid var(--border-2);transform:rotate(45deg)}
+.rail-node.done,.rail-node.now{border-color:var(--acc);background:var(--acc);box-shadow:0 0 12px color-mix(in srgb,var(--acc) 55%,transparent)}
+.rail-labels{max-width:400px;margin:7px auto 0;display:flex;justify-content:space-between}
+.rail-labels span{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3)}
+.rail-labels span.on{color:var(--acc-on)}
+
+/* ── Carte de récap « à lèvre ondulée » (validée) — réutilisée telle quelle ── */
+.wave-card{position:relative;max-width:600px;margin:20px auto 0;background:var(--surface);
+  border:1px solid var(--border);border-radius:22px;overflow:hidden;box-shadow:var(--sh-2);text-align:left}
+.wave-lip{height:28px;background:linear-gradient(135deg,var(--acc),var(--acc-2));position:relative}
+.wave-lip::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:13px;background:var(--surface);
+  border-radius:50% 50% 0 0 / 100% 100% 0 0}
+.wave-card .wc-b{padding:16px 22px 18px}
+.wave-card .wc-tag{padding:12px 22px 0}
+.wrow{display:flex;gap:13px;padding:12px 0;align-items:center}
+.wrow:not(:last-child){border-bottom:2px dotted var(--border)}
+.wrow .wi{width:38px;height:38px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;
+  background:color-mix(in srgb,var(--acc) 16%,transparent);color:var(--acc-on)}
+.wrow .wt{font-size:13.5px;font-weight:750}
+.wrow .wd{font-size:11.5px;color:var(--text-2);margin-top:2px;line-height:1.45}
+.wrow .wx{margin-left:auto;flex-shrink:0}
+.rest-note{display:flex;gap:12px;align-items:flex-start;max-width:600px;margin:14px auto 0;padding:13px 17px;
+  background:color-mix(in srgb,var(--warn) 12%,transparent);border:1px solid color-mix(in srgb,var(--warn) 34%,transparent);border-radius:14px}
+.rest-note svg{color:var(--warn);flex-shrink:0}
+.rest-note p{font-size:12px;color:var(--text-2);line-height:1.5}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ① CONSOLE — tuiles à coins coupés, disposition en grille nette
+   ══════════════════════════════════════════════════════════════════════ */
+.console-stage{padding:8px 24px 34px;text-align:center}
+.console-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;max-width:740px;margin:22px auto 0}
+.cmod{background:var(--surface);border:1px solid var(--border);padding:20px 14px;text-align:center;cursor:pointer;
+  clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px);
+  transition:all .18s}
+.cmod:hover{border-color:color-mix(in srgb,var(--acc) 55%,transparent)}
+.cmod.on{border-color:var(--acc);box-shadow:0 0 0 1px color-mix(in srgb,var(--acc) 45%,transparent),0 0 28px color-mix(in srgb,var(--acc) 20%,transparent)}
+.cmod .mid{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.13em;color:var(--text-3);text-transform:uppercase}
+.cmod .ci{width:42px;height:42px;margin:9px auto;display:grid;place-items:center;border-radius:50%;
+  background:var(--surface-2);color:var(--text-2);border:1px solid var(--border)}
+.cmod.on .ci{color:var(--acc-on);border-color:var(--acc);box-shadow:0 0 16px color-mix(in srgb,var(--acc) 45%,transparent)}
+.cmod .ct{font-size:13px;font-weight:750}
+.cmod .cd{font-size:10.5px;color:var(--text-3);margin-top:3px;line-height:1.3}
+.cmod.hero{grid-column:span 3;display:flex;align-items:center;gap:16px;text-align:left;padding:18px 24px;border-color:var(--acc)}
+.cmod.hero .ci{margin:0;width:50px;height:50px}
+.cmod.hero .ct{font-size:15px}
+
+.brickbar{display:flex;gap:4px;max-width:400px;margin:0 auto}
+.brick{flex:1;height:32px;background:var(--surface-2);border:1px solid var(--border)}
+.brick.on{background:linear-gradient(180deg,var(--acc-2),var(--acc));border-color:var(--acc);
+  box-shadow:0 0 12px color-mix(in srgb,var(--acc) 50%,transparent)}
+.big-n{font-family:'IBM Plex Mono',monospace;font-size:38px;font-weight:700;letter-spacing:-1px;margin:14px 0 4px}
+.wtask{display:flex;align-items:center;gap:12px;padding:11px 16px;border-radius:999px;background:var(--surface);
+  border:1.5px solid var(--border);max-width:420px;margin:8px auto 0;text-align:left}
+.wtask.now{border-color:var(--acc)}
+.wtask .wti{width:24px;height:24px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;
+  background:var(--surface-2);color:var(--text-3);font-size:10.5px;font-weight:800}
+.wtask.done .wti{background:var(--ok);color:var(--bg)}
+.wtask.now .wti{background:linear-gradient(135deg,var(--acc),var(--acc-2))}
+.wtask .wtt{flex:1;font-size:12.5px;font-weight:650}
+.wtask .wtx{font-size:11px;color:var(--text-3)}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ② ORBITE — sélection en orbite symétrique, radar de progression
+   ══════════════════════════════════════════════════════════════════════ */
+.orbit-head{padding:16px 24px 0;text-align:center}
+.orbit-arc{width:120px;height:60px;margin:6px auto 0}
+.orbit-stage{padding:0 24px 34px;text-align:center}
+.orbit-wrap{position:relative;width:480px;height:480px;margin:14px auto 0}
+.orbit-ring{position:absolute;inset:0;border:1.5px dashed var(--border-2);border-radius:50%}
+.orbit-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:148px;height:148px;
+  border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:4px;
+  background:radial-gradient(circle at 35% 30%, color-mix(in srgb,var(--acc) 26%,var(--surface)), var(--surface));
+  border:2px solid var(--acc);box-shadow:0 0 44px color-mix(in srgb,var(--acc) 35%,transparent);cursor:pointer}
+.orbit-center .oi{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:var(--acc);color:var(--bg)}
+.orbit-center .ot{font-size:13px;font-weight:800}
+.orbit-item{position:absolute;top:50%;left:50%;width:100px;height:100px;margin:-50px;
+  border-radius:50%;background:var(--surface);border:1.5px solid var(--border);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;cursor:pointer;transition:all .2s;gap:5px}
+.orbit-item:hover,.orbit-item.on{border-color:var(--acc);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 32%,transparent)}
+.orbit-item .oi{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);color:var(--text-2)}
+.orbit-item.on .oi{color:var(--acc-on);background:color-mix(in srgb,var(--acc) 18%,transparent)}
+.orbit-item .ot{font-size:11px;font-weight:700;padding:0 6px;line-height:1.2}
+
+.radar-stage{text-align:center;padding-top:6px}
+.radar{width:216px;height:216px;margin:0 auto;border-radius:50%;position:relative;overflow:hidden;
+  background:var(--surface-2);border:2px solid var(--border-2)}
+.radar::before{content:'';position:absolute;inset:0;border-radius:50%;
+  background:conic-gradient(from 0deg, color-mix(in srgb,var(--acc) 60%,transparent), transparent 45%);
+  animation:sweep 2.6s linear infinite;transform-origin:center}
+@keyframes sweep{to{transform:rotate(360deg)}}
+.radar-rings{position:absolute;inset:0;border-radius:50%}
+.radar-rings i{position:absolute;border:1px solid color-mix(in srgb,var(--acc) 18%,transparent);border-radius:50%}
+.radar-rings i:nth-child(1){inset:18px}.radar-rings i:nth-child(2){inset:40px}.radar-rings i:nth-child(3){inset:62px}
+.radar-n{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1}
+.radar-n .n{font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:700}
+.radar-n .u{font-size:11px;color:var(--text-3)}
+.blip{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--border-2);top:50%;left:50%}
+.blip.done{background:var(--acc);box-shadow:0 0 10px var(--acc)}
+
+/* ══════════════════════════════════════════════════════════════════════
+   ③ RÉACTEUR — cellules d'énergie, jauge interchangeable
+   ══════════════════════════════════════════════════════════════════════ */
+.reactor-stage{padding:8px 24px 34px;text-align:center}
+.cell-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:720px;margin:22px auto 0}
+.cell{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:18px 12px;text-align:center;
+  cursor:pointer;transition:all .18s}
+.cell:hover{border-color:color-mix(in srgb,var(--acc) 55%,transparent)}
+.cell.on{border-color:var(--acc);box-shadow:0 0 0 1px color-mix(in srgb,var(--acc) 45%,transparent),0 0 26px color-mix(in srgb,var(--acc) 20%,transparent)}
+.cell .cring{width:52px;height:52px;margin:0 auto 9px;border-radius:50%;padding:3px;
+  background:conic-gradient(var(--surface-3) 0turn);display:grid;place-items:center}
+.cell.on .cring{background:conic-gradient(var(--acc) 1turn)}
+.cell .cring i{width:100%;height:100%;border-radius:50%;background:var(--surface);display:grid;place-items:center;color:var(--text-2)}
+.cell.on .cring i{color:var(--acc-on)}
+.cell .ct{font-size:12.5px;font-weight:750}
+.cell .cd{font-size:10.5px;color:var(--text-3);margin-top:2px}
+.cell.hero{grid-column:span 3;display:flex;align-items:center;gap:16px;text-align:left;border-color:var(--acc)}
+.cell.hero .cring{margin:0;width:58px;height:58px}
+.cell.hero .ct{font-size:15px}
+
+.gauge-switch{display:flex;justify-content:center;gap:6px;margin:20px auto 0;flex-wrap:wrap;max-width:520px}
+.gauge-switch button{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+  padding:8px 13px;border-radius:999px;border:1px solid var(--border-2);color:var(--text-3);transition:all .15s}
+.gauge-switch button:hover{color:var(--text)}
+.gauge-switch button[aria-pressed="true"]{background:linear-gradient(135deg,var(--acc),var(--acc-2));color:var(--bg);border-color:transparent}
+
+.gauge-box{margin-top:22px;display:none}
+html[data-gauge="batterie"] #g-batterie,
+html[data-gauge="eclair"]   #g-eclair,
+html[data-gauge="engrenage"] #g-engrenage,
+html[data-gauge="bouclier"] #g-bouclier,
+html[data-gauge="mur"]      #g-mur{display:block}
+
+.gear-ring{width:150px;height:150px;margin:0 auto;border-radius:50%;padding:8px;
+  background:conic-gradient(var(--acc) 0turn 0.66turn, var(--surface-3) 0.66turn 1turn);display:grid;place-items:center}
+.gear-ring .inner{width:100%;height:100%;border-radius:50%;background:var(--surface);display:grid;place-items:center;position:relative}
+.gear-spin{animation:spin 3.2s linear infinite;color:var(--acc-on)}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.shield-scale{transform:scale(1.02)}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-clean" viewBox="0 0 24 24"><path d="M12 3l1.7 4.3L18 9l-4.3 1.7L12 15l-1.7-4.3L6 9l4.3-1.7z"/><path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></symbol>
+  <symbol id="i-apps" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M15 17.5h5M17.5 15v5"/></symbol>
+  <symbol id="i-perf" viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12z"/></symbol>
+  <symbol id="i-sec" viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.2c0 4.6-3.2 8.6-7.5 9.5-4.3-.9-7.5-4.9-7.5-9.5V6z"/><path d="M9.2 12l2 2 3.6-3.8"/></symbol>
+  <symbol id="i-health" viewBox="0 0 24 24"><path d="M2.5 12H7l2.2-6.5L13 18.5l2.3-6.5h6.2"/></symbol>
+  <symbol id="i-tools" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 3.5L22 20H2z"/><path d="M12 10v4M12 17.2v.1"/></symbol>
+  <symbol id="i-arrR" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-arrL" viewBox="0 0 24 24"><path d="M20 12H5M11 6l-6 6 6 6"/></symbol>
+</svg>
+
+<!-- ══════════════ ① CONSOLE ══════════════ -->
+<div class="layout" id="P-console">
+  <div class="miniHead"><div class="mark"><svg class="ico i16" style="stroke-width:2.4"><use href="#i-bolt"/></svg></div><span class="word">WinTool</span><span class="tag badge">① Console</span></div>
+
+  <div class="pane" data-s="1">
+    <div class="rail-head">
+      <div class="rail-line"><i style="width:16%"></i></div>
+      <div class="rail-nodes"><div class="rail-node now"></div><div class="rail-node"></div><div class="rail-node"></div></div>
+      <div class="rail-labels"><span class="on">Choisir</span><span>Vérifier</span><span>Entretien</span></div>
+    </div>
+    <div class="console-stage">
+      <div class="h1">Sélectionnez un module</div>
+      <p class="lead">Chaque module active un ensemble d'actions. Le module recommandé est mis en évidence.</p>
+
+      <div class="console-grid">
+        <div class="cmod hero on"><div class="ci"><svg class="ico i22"><use href="#i-bolt"/></svg></div><div><div class="mid">Module principal</div><div class="ct">Entretien complet</div><div class="cd">Ménage, vitesse et vie privée — 9 min environ</div></div></div>
+        <div class="cmod"><div class="mid">Mod. 01</div><div class="ci"><svg class="ico i18"><use href="#i-clean"/></svg></div><div class="ct">Ménage</div><div class="cd">Libère de la place</div></div>
+        <div class="cmod"><div class="mid">Mod. 02</div><div class="ci"><svg class="ico i18"><use href="#i-perf"/></svg></div><div class="ct">Vitesse</div><div class="cd">Veille, Internet, disques</div></div>
+        <div class="cmod"><div class="mid">Mod. 03</div><div class="ci"><svg class="ico i18"><use href="#i-sec"/></svg></div><div class="ct">Vie privée</div><div class="cd">Moins de données transmises</div></div>
+        <div class="cmod"><div class="mid">Mod. 04</div><div class="ci"><svg class="ico i18"><use href="#i-apps"/></svg></div><div class="ct">Applications</div><div class="cd">Ajoutées sans accord</div></div>
+        <div class="cmod"><div class="mid">Mod. 05</div><div class="ci"><svg class="ico i18"><use href="#i-health"/></svg></div><div class="ct">Diagnostic</div><div class="cd">Sans rien modifier</div></div>
+      </div>
+
+      <div class="nav"><button class="big" data-go="2">Continuer<svg class="ico i18"><use href="#i-arrR"/></svg></button></div>
+    </div>
+  </div>
+
+  <div class="pane" data-s="2">
+    <div class="rail-head">
+      <div class="rail-line"><i style="width:50%"></i></div>
+      <div class="rail-nodes"><div class="rail-node done"></div><div class="rail-node now"></div><div class="rail-node"></div></div>
+      <div class="rail-labels"><span>Choisir</span><span class="on">Vérifier</span><span>Entretien</span></div>
+    </div>
+    <div class="console-stage">
+      <div class="h1">Séquence à exécuter</div>
+      <p class="lead">Rien n'est encore lancé — vérifiez, puis validez.</p>
+      <div class="wave-card">
+        <div class="wave-lip"></div>
+        <div class="wc-tag hud">Séquence · 3 modules</div>
+        <div class="wc-b">
+          <div class="wrow"><div class="wi"><svg class="ico i18"><use href="#i-clean"/></svg></div><div><div class="wt">Faire le ménage</div><div class="wd">Fichiers temp et caches. <b>Favoris intacts.</b></div></div><span class="wx badge">≈ 3 min</span></div>
+          <div class="wrow"><div class="wi"><svg class="ico i18"><use href="#i-perf"/></svg></div><div><div class="wt">Accélérer le PC</div><div class="wd">Veille, Internet, disques.</div></div><span class="wx badge">≈ 4 min</span></div>
+          <div class="wrow"><div class="wi"><svg class="ico i18"><use href="#i-sec"/></svg></div><div><div class="wt">Vie privée</div><div class="wd">Moins de données envoyées.</div></div><span class="wx badge">≈ 2 min</span></div>
+        </div>
+      </div>
+      <div class="rest-note"><svg class="ico i20"><use href="#i-warn"/></svg><p><b>Un point de restauration sera créé avant de commencer.</b></p></div>
+      <div class="nav">
+        <button class="big quiet" data-go="1"><svg class="ico i18"><use href="#i-arrL"/></svg>Retour</button>
+        <button class="big" data-go="3"><svg class="ico i18"><use href="#i-bolt"/></svg>Exécuter</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pane" data-s="3">
+    <div class="rail-head">
+      <div class="rail-line"><i style="width:100%"></i></div>
+      <div class="rail-nodes"><div class="rail-node done"></div><div class="rail-node done"></div><div class="rail-node now"></div></div>
+      <div class="rail-labels"><span>Choisir</span><span>Vérifier</span><span class="on">Entretien</span></div>
+    </div>
+    <div class="console-stage">
+      <div class="hud">Progression</div>
+      <div class="big-n">66%</div>
+      <div class="brickbar">
+        <div class="brick on"></div><div class="brick on"></div><div class="brick on"></div><div class="brick on"></div>
+        <div class="brick on"></div><div class="brick on"></div><div class="brick on"></div><div class="brick on"></div>
+        <div class="brick on"></div><div class="brick on"></div><div class="brick"></div><div class="brick"></div>
+      </div>
+      <p class="lead" style="margin-top:14px">2 modules sur 3 terminés — le mur se termine dans un instant.</p>
+      <div class="wtask done"><div class="wti"><svg class="ico i14" style="stroke-width:3"><use href="#i-check"/></svg></div><div class="wtt">Faire le ménage</div><span class="wtx">12,4 Go libérés</span></div>
+      <div class="wtask now"><div class="wti">2</div><div class="wtt">Accélérer le PC</div><span class="wtx">en cours…</span></div>
+      <div class="wtask"><div class="wti">3</div><div class="wtt">Vie privée</div><span class="wtx">en attente</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ ② ORBITE ══════════════ -->
+<div class="layout" id="P-orbite">
+  <div class="miniHead"><div class="mark"><svg class="ico i16" style="stroke-width:2.4"><use href="#i-bolt"/></svg></div><span class="word">WinTool</span><span class="tag badge">② Orbite</span></div>
+
+  <div class="pane" data-s="1">
+    <div class="orbit-head">
+      <svg class="orbit-arc" viewBox="0 0 120 60"><path d="M8 50 A52 52 0 0 1 112 50" fill="none" stroke="var(--border-2)" stroke-width="2"/>
+        <circle cx="8" cy="50" r="5" fill="var(--acc)"/><circle cx="60" cy="4" r="4" fill="var(--border-2)"/><circle cx="112" cy="50" r="4" fill="var(--border-2)"/></svg>
+      <div class="h1">Choisissez une trajectoire</div>
+      <p class="lead">Les options gravitent à égale distance — la plus grande, au centre, est recommandée.</p>
+    </div>
+    <div class="orbit-stage">
+      <div class="orbit-wrap">
+        <div class="orbit-ring"></div>
+        <div class="orbit-ring" style="inset:44px"></div>
+        <div class="orbit-center"><div class="oi"><svg class="ico i18" style="stroke-width:2.2"><use href="#i-bolt"/></svg></div><div class="ot">Entretien<br>complet</div></div>
+        <div class="orbit-item on" style="--ang:0deg;top:calc(50% - 200px);left:50%;margin-left:-50px"><div class="oi"><svg class="ico i16"><use href="#i-perf"/></svg></div><div class="ot">Accélérer</div></div>
+        <div class="orbit-item" style="top:calc(50% - 62px);left:calc(50% + 190px);margin-top:-50px"><div class="oi"><svg class="ico i16"><use href="#i-clean"/></svg></div><div class="ot">Ménage</div></div>
+        <div class="orbit-item" style="top:calc(50% + 162px);left:calc(50% + 118px);margin-top:-50px"><div class="oi"><svg class="ico i16"><use href="#i-sec"/></svg></div><div class="ot">Vie privée</div></div>
+        <div class="orbit-item" style="top:calc(50% + 162px);left:calc(50% - 118px);margin-top:-50px;margin-left:-100px"><div class="oi"><svg class="ico i16"><use href="#i-apps"/></svg></div><div class="ot">Applications</div></div>
+        <div class="orbit-item" style="top:calc(50% - 62px);left:calc(50% - 190px);margin-top:-50px;margin-left:-100px"><div class="oi"><svg class="ico i16"><use href="#i-health"/></svg></div><div class="ot">Diagnostic</div></div>
+      </div>
+      <div class="nav"><button class="big" data-go="2">Continuer<svg class="ico i18"><use href="#i-arrR"/></svg></button></div>
+    </div>
+  </div>
+
+  <div class="pane" data-s="2">
+    <div class="orbit-head">
+      <div class="h1">Trajectoire confirmée</div>
+      <p class="lead">Dernier contrôle avant le lancement.</p>
+    </div>
+    <div class="orbit-stage">
+      <div class="wave-card">
+        <div class="wave-lip"></div>
+        <div class="wc-tag hud">Trajectoire · 3 étapes</div>
+        <div class="wc-b">
+          <div class="wrow"><div class="wi"><svg class="ico i18"><use href="#i-clean"/></svg></div><div><div class="wt">Faire le ménage</div><div class="wd">Fichiers temp et caches. <b>Favoris intacts.</b></div></div><span class="wx badge">≈ 3 min</span></div>
+          <div class="wrow"><div class="wi"><svg class="ico i18"><use href="#i-perf"/></svg></div><div><div class="wt">Accélérer le PC</div><div class="wd">Veille, Internet, disques.</div></div><span class="wx badge">≈ 4 min</span></div>
+          <div class="wrow"><div class="wi"><svg class="ico i18"><use href="#i-sec"/></svg></div><div><div class="wt">Vie privée</div><div class="wd">Moins de données envoyées.</div></div><span class="wx badge">≈ 2 min</span></div>
+        </div>
+      </div>
+      <div class="rest-note"><svg class="ico i20"><use href="#i-warn"/></svg><p><b>Un point de restauration sera créé avant le décollage.</b></p></div>
+      <div class="nav">
+        <button class="big quiet" data-go="1"><svg class="ico i18"><use href="#i-arrL"/></svg>Retour</button>
+        <button class="big" data-go="3"><svg class="ico i18"><use href="#i-bolt"/></svg>Décoller</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pane" data-s="3">
+    <div class="radar-stage">
+      <div class="h1">Signal en approche</div>
+      <p class="lead">2 étapes détectées sur 3.</p>
+      <div class="radar" style="margin-top:18px">
+        <div class="radar-rings"><i></i><i></i><i></i></div>
+        <div class="blip done" style="top:18%;left:50%"></div>
+        <div class="blip done" style="top:82%;left:26%"></div>
+        <div class="blip" style="top:82%;left:74%"></div>
+        <div class="radar-n"><div class="n">66%</div><div class="u">2 / 3</div></div>
+      </div>
+      <div class="wtask done" style="margin-top:22px"><div class="wti"><svg class="ico i14" style="stroke-width:3"><use href="#i-check"/></svg></div><div class="wtt">Faire le ménage</div><span class="wtx">12,4 Go libérés</span></div>
+      <div class="wtask now"><div class="wti">2</div><div class="wtt">Accélérer le PC</div><span class="wtx">en cours…</span></div>
+      <div class="wtask"><div class="wti">3</div><div class="wtt">Vie privée</div><span class="wtx">en attente</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ ③ RÉACTEUR ══════════════ -->
+<div class="layout" id="P-reacteur">
+  <div class="miniHead"><div class="mark"><svg class="ico i16" style="stroke-width:2.4"><use href="#i-bolt"/></svg></div><span class="word">WinTool</span><span class="tag badge">③ Réacteur</span></div>
+
+  <div class="pane" data-s="1">
+    <div class="rail-head">
+      <div class="rail-line"><i style="width:16%"></i></div>
+      <div class="rail-nodes"><div class="rail-node now"></div><div class="rail-node"></div><div class="rail-node"></div></div>
+      <div class="rail-labels"><span class="on">Choisir</span><span>Vérifier</span><span>Entretien</span></div>
+    </div>
+    <div class="reactor-stage">
+      <div class="h1">Chargez une cellule d'énergie</div>
+      <p class="lead">Chaque cellule alimente un ensemble d'actions.</p>
+      <div class="cell-grid">
+        <div class="cell hero on"><div class="cring"><i><svg class="ico i22"><use href="#i-bolt"/></svg></i></div><div><div class="ct">Entretien complet</div><div class="cd">Ménage, vitesse, vie privée — 9 min</div></div></div>
+        <div class="cell"><div class="cring"><i><svg class="ico i18"><use href="#i-clean"/></svg></i></div><div class="ct">Ménage</div><div class="cd">Libère de la place</div></div>
+        <div class="cell"><div class="cring"><i><svg class="ico i18"><use href="#i-perf"/></svg></i></div><div class="ct">Vitesse</div><div class="cd">Veille, Internet, disques</div></div>
+        <div class="cell"><div class="cring"><i><svg class="ico i18"><use href="#i-sec"/></svg></i></div><div class="ct">Vie privée</div><div class="cd">Moins de données</div></div>
+        <div class="cell"><div class="cring"><i><svg class="ico i18"><use href="#i-apps"/></svg></i></div><div class="ct">Applications</div><div class="cd">Ajoutées sans accord</div></div>
+        <div class="cell"><div class="cring"><i><svg class="ico i18"><use href="#i-health"/></svg></i></div><div class="ct">Diagnostic</div><div class="cd">Sans rien modifier</div></div>
+      </div>
+      <div class="nav"><button class="big" data-go="2">Continuer<svg class="ico i18"><use href="#i-arrR"/></svg></button></div>
+    </div>
+  </div>
+
+  <div class="pane" data-s="2">
+    <div class="rail-head">
+      <div class="rail-line"><i style="width:50%"></i></div>
+      <div class="rail-nodes"><div class="rail-node done"></div><div class="rail-node now"></div><div class="rail-node"></div></div>
+      <div class="rail-labels"><span>Choisir</span><span class="on">Vérifier</span><span>Entretien</span></div>
+    </div>
+    <div class="reactor-stage">
+      <div class="h1">Protocole prêt à l'allumage</div>
+      <p class="lead">Rien n'est encore lancé.</p>
+      <div class="wave-card">
+        <div class="wave-lip"></div>
+        <div class="wc-tag hud">Protocole · 3 cellules</div>
+        <div class="wc-b">
+          <div class="wrow"><div class="wi"><svg class="ico i18"><use href="#i-clean"/></svg></div><div><div class="wt">Faire le ménage</div><div class="wd">Fichiers temp et caches. <b>Favoris intacts.</b></div></div><span class="wx badge">≈ 3 min</span></div>
+          <div class="wrow"><div class="wi"><svg class="ico i18"><use href="#i-perf"/></svg></div><div><div class="wt">Accélérer le PC</div><div class="wd">Veille, Internet, disques.</div></div><span class="wx badge">≈ 4 min</span></div>
+          <div class="wrow"><div class="wi"><svg class="ico i18"><use href="#i-sec"/></svg></div><div><div class="wt">Vie privée</div><div class="wd">Moins de données envoyées.</div></div><span class="wx badge">≈ 2 min</span></div>
+        </div>
+      </div>
+      <div class="rest-note"><svg class="ico i20"><use href="#i-warn"/></svg><p><b>Un point de restauration sera créé avant l'allumage.</b></p></div>
+      <div class="nav">
+        <button class="big quiet" data-go="1"><svg class="ico i18"><use href="#i-arrL"/></svg>Retour</button>
+        <button class="big" data-go="3"><svg class="ico i18"><use href="#i-bolt"/></svg>Allumer</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pane" data-s="3">
+    <div class="reactor-stage">
+      <div class="h1">Réacteur en charge</div>
+      <p class="lead">2 cellules sur 3 alimentées.</p>
+
+      <div class="gauge-switch">
+        <button data-gauge="batterie" aria-pressed="true">Batterie</button>
+        <button data-gauge="eclair" aria-pressed="false">Éclair</button>
+        <button data-gauge="engrenage" aria-pressed="false">Engrenage</button>
+        <button data-gauge="bouclier" aria-pressed="false">Bouclier</button>
+        <button data-gauge="mur" aria-pressed="false">Mur</button>
+      </div>
+
+      <!-- Batterie -->
+      <div class="gauge-box" id="g-batterie">
+        <svg width="200" height="100" viewBox="0 0 130 64">
+          <defs><clipPath id="battClip"><rect x="4" y="4" width="112" height="56" rx="12"/></clipPath></defs>
+          <rect x="118" y="22" width="8" height="20" rx="3" fill="var(--border-2)"/>
+          <rect x="4" y="4" width="112" height="56" rx="12" fill="none" stroke="var(--border-2)" stroke-width="4"/>
+          <g clip-path="url(#battClip)"><rect x="4" y="4" width="74" height="56" fill="var(--acc)"/></g>
+          <g clip-path="url(#battClip)"><path d="M52 14 L34 36 H46 L40 54 L64 30 H50 Z" fill="var(--bg)"/></g>
+        </svg>
+        <div class="big-n">66%</div>
+      </div>
+      <!-- Éclair -->
+      <div class="gauge-box" id="g-eclair">
+        <svg width="90" height="130" viewBox="0 0 60 90">
+          <defs><clipPath id="boltClip2"><path d="M33 4L14 50h14l-6 36 27-46H35z"/></clipPath></defs>
+          <path d="M33 4L14 50h14l-6 36 27-46H35z" fill="none" stroke="var(--border-2)" stroke-width="3"/>
+          <g clip-path="url(#boltClip2)"><rect x="0" y="31" width="60" height="59" fill="var(--acc)"/></g>
+        </svg>
+        <div class="big-n">66%</div>
+      </div>
+      <!-- Engrenage -->
+      <div class="gauge-box" id="g-engrenage">
+        <div class="gear-ring"><div class="inner">
+          <svg class="ico gear-spin i22" style="width:64px;height:64px;stroke-width:1.6">
+            <circle cx="12" cy="12" r="4.6"/>
+            <path d="M12 2.4v3M12 18.6v3M21.6 12h-3M5.4 12h-3M18.6 5.4l-2.1 2.1M7.5 16.5l-2.1 2.1M18.6 18.6l-2.1-2.1M7.5 7.5L5.4 5.4"/>
+          </svg>
+        </div></div>
+        <div class="big-n">66%</div>
+      </div>
+      <!-- Bouclier -->
+      <div class="gauge-box" id="g-bouclier">
+        <svg class="shield-scale" width="120" height="130" viewBox="0 0 80 88">
+          <defs><clipPath id="shieldClip"><path d="M40 4l28 10v18c0 22-14 34-28 38C26 66 12 54 12 32V14z"/></clipPath></defs>
+          <path d="M40 4l28 10v18c0 22-14 34-28 38C26 66 12 54 12 32V14z" fill="none" stroke="var(--border-2)" stroke-width="3.5"/>
+          <g clip-path="url(#shieldClip)"><rect x="6" y="36" width="68" height="52" fill="var(--acc)"/></g>
+          <g clip-path="url(#shieldClip)"><path d="M28 44l8 8 16-16" stroke="var(--bg)" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>
+        </svg>
+        <div class="big-n">66%</div>
+      </div>
+      <!-- Mur -->
+      <div class="gauge-box" id="g-mur">
+        <div style="max-width:280px;margin:0 auto;display:flex;flex-direction:column;gap:4px">
+          <div style="display:flex;gap:4px"><div class="brick on" style="height:26px"></div><div class="brick on" style="height:26px"></div><div class="brick on" style="height:26px"></div><div class="brick" style="height:26px"></div></div>
+          <div style="display:flex;gap:4px;padding-left:16px"><div class="brick on" style="height:26px"></div><div class="brick on" style="height:26px"></div><div class="brick" style="height:26px"></div></div>
+          <div style="display:flex;gap:4px"><div class="brick on" style="height:26px"></div><div class="brick on" style="height:26px"></div><div class="brick on" style="height:26px"></div><div class="brick" style="height:26px"></div></div>
+          <div style="display:flex;gap:4px;padding-left:16px"><div class="brick on" style="height:26px"></div><div class="brick" style="height:26px"></div><div class="brick" style="height:26px"></div></div>
+        </div>
+        <div class="big-n">66%</div>
+      </div>
+
+      <div class="wtask done"><div class="wti"><svg class="ico i14" style="stroke-width:3"><use href="#i-check"/></svg></div><div class="wtt">Faire le ménage</div><span class="wtx">12,4 Go libérés</span></div>
+      <div class="wtask now"><div class="wti">2</div><div class="wtt">Accélérer le PC</div><span class="wtx">en cours…</span></div>
+      <div class="wtask"><div class="wti">3</div><div class="wtt">Vie privée</div><span class="wtx">en attente</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────── BARRE DE MAQUETTE ─────────── -->
+<div class="mockbar">
+  <span class="lbl">Piste</span>
+  <div class="grp">
+    <button data-l="console" aria-pressed="true">① Console</button>
+    <button data-l="orbite" aria-pressed="false">② Orbite</button>
+    <button data-l="reacteur" aria-pressed="false">③ Réacteur</button>
+  </div>
+  <div class="sep"></div>
+  <span class="lbl">Étape</span>
+  <div class="grp">
+    <button data-st="1" aria-pressed="true">1</button>
+    <button data-st="2" aria-pressed="false">2</button>
+    <button data-st="3" aria-pressed="false">3</button>
+  </div>
+  <div class="sep"></div>
+  <span class="lbl">Thème</span>
+  <div class="grp">
+    <button data-t="light" aria-pressed="false">Clair</button>
+    <button data-t="dark" aria-pressed="true">Sombre</button>
+  </div>
+</div>
+
+<style>
+.mockbar{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:900;
+  display:flex;align-items:center;gap:12px;padding:8px 11px 8px 15px;flex-wrap:wrap;max-width:96vw;
+  background:#06080B;border:1px solid #1E2530;border-radius:12px;
+  box-shadow:0 16px 44px rgba(0,0,0,.55);font-family:'Inter',sans-serif}
+.mockbar .lbl{font-size:9.5px;letter-spacing:.14em;color:#5D6B7C;text-transform:uppercase;font-weight:700}
+.mockbar .grp{display:flex;gap:3px;padding:3px;background:#0F141B;border-radius:9px}
+.mockbar .grp button{padding:7px 13px;border-radius:6px;font-size:11.5px;font-weight:650;color:#8A99AB;
+  transition:all .15s;white-space:nowrap;cursor:pointer;border:none;background:none;font-family:inherit}
+.mockbar .grp button:hover{color:#EAF0F6}
+.mockbar .grp button[aria-pressed="true"]{background:linear-gradient(135deg,#22D39A,#35C8E8);color:#06121A}
+.mockbar .sep{width:1px;height:26px;background:#1E2530}
+</style>
+
+<script>
+const H = document.documentElement;
+const press = (sel, attr, val) => document.querySelectorAll(sel)
+  .forEach(b => b.setAttribute('aria-pressed', String(b.dataset[attr] === val)));
+
+function setLayout(v){ H.dataset.layout = v; press('[data-l]', 'l', v); }
+function setStep(s){ H.dataset.step = s; press('[data-st]', 'st', s); }
+function setTheme(t){ H.dataset.theme = t; press('[data-t]', 't', t); }
+function setGauge(g){ H.dataset.gauge = g; press('.gauge-switch [data-gauge]', 'gauge', g); }
+
+document.querySelectorAll('.mockbar [data-l]').forEach(b => b.onclick = () => setLayout(b.dataset.l));
+document.querySelectorAll('.mockbar [data-st]').forEach(b => b.onclick = () => setStep(b.dataset.st));
+document.querySelectorAll('.mockbar [data-t]').forEach(b => b.onclick = () => setTheme(b.dataset.t));
+document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => setStep(b.dataset.go));
+document.querySelectorAll('.gauge-switch [data-gauge]').forEach(b => b.onclick = () => setGauge(b.dataset.gauge));
+
+document.querySelectorAll('.cmod:not(.hero), .cell:not(.hero), .orbit-item').forEach(el => {
+  el.onclick = () => {
+    el.parentElement.querySelectorAll('.cmod:not(.hero), .cell:not(.hero), .orbit-item').forEach(x => x.classList.remove('on'));
+    el.classList.add('on');
+  };
+});
+
+setLayout('console'); setStep('1'); setTheme('dark'); setGauge('batterie');
+</script>
+</body>
+</html>

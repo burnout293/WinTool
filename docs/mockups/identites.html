@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="fr" data-identity="atelier" data-mode="simple">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WinTool v4 — Comparateur d'identités visuelles</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ══════════════════════════════════════════════════════════════
+   TOKENS — une identité = un jeu de variables, rien d'autre.
+   C'est exactement ce qui deviendra src/styles/tokens.css.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ─── ATELIER — ardoise & ambre ─────────────────────────────── */
+html[data-identity="atelier"]{
+  --bg:#14161A;        --surface:#1C1F26;   --surface-2:#23272F;  --surface-3:#2A2F38;
+  --border:#2E333D;    --border-strong:#3D444F;
+  --text:#E9EBEF;      --text-2:#A2A9B4;    --text-3:#6C7481;
+  --accent:#F0A030;    --accent-2:#FFB347;  --accent-fg:#14161A;
+  --accent-soft:rgba(240,160,48,.11);  --accent-line:rgba(240,160,48,.30);
+  --ok:#5FB87A;        --warn:#E0A030;      --err:#E0574A;        --info:#7FA8D0;
+  --term-bg:#0E1013;   --term-text:#CBD1D9; --term-dim:#5A6270;   --term-bar:#161920;
+  --r:6px;  --r-sm:4px;  --r-pill:4px;  --bw:1px;
+  --font-ui:'Inter Tight','Inter',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono','Cascadia Code',monospace;
+  --shadow:none;
+  --shadow-lg:0 10px 30px rgba(0,0,0,.45);
+  --accent-glow:none;
+  --label-tt:uppercase;  --label-ls:.10em;  --label-w:700;
+  --pad:14px;  --gap:10px;
+  --nav-h:38px;
+}
+
+/* ─── BLOC OPÉRATOIRE — clair & teal ────────────────────────── */
+html[data-identity="bloc"]{
+  --bg:#F7F9FA;        --surface:#FFFFFF;   --surface-2:#EFF3F5;  --surface-3:#E6ECEF;
+  --border:#DDE4E8;    --border-strong:#C6D2D8;
+  --text:#12212B;      --text-2:#52646F;    --text-3:#8A9AA4;
+  --accent:#0F7B7B;    --accent-2:#0C6666;  --accent-fg:#FFFFFF;
+  --accent-soft:rgba(15,123,123,.08);  --accent-line:rgba(15,123,123,.22);
+  --ok:#2E9E5B;        --warn:#B87A15;      --err:#C4453C;        --info:#2D6FA8;
+  --term-bg:#FBFCFD;   --term-text:#2B3A44; --term-dim:#9AACB5;   --term-bar:#F1F5F7;
+  --r:10px; --r-sm:7px;  --r-pill:999px; --bw:1px;
+  --font-ui:'Inter',system-ui,sans-serif;
+  --font-mono:'IBM Plex Mono',monospace;
+  --shadow:0 1px 2px rgba(18,33,43,.05), 0 2px 8px rgba(18,33,43,.04);
+  --shadow-lg:0 12px 32px rgba(18,33,43,.10);
+  --accent-glow:none;
+  --label-tt:none;  --label-ls:0;  --label-w:600;
+  --pad:18px;  --gap:14px;
+  --nav-h:42px;
+}
+
+/* ─── SALLE DE CONTRÔLE — nuit & cyan ───────────────────────── */
+html[data-identity="salle"]{
+  --bg:#0B1220;        --surface:#131C2E;   --surface-2:#1A2438;  --surface-3:#212D45;
+  --border:#23304A;    --border-strong:#31415F;
+  --text:#E2E8F5;      --text-2:#94A3BE;    --text-3:#5D6B85;
+  --accent:#22D3EE;    --accent-2:#67E8F9;  --accent-fg:#06121A;
+  --accent-soft:rgba(34,211,238,.10);  --accent-line:rgba(34,211,238,.35);
+  --ok:#34D399;        --warn:#FBBF24;      --err:#F87171;        --info:#60A5FA;
+  --term-bg:#060C16;   --term-text:#C7D3E8; --term-dim:#4A5876;   --term-bar:#101A2C;
+  --r:4px;  --r-sm:3px;  --r-pill:3px;  --bw:1px;
+  --font-ui:'Space Grotesk',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+  --shadow:none;
+  --shadow-lg:0 10px 30px rgba(0,0,0,.5);
+  --accent-glow:0 0 18px rgba(34,211,238,.28);
+  --label-tt:uppercase;  --label-ls:.12em;  --label-w:600;
+  --pad:13px;  --gap:9px;
+  --nav-h:36px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BASE
+   ══════════════════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:var(--font-ui);background:var(--bg);color:var(--text);
+  font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;
+}
+/* Pas de transition sur le changement d'identité : la bascule doit être
+   instantanée pour pouvoir comparer deux directions en A/B. */
+button,input{font-family:inherit;color:inherit;border:none;outline:none;background:none;cursor:pointer}
+svg{display:block}
+.ico{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.ico-sm{width:14px;height:14px}
+
+/* ══════════════════════════════════════════════════════════════
+   FENÊTRE APPLICATIVE
+   ══════════════════════════════════════════════════════════════ */
+.app{height:100vh;display:flex;flex-direction:column;padding-bottom:64px}
+
+/* ─── Barre de titre (chrome personnalisé, fenêtre sans décoration) ─ */
+.titlebar{
+  height:48px;flex-shrink:0;display:flex;align-items:center;gap:18px;
+  padding:0 0 0 16px;background:var(--surface);
+  border-bottom:var(--bw) solid var(--border);
+}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-mark{
+  width:28px;height:28px;border-radius:var(--r-sm);
+  background:var(--accent);color:var(--accent-fg);
+  display:grid;place-items:center;box-shadow:var(--accent-glow);
+}
+.brand-mark svg{width:16px;height:16px;stroke-width:2.2}
+.brand-name{font-size:15px;font-weight:800;letter-spacing:-.3px}
+.brand-ver{
+  font-family:var(--font-mono);font-size:10px;color:var(--text-3);
+  padding:2px 6px;border:var(--bw) solid var(--border);border-radius:var(--r-pill);
+}
+
+.modeswitch{
+  display:flex;gap:2px;padding:3px;margin-left:auto;
+  background:var(--surface-2);border:var(--bw) solid var(--border);border-radius:var(--r-sm);
+}
+.modeswitch button{
+  padding:5px 16px;border-radius:calc(var(--r-sm) - 1px);
+  font-size:12px;font-weight:600;color:var(--text-2);transition:all .18s;
+}
+.modeswitch button[aria-selected="true"]{
+  background:var(--accent);color:var(--accent-fg);box-shadow:var(--accent-glow);
+}
+
+.tb-right{display:flex;align-items:center;gap:8px;margin-left:auto}
+.pill{
+  display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;
+  padding:5px 10px;border-radius:var(--r-pill);
+  border:var(--bw) solid var(--border);color:var(--text-2);background:var(--surface-2);
+}
+.pill.shield{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 35%,transparent);
+  background:color-mix(in srgb,var(--ok) 9%,transparent)}
+.pill.upd{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+
+.winctl{display:flex;margin-left:6px}
+.winctl button{width:44px;height:48px;display:grid;place-items:center;color:var(--text-3);transition:all .15s}
+.winctl button:hover{background:var(--surface-2);color:var(--text)}
+.winctl button:last-child:hover{background:#E0574A;color:#fff}
+.winctl svg{width:11px;height:11px;stroke-width:1.5}
+
+/* ─── Corps ─────────────────────────────────────────────────── */
+.shell{flex:1;display:flex;min-height:0}
+
+/* ─── Barre latérale ────────────────────────────────────────── */
+.sidebar{
+  width:232px;flex-shrink:0;background:var(--surface);
+  border-right:var(--bw) solid var(--border);display:flex;flex-direction:column;
+}
+.sb-scroll{flex:1;overflow-y:auto;padding:12px 9px}
+.sb-scroll::-webkit-scrollbar{width:4px}
+.sb-scroll::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:2px}
+.sb-label{
+  font-size:10px;font-weight:var(--label-w);letter-spacing:var(--label-ls);
+  text-transform:var(--label-tt);color:var(--text-3);padding:12px 9px 7px;
+}
+.nav{
+  display:flex;align-items:center;gap:10px;height:var(--nav-h);padding:0 10px;
+  border-radius:var(--r-sm);cursor:pointer;margin-bottom:2px;
+  border:var(--bw) solid transparent;transition:all .15s;position:relative;
+}
+.nav:hover{background:var(--surface-2)}
+.nav[aria-current="true"]{
+  background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent);
+}
+.nav[aria-current="true"]::before{
+  content:'';position:absolute;left:-9px;top:50%;transform:translateY(-50%);
+  width:3px;height:56%;border-radius:0 2px 2px 0;background:var(--accent);
+  box-shadow:var(--accent-glow);
+}
+.nav-ico{width:20px;flex-shrink:0;color:var(--text-3);display:grid;place-items:center}
+.nav[aria-current="true"] .nav-ico{color:var(--accent)}
+.nav-txt{flex:1;font-size:13px;font-weight:600;color:var(--text-2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav[aria-current="true"] .nav-txt{color:var(--accent)}
+.nav-count{font-family:var(--font-mono);font-size:10px;color:var(--text-3)}
+.nav-num{
+  width:22px;flex-shrink:0;font-family:var(--font-mono);font-size:10px;
+  font-weight:500;color:var(--text-3);text-align:center;
+}
+.nav[aria-current="true"] .nav-num{color:var(--accent)}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;background:transparent}
+.dot.run{background:var(--accent);animation:pulse 1.1s ease-in-out infinite}
+.dot.ok{background:var(--ok)}
+.dot.err{background:var(--err)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+.sb-foot{padding:10px;border-top:var(--bw) solid var(--border);display:flex;flex-direction:column;gap:8px}
+.sb-btn{
+  display:flex;align-items:center;gap:9px;width:100%;padding:9px 11px;
+  border:var(--bw) solid var(--border);border-radius:var(--r-sm);
+  font-size:12px;font-weight:600;color:var(--text-2);transition:all .15s;
+}
+.sb-btn:hover{border-color:var(--accent-line);color:var(--accent);background:var(--accent-soft)}
+.sb-meta{font-family:var(--font-mono);font-size:10px;color:var(--text-3);padding:0 2px;line-height:1.7}
+
+/* ─── Zone principale ───────────────────────────────────────── */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.etabs{
+  display:none;gap:2px;padding:0 22px;background:var(--surface);
+  border-bottom:var(--bw) solid var(--border);
+}
+html[data-mode="expert"] .etabs{display:flex}
+.etab{
+  padding:12px 16px;font-size:13px;font-weight:600;color:var(--text-2);
+  border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;
+}
+.etab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+
+.content{flex:1;overflow-y:auto;padding:22px}
+.content::-webkit-scrollbar{width:6px}
+.content::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:3px}
+
+html[data-mode="simple"] [data-screen="expert"],
+html[data-mode="expert"] [data-screen="simple"]{display:none}
+
+/* ─── En-tête de panneau ────────────────────────────────────── */
+.phead{display:flex;align-items:flex-start;gap:14px;margin-bottom:20px}
+.phead-ico{
+  width:46px;height:46px;flex-shrink:0;border-radius:var(--r);
+  display:grid;place-items:center;
+  background:var(--accent-soft);color:var(--accent);
+  border:var(--bw) solid var(--accent-line);
+}
+.phead-ico svg{width:22px;height:22px}
+.ptitle{font-size:19px;font-weight:800;letter-spacing:-.3px;line-height:1.25}
+.pdesc{font-size:13px;color:var(--text-2);margin-top:3px}
+.pmeta{font-family:var(--font-mono);font-size:10.5px;color:var(--text-3);margin-top:5px}
+.phead-actions{margin-left:auto;display:flex;align-items:center;gap:9px;flex-shrink:0}
+
+/* ─── Badges ────────────────────────────────────────────────── */
+.badge{
+  display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;
+  padding:3px 9px;border-radius:var(--r-pill);border:var(--bw) solid var(--border);
+  color:var(--text-2);background:var(--surface-2);
+  text-transform:var(--label-tt);letter-spacing:var(--label-ls);
+}
+.badge.risk-low{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 32%,transparent);background:color-mix(in srgb,var(--ok) 9%,transparent)}
+.badge.risk-med{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 32%,transparent);background:color-mix(in srgb,var(--warn) 9%,transparent)}
+.badge.risk-high{color:var(--err);border-color:color-mix(in srgb,var(--err) 32%,transparent);background:color-mix(in srgb,var(--err) 9%,transparent)}
+.badge.acc{color:var(--accent);border-color:var(--accent-line);background:var(--accent-soft)}
+
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:18px}
+.chip{
+  display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;
+  padding:6px 12px;border-radius:var(--r-pill);
+  background:var(--surface);border:var(--bw) solid var(--border);color:var(--text-2);
+}
+.chip .n{font-family:var(--font-mono);font-size:10px;color:var(--accent);font-weight:500}
+.chip.done{border-color:color-mix(in srgb,var(--ok) 35%,transparent);color:var(--ok)}
+.chip.done .n{color:var(--ok)}
+.chip.active{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent)}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
+.tag{font-size:10.5px;padding:3px 9px;border-radius:var(--r-pill);
+  background:var(--surface-2);border:var(--bw) solid var(--border);color:var(--text-3);
+  font-family:var(--font-mono)}
+
+/* ─── Cartes ────────────────────────────────────────────────── */
+.card{
+  background:var(--surface);border:var(--bw) solid var(--border);
+  border-radius:var(--r);box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden;
+}
+.card-head{
+  padding:11px var(--pad);border-bottom:var(--bw) solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.card-title{
+  font-size:10.5px;font-weight:var(--label-w);letter-spacing:var(--label-ls);
+  text-transform:var(--label-tt);color:var(--text-3);
+}
+.card-body{padding:var(--pad)}
+
+/* ─── Bouton d'exécution principal ──────────────────────────── */
+.exec{
+  position:relative;width:100%;height:50px;border-radius:var(--r-sm);
+  background:var(--accent);color:var(--accent-fg);
+  font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:10px;
+  overflow:hidden;box-shadow:var(--accent-glow);
+}
+/* La part restante est assombrie : le progrès accompli reste l'accent plein. */
+.exec .fill{position:absolute;inset:0 0 0 auto;width:34%;background:rgba(0,0,0,.22);transition:width .4s}
+.exec > *{position:relative}
+.spin{
+  width:15px;height:15px;border-radius:50%;
+  border:2.2px solid color-mix(in srgb,var(--accent-fg) 30%,transparent);
+  border-top-color:var(--accent-fg);animation:spin .75s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.runbtn{
+  display:flex;align-items:center;gap:8px;padding:9px 18px;border-radius:var(--r-sm);
+  background:var(--accent);color:var(--accent-fg);font-size:13px;font-weight:700;
+  box-shadow:var(--accent-glow);
+}
+.ghostbtn{
+  display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:var(--r-sm);
+  border:var(--bw) solid var(--border);font-size:12px;font-weight:600;color:var(--text-2);
+}
+.ghostbtn:hover{border-color:var(--accent-line);color:var(--accent)}
+
+.disclose{
+  display:flex;align-items:center;gap:7px;padding:12px 0 0;
+  font-size:12px;font-weight:600;color:var(--accent);
+}
+.disclose svg{transition:transform .2s}
+.disclose[aria-expanded="true"] svg{transform:rotate(180deg)}
+.adv{display:none;margin-top:14px;padding-top:14px;border-top:var(--bw) solid var(--border)}
+.adv.open{display:block}
+
+/* ─── Grille de configuration ───────────────────────────────── */
+.cfg{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap)}
+.cfg-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 12px;background:var(--surface-2);
+  border:var(--bw) solid var(--border);border-radius:var(--r-sm);
+}
+.cfg-l{min-width:0}
+.cfg-name{font-size:12.5px;font-weight:600;line-height:1.35}
+.cfg-sub{font-size:10.5px;color:var(--text-3);margin-top:2px;line-height:1.35}
+.hidden-tag{
+  font-family:var(--font-mono);font-size:9px;color:var(--text-3);
+  border:var(--bw) solid var(--border);border-radius:3px;padding:0 4px;margin-left:5px;
+}
+
+.tgl{position:relative;width:36px;height:20px;flex-shrink:0}
+.tgl input{position:absolute;opacity:0;width:0;height:0}
+.tgl span{
+  position:absolute;inset:0;border-radius:var(--r-pill);background:var(--surface-3);
+  border:var(--bw) solid var(--border-strong);cursor:pointer;transition:all .2s;
+}
+.tgl span::after{
+  content:'';position:absolute;width:12px;height:12px;border-radius:50%;
+  background:var(--text-3);top:3px;left:3px;transition:all .2s;
+}
+.tgl input:checked + span{background:var(--accent);border-color:var(--accent)}
+.tgl input:checked + span::after{transform:translateX(16px);background:var(--accent-fg)}
+.inp{
+  padding:5px 9px;border-radius:var(--r-sm);background:var(--surface);
+  border:var(--bw) solid var(--border-strong);font-family:var(--font-mono);
+  font-size:11.5px;color:var(--text);flex-shrink:0;
+}
+.inp.num{width:62px;text-align:right}
+.inp.sel{width:120px}
+
+/* ─── Terminal ──────────────────────────────────────────────── */
+.term{
+  border:var(--bw) solid var(--border);border-radius:var(--r-sm);
+  overflow:hidden;background:var(--term-bg);margin-top:14px;
+}
+.term-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;background:var(--term-bar);
+  border-bottom:var(--bw) solid var(--border);
+}
+.term-name{
+  font-family:var(--font-mono);font-size:10px;color:var(--term-dim);
+  text-transform:var(--label-tt);letter-spacing:var(--label-ls);
+}
+.term-acts{display:flex;gap:6px}
+.term-acts button{font-family:var(--font-mono);font-size:10px;color:var(--term-dim)}
+.term-acts button:hover{color:var(--accent)}
+.term-body{
+  font-family:var(--font-mono);font-size:11.5px;line-height:1.85;
+  padding:11px 13px;max-height:230px;overflow-y:auto;color:var(--term-text);
+}
+.term-body::-webkit-scrollbar{width:4px}
+.term-body::-webkit-scrollbar-thumb{background:var(--border-strong)}
+.ln{display:flex;gap:11px;white-space:pre}
+.ts{color:var(--term-dim);flex-shrink:0}
+.tag-ok{color:var(--ok)}
+.tag-err{color:var(--err)}
+.tag-warn{color:var(--warn)}
+.tag-info{color:var(--info)}
+.tag-step{color:var(--accent);font-weight:500}
+.tag-done{color:var(--ok);font-weight:500}
+.cur{display:inline-block;width:7px;height:13px;background:var(--accent);
+  vertical-align:-2px;animation:pulse 1s steps(2) infinite}
+
+/* ══════════════════════════════════════════════════════════════
+   BARRE DE CONTRÔLE DE LA MAQUETTE — neutre, hors identité
+   ══════════════════════════════════════════════════════════════ */
+.mockbar{
+  position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:900;
+  display:flex;align-items:center;gap:14px;padding:8px 10px 8px 16px;
+  background:#101013;border:1px solid #2A2A32;border-radius:10px;
+  box-shadow:0 14px 40px rgba(0,0,0,.5);
+  font-family:'JetBrains Mono',monospace;
+}
+.mockbar .lbl{font-size:9.5px;letter-spacing:.14em;color:#6A6A78;text-transform:uppercase}
+.mockbar .grp{display:flex;gap:3px;padding:3px;background:#1A1A20;border-radius:7px}
+.mockbar .grp button{
+  padding:6px 13px;border-radius:5px;font-family:inherit;font-size:11px;
+  font-weight:500;color:#9A9AAA;transition:all .15s;white-space:nowrap;
+}
+.mockbar .grp button:hover{color:#E4E4EC}
+.mockbar .grp button[aria-pressed="true"]{color:#0E0E12}
+.mockbar .sep{width:1px;height:26px;background:#2A2A32}
+#idAtelier[aria-pressed="true"]{background:#F0A030}
+#idBloc[aria-pressed="true"]{background:#0F7B7B;color:#fff!important}
+#idSalle[aria-pressed="true"]{background:#22D3EE}
+.mockbar .grp.mono button[aria-pressed="true"]{background:#E4E4EC}
+.mockbar kbd{
+  font-family:inherit;font-size:9.5px;color:#6A6A78;border:1px solid #2A2A32;
+  border-radius:4px;padding:2px 5px;
+}
+
+@media (max-width:1100px){
+  .cfg{grid-template-columns:1fr}
+  .sidebar{width:196px}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ Sprite d'icônes ═══════════════════════════════════════ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-logo" viewBox="0 0 24 24"><path d="M4 7h7M4 12h16M4 17h11"/><circle cx="17" cy="7" r="2"/><circle cx="19" cy="17" r="2"/></symbol>
+  <symbol id="i-clean" viewBox="0 0 24 24"><path d="M12 3l1.7 4.3L18 9l-4.3 1.7L12 15l-1.7-4.3L6 9l4.3-1.7z"/><path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></symbol>
+  <symbol id="i-apps" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M15 17.5h5M17.5 15v5"/></symbol>
+  <symbol id="i-perf" viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11l-1 8.5 8.5-11.5H12z"/></symbol>
+  <symbol id="i-sec" viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.2c0 4.6-3.2 8.6-7.5 9.5-4.3-.9-7.5-4.9-7.5-9.5V6z"/><path d="M9.2 12l2 2 3.6-3.8"/></symbol>
+  <symbol id="i-health" viewBox="0 0 24 24"><path d="M2.5 12H7l2.2-6.5L13 18.5l2.3-6.5h6.2"/></symbol>
+  <symbol id="i-tools" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.2"/><circle cx="10" cy="17" r="2.2"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M5 9l7 7 7-7"/></symbol>
+  <symbol id="i-hist" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.2l3.4 2"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.2c0 4.6-3.2 8.6-7.5 9.5-4.3-.9-7.5-4.9-7.5-9.5V6z"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14"/></symbol>
+  <symbol id="i-min" viewBox="0 0 24 24"><path d="M4 12h16"/></symbol>
+  <symbol id="i-max" viewBox="0 0 24 24"><rect x="4.5" y="4.5" width="15" height="15" rx="1.5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/></symbol>
+</svg>
+
+<!-- ═══ L'APPLICATION ═════════════════════════════════════════ -->
+<div class="app">
+
+  <header class="titlebar">
+    <div class="brand">
+      <div class="brand-mark"><svg class="ico"><use href="#i-logo"/></svg></div>
+      <span class="brand-name">WinTool</span>
+      <span class="brand-ver">4.0.0</span>
+    </div>
+
+    <div class="modeswitch" role="tablist">
+      <button id="mSimple" role="tab" aria-selected="true">Simple</button>
+      <button id="mExpert" role="tab" aria-selected="false">Expert</button>
+    </div>
+
+    <div class="tb-right">
+      <span class="pill shield"><svg class="ico ico-sm"><use href="#i-shield"/></svg>Administrateur</span>
+      <span class="pill upd"><svg class="ico ico-sm"><use href="#i-down"/></svg>4.0.1 disponible</span>
+      <div class="winctl">
+        <button><svg class="ico"><use href="#i-min"/></svg></button>
+        <button><svg class="ico"><use href="#i-max"/></svg></button>
+        <button><svg class="ico"><use href="#i-close"/></svg></button>
+      </div>
+    </div>
+  </header>
+
+  <div class="shell">
+
+    <!-- ─── BARRE LATÉRALE ─────────────────────────────────── -->
+    <aside class="sidebar">
+      <div class="sb-scroll">
+
+        <!-- Mode simple -->
+        <div data-screen="simple">
+          <div class="sb-label">Catégories</div>
+          <div class="nav"><div class="nav-ico"><svg class="ico"><use href="#i-clean"/></svg></div><div class="nav-txt">Nettoyage</div><span class="nav-count">2</span><div class="dot"></div></div>
+          <div class="nav"><div class="nav-ico"><svg class="ico"><use href="#i-apps"/></svg></div><div class="nav-txt">Applications</div><span class="nav-count">2</span><div class="dot"></div></div>
+          <div class="nav" aria-current="true"><div class="nav-ico"><svg class="ico"><use href="#i-perf"/></svg></div><div class="nav-txt">Performance</div><span class="nav-count">3</span><div class="dot run"></div></div>
+          <div class="nav"><div class="nav-ico"><svg class="ico"><use href="#i-sec"/></svg></div><div class="nav-txt">Sécurité</div><span class="nav-count">2</span><div class="dot"></div></div>
+          <div class="nav"><div class="nav-ico"><svg class="ico"><use href="#i-health"/></svg></div><div class="nav-txt">Santé</div><span class="nav-count">2</span><div class="dot ok"></div></div>
+          <div class="nav"><div class="nav-ico"><svg class="ico"><use href="#i-tools"/></svg></div><div class="nav-txt">Outillage</div><span class="nav-count">2</span><div class="dot"></div></div>
+        </div>
+
+        <!-- Mode expert -->
+        <div data-screen="expert">
+          <div class="sb-label">Catégories</div>
+          <div class="nav"><div class="nav-ico"><svg class="ico"><use href="#i-clean"/></svg></div><div class="nav-txt">Nettoyage</div></div>
+          <div class="nav"><div class="nav-ico"><svg class="ico"><use href="#i-apps"/></svg></div><div class="nav-txt">Applications</div></div>
+          <div class="nav"><div class="nav-ico"><svg class="ico"><use href="#i-perf"/></svg></div><div class="nav-txt">Performance</div></div>
+          <div class="nav"><div class="nav-ico"><svg class="ico"><use href="#i-sec"/></svg></div><div class="nav-txt">Sécurité</div></div>
+          <div class="nav"><div class="nav-ico"><svg class="ico"><use href="#i-health"/></svg></div><div class="nav-txt">Santé</div></div>
+          <div class="nav"><div class="nav-ico"><svg class="ico"><use href="#i-tools"/></svg></div><div class="nav-txt">Outillage</div></div>
+
+          <div class="sb-label">Scripts</div>
+          <div class="nav"><span class="nav-num">01</span><div class="nav-txt">Désactiver la veille</div><div class="dot ok"></div></div>
+          <div class="nav"><span class="nav-num">02</span><div class="nav-txt">Installer VCRedist</div><div class="dot"></div></div>
+          <div class="nav"><span class="nav-num">03</span><div class="nav-txt">Supprimer bloatwares</div><div class="dot"></div></div>
+          <div class="nav"><span class="nav-num">04</span><div class="nav-txt">Désinstaller apps Microsoft</div><div class="dot"></div></div>
+          <div class="nav"><span class="nav-num">05</span><div class="nav-txt">Nettoyage fichiers temp</div><div class="dot ok"></div></div>
+          <div class="nav"><span class="nav-num">06</span><div class="nav-txt">Cache navigateurs</div><div class="dot"></div></div>
+          <div class="nav" aria-current="true"><span class="nav-num">07</span><div class="nav-txt">Configurer DNS</div><div class="dot err"></div></div>
+          <div class="nav"><span class="nav-num">08</span><div class="nav-txt">Désactiver télémétrie</div><div class="dot"></div></div>
+          <div class="nav"><span class="nav-num">09</span><div class="nav-txt">Vérification système SFC</div><div class="dot"></div></div>
+          <div class="nav"><span class="nav-num">10</span><div class="nav-txt">Santé des disques SMART</div><div class="dot ok"></div></div>
+          <div class="nav"><span class="nav-num">11</span><div class="nav-txt">Optimiser les disques</div><div class="dot"></div></div>
+          <div class="nav"><span class="nav-num">12</span><div class="nav-txt">Désactiver notifications</div><div class="dot"></div></div>
+          <div class="nav"><span class="nav-num">13</span><div class="nav-txt">Maintenance mensuelle auto</div><div class="dot"></div></div>
+        </div>
+
+      </div>
+      <div class="sb-foot">
+        <button class="sb-btn"><svg class="ico ico-sm"><use href="#i-hist"/></svg>Historique</button>
+        <div class="sb-meta">13 scripts · 6 catégories<br>dernière exécution 21/09 14:32</div>
+      </div>
+    </aside>
+
+    <!-- ─── ZONE PRINCIPALE ────────────────────────────────── -->
+    <main class="main">
+
+      <div class="etabs" role="tablist">
+        <button class="etab" aria-selected="true">Script</button>
+        <button class="etab" aria-selected="false">Catégories</button>
+        <button class="etab" aria-selected="false">Historique</button>
+      </div>
+
+      <div class="content">
+
+        <!-- ══════ ÉCRAN SIMPLE ══════════════════════════════ -->
+        <section data-screen="simple">
+          <div class="phead">
+            <div class="phead-ico"><svg class="ico"><use href="#i-perf"/></svg></div>
+            <div>
+              <div class="ptitle">Performance</div>
+              <div class="pdesc">Veille, résolution DNS et optimisation des disques</div>
+              <div class="pmeta">3 scripts · durée estimée 4 min · aucune action irréversible</div>
+            </div>
+          </div>
+
+          <div class="chips">
+            <span class="chip done"><span class="n">01</span>Désactiver la veille</span>
+            <span class="chip active"><span class="n">07</span>Configurer DNS</span>
+            <span class="chip"><span class="n">11</span>Optimiser les disques</span>
+          </div>
+
+          <div class="card">
+            <div class="card-body">
+              <button class="exec">
+                <span class="fill"></span>
+                <span class="spin"></span>
+                <span>En cours — 2 / 3</span>
+              </button>
+
+              <button class="disclose" id="disclose" aria-expanded="true">
+                <svg class="ico ico-sm"><use href="#i-chev"/></svg>
+                Options et journal d'exécution
+              </button>
+
+              <div class="adv open" id="adv">
+                <div class="cfg">
+                  <div class="cfg-row">
+                    <div class="cfg-l"><div class="cfg-name">Veille sur secteur</div><div class="cfg-sub">0 = jamais de mise en veille</div></div>
+                    <input class="inp num" value="0">
+                  </div>
+                  <div class="cfg-row">
+                    <div class="cfg-l"><div class="cfg-name">Veille sur batterie</div><div class="cfg-sub">en minutes</div></div>
+                    <input class="inp num" value="0">
+                  </div>
+                  <div class="cfg-row">
+                    <div class="cfg-l"><div class="cfg-name">Supprimer l'hibernation</div><div class="cfg-sub">efface hiberfil.sys, libère ~8 Go</div></div>
+                    <label class="tgl"><input type="checkbox" checked><span></span></label>
+                  </div>
+                  <div class="cfg-row">
+                    <div class="cfg-l"><div class="cfg-name">Fournisseur DNS</div><div class="cfg-sub">Cloudflare · Google · Quad9</div></div>
+                    <input class="inp sel" value="Cloudflare">
+                  </div>
+                  <div class="cfg-row">
+                    <div class="cfg-l"><div class="cfg-name">Vider le cache DNS</div><div class="cfg-sub">après changement de résolveur</div></div>
+                    <label class="tgl"><input type="checkbox" checked><span></span></label>
+                  </div>
+                  <div class="cfg-row">
+                    <div class="cfg-l"><div class="cfg-name">Analyser avant d'optimiser</div><div class="cfg-sub">plus lent, évite les passes inutiles</div></div>
+                    <label class="tgl"><input type="checkbox"><span></span></label>
+                  </div>
+                </div>
+
+                <div class="term">
+                  <div class="term-bar">
+                    <span class="term-name">Journal · Performance</span>
+                    <div class="term-acts">
+                      <button>fichier complet</button>
+                      <button>effacer</button>
+                    </div>
+                  </div>
+                  <div class="term-body" id="termA">
+<div class="ln"><span class="ts">14:32:07</span><span class="tag-info">[INFO]</span><span>Démarrage — Performance · 3 scripts</span></div>
+<div class="ln"><span class="ts">14:32:07</span><span class="tag-step">[STEP]</span><span>1/3  Désactiver la veille</span></div>
+<div class="ln"><span class="ts">14:32:08</span><span class="tag-ok">[OK]  </span><span>Veille secteur et batterie : jamais</span></div>
+<div class="ln"><span class="ts">14:32:09</span><span class="tag-ok">[OK]  </span><span>Hibernation désactivée — hiberfil.sys supprimé</span></div>
+<div class="ln"><span class="ts">14:32:09</span><span class="tag-done">[DONE]</span><span>Désactiver la veille · 2,1 s</span></div>
+<div class="ln"><span class="ts">14:32:10</span><span class="tag-step">[STEP]</span><span>2/3  Configurer DNS</span></div>
+<div class="ln"><span class="ts">14:32:11</span><span class="tag-ok">[OK]  </span><span>Ethernet → 1.1.1.1 / 1.0.0.1</span></div>
+<div class="ln"><span class="ts">14:32:11</span><span class="tag-warn">[WARN]</span><span>Wi-Fi désactivé — carte ignorée</span></div>
+<div class="ln"><span class="ts">14:32:12</span><span class="tag-err">[ERR] </span><span>Bluetooth Network : accès refusé</span></div>
+<div class="ln"><span class="ts">14:32:12</span><span class="tag-ok">[OK]  </span><span>Cache de résolution vidé</span></div>
+<div class="ln"><span class="ts">14:32:13</span><span class="tag-step">[STEP]</span><span>3/3  Optimiser les disques</span></div>
+<div class="ln"><span class="ts">14:32:14</span><span class="tag-info">[INFO]</span><span>C: identifié comme SSD → TRIM<span class="cur"></span></span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ══════ ÉCRAN EXPERT ══════════════════════════════ -->
+        <section data-screen="expert">
+          <div class="phead">
+            <div class="phead-ico"><svg class="ico"><use href="#i-perf"/></svg></div>
+            <div>
+              <div class="ptitle">Configurer DNS</div>
+              <div class="pdesc">Accélère la navigation avec un résolveur rapide</div>
+              <div class="pmeta">scripts/07_configurer_dns.ps1 · v2.0</div>
+            </div>
+            <div class="phead-actions">
+              <button class="ghostbtn"><svg class="ico ico-sm"><use href="#i-file"/></svg>Voir le source</button>
+              <button class="runbtn"><svg class="ico ico-sm"><use href="#i-play"/></svg>Exécuter</button>
+            </div>
+          </div>
+
+          <div class="tags">
+            <span class="badge risk-med">Risque moyen</span>
+            <span class="badge">Rapide</span>
+            <span class="badge acc">Réversible</span>
+            <span class="tag">dns</span><span class="tag">réseau</span>
+            <span class="tag">cloudflare</span><span class="tag">latence</span>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <span class="card-title">Configuration</span>
+              <span class="card-title">6 options · 2 avancées</span>
+            </div>
+            <div class="card-body">
+              <div class="cfg">
+                <div class="cfg-row">
+                  <div class="cfg-l"><div class="cfg-name">Fournisseur DNS</div><div class="cfg-sub">Cloudflare · Google · Quad9 · AdGuard</div></div>
+                  <input class="inp sel" value="Cloudflare">
+                </div>
+                <div class="cfg-row">
+                  <div class="cfg-l"><div class="cfg-name">Appliquer à l'IPv6</div><div class="cfg-sub">résolveurs IPv6 équivalents</div></div>
+                  <label class="tgl"><input type="checkbox" checked><span></span></label>
+                </div>
+                <div class="cfg-row">
+                  <div class="cfg-l"><div class="cfg-name">Toutes les cartes réseau</div><div class="cfg-sub">sinon uniquement la carte active</div></div>
+                  <label class="tgl"><input type="checkbox" checked><span></span></label>
+                </div>
+                <div class="cfg-row">
+                  <div class="cfg-l"><div class="cfg-name">Vider le cache après</div><div class="cfg-sub">ipconfig /flushdns</div></div>
+                  <label class="tgl"><input type="checkbox" checked><span></span></label>
+                </div>
+                <div class="cfg-row">
+                  <div class="cfg-l"><div class="cfg-name">Tester la latence<span class="hidden-tag">avancé</span></div><div class="cfg-sub">compare les résolveurs avant d'appliquer</div></div>
+                  <label class="tgl"><input type="checkbox"><span></span></label>
+                </div>
+                <div class="cfg-row">
+                  <div class="cfg-l"><div class="cfg-name">Sauvegarder l'ancien DNS<span class="hidden-tag">avancé</span></div><div class="cfg-sub">export .reg avant modification</div></div>
+                  <label class="tgl"><input type="checkbox" checked><span></span></label>
+                </div>
+              </div>
+
+              <div class="term">
+                <div class="term-bar">
+                  <span class="term-name">Journal · 07_configurer_dns.ps1</span>
+                  <div class="term-acts">
+                    <button>fichier complet</button>
+                    <button>effacer</button>
+                  </div>
+                </div>
+                <div class="term-body">
+<div class="ln"><span class="ts">14:32:10</span><span class="tag-info">[INFO]</span><span>Résolveur cible : Cloudflare (1.1.1.1 / 1.0.0.1)</span></div>
+<div class="ln"><span class="ts">14:32:10</span><span class="tag-step">[STEP]</span><span>1/4  Sauvegarde de la configuration actuelle</span></div>
+<div class="ln"><span class="ts">14:32:10</span><span class="tag-ok">[OK]  </span><span>Export → %LOCALAPPDATA%\WinTool\backup\dns-2026-09-21.reg</span></div>
+<div class="ln"><span class="ts">14:32:11</span><span class="tag-step">[STEP]</span><span>2/4  Application aux cartes réseau</span></div>
+<div class="ln"><span class="ts">14:32:11</span><span class="tag-ok">[OK]  </span><span>Ethernet → 1.1.1.1 / 1.0.0.1</span></div>
+<div class="ln"><span class="ts">14:32:11</span><span class="tag-warn">[WARN]</span><span>Wi-Fi désactivé — carte ignorée</span></div>
+<div class="ln"><span class="ts">14:32:12</span><span class="tag-err">[ERR] </span><span>Bluetooth Network : accès refusé</span></div>
+<div class="ln"><span class="ts">14:32:12</span><span class="tag-step">[STEP]</span><span>3/4  Résolveurs IPv6</span></div>
+<div class="ln"><span class="ts">14:32:12</span><span class="tag-ok">[OK]  </span><span>Ethernet → 2606:4700:4700::1111</span></div>
+<div class="ln"><span class="ts">14:32:12</span><span class="tag-step">[STEP]</span><span>4/4  Vidage du cache de résolution</span></div>
+<div class="ln"><span class="ts">14:32:13</span><span class="tag-ok">[OK]  </span><span>Cache vidé</span></div>
+<div class="ln"><span class="ts">14:32:13</span><span class="tag-done">[DONE]</span><span>Terminé · 2,4 s · code de sortie 0 · 1 erreur non bloquante</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ═══ BARRE DE COMPARAISON ══════════════════════════════════ -->
+<div class="mockbar">
+  <span class="lbl">Identité</span>
+  <div class="grp">
+    <button id="idAtelier" aria-pressed="true">Atelier</button>
+    <button id="idBloc"    aria-pressed="false">Bloc opératoire</button>
+    <button id="idSalle"   aria-pressed="false">Salle de contrôle</button>
+  </div>
+  <div class="sep"></div>
+  <span class="lbl">Écran</span>
+  <div class="grp mono">
+    <button id="scSimple" aria-pressed="true">Simple</button>
+    <button id="scExpert" aria-pressed="false">Expert</button>
+  </div>
+  <div class="sep"></div>
+  <kbd>1 2 3</kbd><kbd>S E</kbd>
+</div>
+
+<script>
+const html = document.documentElement;
+
+const IDS   = {idAtelier:'atelier', idBloc:'bloc', idSalle:'salle'};
+const MODES = {scSimple:'simple',  scExpert:'expert'};
+
+function setIdentity(v){
+  html.dataset.identity = v;
+  for (const [id, val] of Object.entries(IDS))
+    document.getElementById(id).setAttribute('aria-pressed', String(val === v));
+}
+function setMode(v){
+  html.dataset.mode = v;
+  for (const [id, val] of Object.entries(MODES))
+    document.getElementById(id).setAttribute('aria-pressed', String(val === v));
+  document.getElementById('mSimple').setAttribute('aria-selected', String(v === 'simple'));
+  document.getElementById('mExpert').setAttribute('aria-selected', String(v === 'expert'));
+}
+
+for (const [id, val] of Object.entries(IDS))
+  document.getElementById(id).onclick = () => setIdentity(val);
+for (const [id, val] of Object.entries(MODES))
+  document.getElementById(id).onclick = () => setMode(val);
+
+// La bascule Simple/Expert de la barre de titre est réellement câblée
+document.getElementById('mSimple').onclick = () => setMode('simple');
+document.getElementById('mExpert').onclick = () => setMode('expert');
+
+// Panneau avancé
+const disclose = document.getElementById('disclose');
+disclose.onclick = () => {
+  const open = disclose.getAttribute('aria-expanded') === 'true';
+  disclose.setAttribute('aria-expanded', String(!open));
+  document.getElementById('adv').classList.toggle('open', !open);
+};
+
+// Raccourcis clavier
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  const k = e.key.toLowerCase();
+  if (k === '1') setIdentity('atelier');
+  if (k === '2') setIdentity('bloc');
+  if (k === '3') setIdentity('salle');
+  if (k === 's') setMode('simple');
+  if (k === 'e') setMode('expert');
+});
+
+// Le journal démarre en bas, comme un vrai terminal qui défile
+const t = document.getElementById('termA');
+t.scrollTop = t.scrollHeight;
+</script>
+</body>
+</html>
