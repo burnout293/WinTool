@@ -1,18 +1,28 @@
 //! Decouverte des scripts sur le disque.
 //!
-//! Emplacement (specification 4.3) : toute l'arborescence vit dans
-//! `%LOCALAPPDATA%\WinTool\scripts\`, inscriptible et hors de Program Files.
-//! Les sous-dossiers sont libres et le parcours est recursif.
+//! Deux racines, et c'est une decision de securite autant que de rangement
+//! (specification 4.3) :
 //!
 //! ```text
-//! %LOCALAPPDATA%\WinTool\scripts\
-//! ├─ Default\      scripts livres avec l'application
-//! ├─ MesScripts\   l'utilisateur organise comme il veut
+//! <dossier d'installation>\scripts\Default\   scripts livres avec l'application
+//! %LOCALAPPDATA%\WinTool\scripts\             scripts de l'utilisateur
+//! ├─ MesScripts\                              il organise comme il veut
 //! └─ Essais\
 //! ```
 //!
-//! Une mise a jour ne remplace que `Default\` : les autres sous-dossiers ne sont
-//! jamais touches.
+//! Les scripts livres **restent dans le dossier d'installation** et ne sont pas
+//! recopies ailleurs. Program Files n'est pas inscriptible sans elevation : du
+//! code lance sous le compte de l'utilisateur ne peut donc pas les remplacer,
+//! alors que ce sont precisement ceux qu'un debutant lancera en mode Simple sans
+//! les lire. La protection vient des droits du systeme, pas d'un mecanisme qu'il
+//! faudrait ecrire et maintenir.
+//!
+//! Le dossier de l'utilisateur, lui, reste inscriptible — c'est le principe du
+//! projet, on depose un `.ps1` et il apparait. C'est aussi pourquoi tout ce qui
+//! s'y trouve passe par l'approbation avant premiere execution (§12.1).
+//!
+//! Une mise a jour remplace `Default\` avec l'application, sans jamais toucher
+//! aux scripts de l'utilisateur, qui vivent ailleurs.
 
 use crate::contract::{self, Finding, Script, Severity};
 use serde::Serialize;
@@ -26,8 +36,12 @@ pub struct ScriptEntry {
     /// Identifiant resolu : le champ `id` de l'entete, ou a defaut le chemin
     /// relatif. Un chemin change au moindre renommage, l'`id` survit.
     pub id: String,
-    /// Chemin relatif a la racine des scripts, separateurs normalises.
+    /// Chemin relatif a sa propre racine, separateurs normalises.
     pub path: String,
+    /// Chemin complet, utilise pour l'execution.
+    pub abs_path: String,
+    /// `shipped` (livre avec l'application) ou `user`.
+    pub origin: &'static str,
     /// Empreinte du contenu : base de l'approbation avant premiere execution
     /// (specification 12.1) et de la detection des modifications.
     pub hash: String,
@@ -38,7 +52,10 @@ pub struct ScriptEntry {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct DiscoveryResult {
+    /// Racine des scripts de l'utilisateur — celle qu'ouvre le bouton du meme nom.
     pub root: String,
+    /// Racine des scripts livres, en lecture seule.
+    pub shipped_root: String,
     pub scripts: Vec<ScriptEntry>,
     /// Anomalies qui ne visent aucun script en particulier (dossier illisible…).
     pub problems: Vec<String>,
@@ -46,9 +63,9 @@ pub struct DiscoveryResult {
 
 /// Dossier de travail de l'application : `%LOCALAPPDATA%\WinTool`.
 ///
-/// Une seule definition, parce que trois modules en ont besoin (scripts,
-/// journaux, fichiers de configuration d'execution) et que deux definitions qui
-/// divergent donneraient deux arborescences.
+/// Une seule definition, parce que plusieurs modules en ont besoin (scripts de
+/// l'utilisateur, journaux) et que deux definitions qui divergent donneraient
+/// deux arborescences.
 pub fn base_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     let base = app
         .path()
@@ -57,49 +74,22 @@ pub fn base_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(base.join("WinTool"))
 }
 
-/// Racine des scripts : `%LOCALAPPDATA%\WinTool\scripts`.
+/// Racine des scripts de l'utilisateur : `%LOCALAPPDATA%\WinTool\scripts`.
 pub fn scripts_root<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(base_dir(app)?.join("scripts"))
+}
+
+/// Racine des scripts livres, dans le dossier d'installation.
+pub fn shipped_root<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    app.path()
+        .resolve("scripts/Default", tauri::path::BaseDirectory::Resource)
+        .map_err(|e| format!("ressources introuvables : {e}"))
 }
 
 fn sha256_hex(octets: &[u8]) -> String {
     let mut h = Sha256::new();
     h.update(octets);
     h.finalize().iter().map(|b| format!("{b:02x}")).collect()
-}
-
-/// Copie `Default\` depuis les ressources livrees si elle est absente.
-///
-/// Volontairement limite a la creation initiale : le remplacement lors d'une
-/// mise a jour, avec sauvegarde des fichiers modifies a la main, releve de
-/// l'updater et sera traite avec lui.
-fn seed_default<R: Runtime>(app: &AppHandle<R>, root: &Path) -> Result<(), String> {
-    let cible = root.join("Default");
-    if cible.exists() {
-        return Ok(());
-    }
-
-    let source = app
-        .path()
-        .resolve("scripts/Default", tauri::path::BaseDirectory::Resource)
-        .map_err(|e| format!("ressources introuvables : {e}"))?;
-
-    if !source.exists() {
-        // En developpement les ressources peuvent ne pas etre en place. Ce n'est
-        // pas une erreur : le dossier est simplement cree vide.
-        fs::create_dir_all(&cible).map_err(|e| e.to_string())?;
-        return Ok(());
-    }
-
-    fs::create_dir_all(&cible).map_err(|e| e.to_string())?;
-    for entree in fs::read_dir(&source).map_err(|e| e.to_string())? {
-        let entree = entree.map_err(|e| e.to_string())?;
-        if entree.path().extension().and_then(|e| e.to_str()) == Some("ps1") {
-            let nom = entree.file_name();
-            fs::copy(entree.path(), cible.join(&nom)).map_err(|e| e.to_string())?;
-        }
-    }
-    Ok(())
 }
 
 /// Parcours recursif, sans dependance externe.
@@ -121,85 +111,278 @@ fn collect_ps1(dir: &Path, out: &mut Vec<PathBuf>, problems: &mut Vec<String>) {
     }
 }
 
-pub fn discover<R: Runtime>(app: &AppHandle<R>) -> Result<DiscoveryResult, String> {
-    let root = scripts_root(app)?;
-    fs::create_dir_all(&root).map_err(|e| format!("creation de {} : {e}", root.display()))?;
+/// Analyse un fichier et en fait une entree, ou explique pourquoi non.
+fn lire_entree(
+    chemin: &Path,
+    racine: &Path,
+    origin: &'static str,
+    ids_vus: &mut Vec<String>,
+) -> Result<ScriptEntry, String> {
+    let octets = fs::read(chemin).map_err(|e| format!("{} : {e}", chemin.display()))?;
 
-    let mut problems = Vec::new();
-    if let Err(e) = seed_default(app, &root) {
-        problems.push(format!("amorcage de Default : {e}"));
+    // Les scripts sont en UTF-8 avec BOM (voir FORMAT_SCRIPT.md). On le retire
+    // avant analyse, sinon il colle au premier caractere de l'entete.
+    let texte = String::from_utf8_lossy(&octets);
+    let texte = texte.strip_prefix('\u{feff}').unwrap_or(&texte);
+
+    let mut meta = contract::parse(texte);
+
+    let relatif = chemin
+        .strip_prefix(racine)
+        .unwrap_or(chemin)
+        .to_string_lossy()
+        .replace('\\', "/");
+
+    let declared_id = !meta.id.trim().is_empty();
+    let mut id = if declared_id {
+        meta.id.trim().to_string()
+    } else {
+        relatif.clone()
+    };
+
+    if !declared_id {
+        meta.findings.push(Finding {
+            line: 1,
+            severity: Severity::Warning,
+            code: "ID_ABSENT".into(),
+            message:
+                "Pas d'id declare : un renommage ou un deplacement fera perdre la configuration de ce script."
+                    .into(),
+        });
+    } else if ids_vus.contains(&id) {
+        // Les scripts livres sont parcourus en premier : un script de
+        // l'utilisateur ne peut donc pas s'approprier l'id d'un script livre
+        // pour heriter de sa configuration ou de son approbation.
+        meta.findings.push(Finding {
+            line: 1,
+            severity: Severity::Error,
+            code: "ID_COLLISION".into(),
+            message: format!(
+                "L'id '{id}' est deja utilise par un autre script ; celui-ci est identifie par son chemin."
+            ),
+        });
+        id = relatif.clone();
+    } else {
+        ids_vus.push(id.clone());
     }
 
+    Ok(ScriptEntry {
+        id,
+        path: relatif,
+        abs_path: chemin.to_string_lossy().to_string(),
+        origin,
+        hash: sha256_hex(&octets),
+        declared_id,
+        meta,
+    })
+}
+
+/// Parcourt une racine et ajoute ce qu'elle contient.
+fn parcourir(
+    racine: &Path,
+    origin: &'static str,
+    scripts: &mut Vec<ScriptEntry>,
+    ids_vus: &mut Vec<String>,
+    problems: &mut Vec<String>,
+) {
+    if !racine.is_dir() {
+        return;
+    }
     let mut fichiers = Vec::new();
-    collect_ps1(&root, &mut fichiers, &mut problems);
+    collect_ps1(racine, &mut fichiers, problems);
     // Ordre stable : c'est lui qui decide quel script garde un `id` en collision.
     fichiers.sort();
+
+    for chemin in fichiers {
+        match lire_entree(&chemin, racine, origin, ids_vus) {
+            Ok(e) => scripts.push(e),
+            Err(e) => problems.push(e),
+        }
+    }
+}
+
+pub fn discover<R: Runtime>(app: &AppHandle<R>) -> Result<DiscoveryResult, String> {
+    let racine_utilisateur = scripts_root(app)?;
+    fs::create_dir_all(&racine_utilisateur)
+        .map_err(|e| format!("creation de {} : {e}", racine_utilisateur.display()))?;
+
+    let mut problems = Vec::new();
+    let racine_livree = match shipped_root(app) {
+        Ok(r) => r,
+        Err(e) => {
+            problems.push(e);
+            PathBuf::new()
+        }
+    };
 
     let mut scripts: Vec<ScriptEntry> = Vec::new();
     let mut ids_vus: Vec<String> = Vec::new();
 
-    for chemin in fichiers {
-        let octets = match fs::read(&chemin) {
-            Ok(o) => o,
-            Err(e) => {
-                problems.push(format!("{} : {e}", chemin.display()));
-                continue;
-            }
-        };
-
-        // Les scripts sont en UTF-8 avec BOM (voir FORMAT_SCRIPT.md). On le
-        // retire avant analyse, sinon il colle au premier caractere de l'entete.
-        let texte = String::from_utf8_lossy(&octets);
-        let texte = texte.strip_prefix('\u{feff}').unwrap_or(&texte);
-
-        let mut meta = contract::parse(texte);
-
-        let relatif = chemin
-            .strip_prefix(&root)
-            .unwrap_or(&chemin)
-            .to_string_lossy()
-            .replace('\\', "/");
-
-        let declared_id = !meta.id.trim().is_empty();
-        let mut id = if declared_id { meta.id.trim().to_string() } else { relatif.clone() };
-
-        if !declared_id {
-            meta.findings.push(Finding {
-                line: 1,
-                severity: Severity::Warning,
-                code: "ID_ABSENT".into(),
-                message:
-                    "Pas d'id declare : un renommage ou un deplacement fera perdre la configuration de ce script."
-                        .into(),
-            });
-        } else if ids_vus.contains(&id) {
-            // Le premier fichier decouvert garde l'id ; les suivants retombent
-            // sur leur chemin (specification 4.3).
-            meta.findings.push(Finding {
-                line: 1,
-                severity: Severity::Error,
-                code: "ID_COLLISION".into(),
-                message: format!("L'id '{id}' est deja utilise par un autre script ; celui-ci est identifie par son chemin."),
-            });
-            id = relatif.clone();
-        }
-
-        if declared_id {
-            ids_vus.push(meta.id.trim().to_string());
-        }
-
-        scripts.push(ScriptEntry {
-            id,
-            path: relatif,
-            hash: sha256_hex(&octets),
-            declared_id,
-            meta,
-        });
-    }
+    // Les scripts livres d'abord : ils gardent leur id en cas de collision.
+    parcourir(&racine_livree, "shipped", &mut scripts, &mut ids_vus, &mut problems);
+    parcourir(
+        &racine_utilisateur,
+        "user",
+        &mut scripts,
+        &mut ids_vus,
+        &mut problems,
+    );
 
     Ok(DiscoveryResult {
-        root: root.to_string_lossy().to_string(),
+        root: racine_utilisateur.to_string_lossy().to_string(),
+        shipped_root: racine_livree.to_string_lossy().to_string(),
         scripts,
         problems,
     })
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+//
+// `discover` a besoin d'un AppHandle pour resoudre ses deux racines ; le
+// parcours, lui, n'en a pas besoin. C'est donc lui qu'on eprouve, avec deux
+// racines jetables — et c'est bien la que vit la logique qui compte.
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const ENTETE: &str = "## WINTOOL:START
+## id            : {ID}
+## lang          : en
+## title         : {TITRE}
+## desc          : Test fixture
+## category      : outillage
+## icon          : activity
+## version       : 1.0
+## admin         : false
+## risk          : low
+## duration      : fast
+## reversible    : true
+## interruptible : true
+## reboot        : false
+## engine        : auto
+## WINTOOL:END
+";
+
+    struct Bac(PathBuf);
+
+    impl Bac {
+        fn neuf(nom: &str) -> Bac {
+            let d = std::env::temp_dir().join(format!("wintool-dec-{}-{nom}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&d);
+            std::fs::create_dir_all(&d).expect("dossier de test");
+            Bac(d)
+        }
+
+        fn poser(&self, chemin: &str, id: &str, titre: &str) {
+            let p = self.0.join(chemin);
+            std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+            let corps = ENTETE.replace("{ID}", id).replace("{TITRE}", titre);
+            let mut octets = vec![0xEF, 0xBB, 0xBF];
+            octets.extend_from_slice(corps.replace('\n', "\r\n").as_bytes());
+            std::fs::write(&p, &octets).unwrap();
+        }
+    }
+
+    impl Drop for Bac {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn parcours(livre: &Bac, perso: &Bac) -> (Vec<ScriptEntry>, Vec<String>) {
+        let mut scripts = Vec::new();
+        let mut ids = Vec::new();
+        let mut problemes = Vec::new();
+        parcourir(&livre.0, "shipped", &mut scripts, &mut ids, &mut problemes);
+        parcourir(&perso.0, "user", &mut scripts, &mut ids, &mut problemes);
+        (scripts, problemes)
+    }
+
+    #[test]
+    fn distingue_les_deux_racines() {
+        let livre = Bac::neuf("livre");
+        let perso = Bac::neuf("perso");
+        livre.poser("200_SLEEP.ps1", "11111111-1111-4111-8111-111111111111", "Livre");
+        perso.poser("MesScripts/900_A_MOI.ps1", "22222222-2222-4222-8222-222222222222", "A moi");
+
+        let (scripts, problemes) = parcours(&livre, &perso);
+        assert!(problemes.is_empty(), "{problemes:?}");
+        assert_eq!(scripts.len(), 2);
+
+        assert_eq!(scripts[0].origin, "shipped");
+        assert_eq!(scripts[0].path, "200_SLEEP.ps1");
+
+        // Le parcours de la racine personnelle reste recursif.
+        assert_eq!(scripts[1].origin, "user");
+        assert_eq!(scripts[1].path, "MesScripts/900_A_MOI.ps1");
+
+        // Le chemin complet permet l'execution sans reconstruire quoi que ce soit.
+        assert!(PathBuf::from(&scripts[1].abs_path).is_file());
+    }
+
+    #[test]
+    fn un_script_perso_ne_peut_pas_prendre_l_id_d_un_script_livre() {
+        let livre = Bac::neuf("livre2");
+        let perso = Bac::neuf("perso2");
+        let id = "33333333-3333-4333-8333-333333333333";
+        livre.poser("200_VRAI.ps1", id, "Le vrai");
+        // Meme id, depose dans le dossier inscriptible sans elevation.
+        perso.poser("200_IMPOSTEUR.ps1", id, "L'imposteur");
+
+        let (scripts, _) = parcours(&livre, &perso);
+        assert_eq!(scripts.len(), 2);
+
+        // Le script livre garde l'id : c'est lui qui portera la configuration
+        // et l'approbation attachees a cet identifiant.
+        assert_eq!(scripts[0].id, id);
+        assert_eq!(scripts[0].origin, "shipped");
+
+        // L'autre retombe sur son chemin, et la collision est signalee.
+        assert_eq!(scripts[1].id, "200_IMPOSTEUR.ps1");
+        assert!(
+            scripts[1]
+                .meta
+                .findings
+                .iter()
+                .any(|f| f.code == "ID_COLLISION"),
+            "la collision d'id n'est pas signalee"
+        );
+    }
+
+    #[test]
+    fn signale_un_script_sans_id_sans_le_rejeter() {
+        let livre = Bac::neuf("livre3");
+        let perso = Bac::neuf("perso3");
+        perso.poser("sans_id.ps1", "", "Sans id");
+
+        let (scripts, _) = parcours(&livre, &perso);
+        assert_eq!(scripts.len(), 1, "constater, jamais bloquer");
+        assert!(!scripts[0].declared_id);
+        // A defaut d'id declare, le chemin fait office d'identifiant.
+        assert_eq!(scripts[0].id, "sans_id.ps1");
+        assert!(scripts[0].meta.findings.iter().any(|f| f.code == "ID_ABSENT"));
+    }
+
+    #[test]
+    fn une_racine_absente_n_est_pas_une_erreur() {
+        let perso = Bac::neuf("perso4");
+        let mut scripts = Vec::new();
+        let mut ids = Vec::new();
+        let mut problemes = Vec::new();
+        // Cas reel : l'application lancee depuis un emplacement ou les
+        // ressources ne sont pas en place.
+        parcourir(
+            Path::new(r"Z:
+existe\pas"),
+            "shipped",
+            &mut scripts,
+            &mut ids,
+            &mut problemes,
+        );
+        parcourir(&perso.0, "user", &mut scripts, &mut ids, &mut problemes);
+        assert!(problemes.is_empty(), "une racine absente ne doit pas alarmer");
+    }
 }

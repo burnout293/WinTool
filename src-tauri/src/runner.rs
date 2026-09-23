@@ -408,6 +408,35 @@ fn assainir(nom: &str) -> String {
     }
 }
 
+/// Chemins de modules PowerShell qu'un utilisateur non eleve ne peut pas ecrire.
+///
+/// Seuls `System32` et `Program Files` figurent ici. Les dossiers de modules
+/// sous `Documents` sont volontairement absents : c'est tout l'objet de la
+/// fonction.
+fn chemins_modules_systeme(moteur: &str) -> String {
+    let sysroot = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+    let progfiles = std::env::var("ProgramFiles").unwrap_or_else(|_| r"C:\Program Files".into());
+
+    let mut chemins = vec![PathBuf::from(&sysroot)
+        .join("system32")
+        .join("WindowsPowerShell")
+        .join("v1.0")
+        .join("Modules")];
+
+    if moteur == "pwsh" {
+        chemins.push(PathBuf::from(&progfiles).join("PowerShell").join("7").join("Modules"));
+        chemins.push(PathBuf::from(&progfiles).join("PowerShell").join("Modules"));
+    } else {
+        chemins.push(PathBuf::from(&progfiles).join("WindowsPowerShell").join("Modules"));
+    }
+
+    chemins
+        .iter()
+        .map(|p| p.to_string_lossy().to_string())
+        .collect::<Vec<_>>()
+        .join(";")
+}
+
 /// Coeur du moteur : lance le processus et publie ce qu'il produit.
 ///
 /// Ne connait ni Tauri ni la decouverte — c'est ce qui le rend verifiable avec
@@ -487,17 +516,30 @@ pub fn lancer(
         ));
     }
 
-    // --- Fichier de configuration -----------------------------------------
+    // --- Configuration -----------------------------------------------------
+    //
+    // Le JSON voyage dans la variable d'environnement elle-meme, et non par un
+    // fichier dont la variable donnerait le chemin. Un fichier aurait du vivre
+    // dans un dossier inscriptible sans elevation, et un processus tiers aurait
+    // pu le remplacer entre notre ecriture et la lecture par PowerShell : ses
+    // valeurs auraient alors atterri dans `$CONFIG`, en administrateur. Un
+    // `Remove-Item $CONFIG.Chemin -Recurse -Force` suffit a mesurer les degats.
+    //
+    // L'environnement d'un processus deja lance ne peut pas etre modifie de
+    // l'exterieur sans privilege de debogage. Il n'y a donc plus d'intervalle
+    // a exploiter, parce qu'il n'y a plus de fichier.
     let run_id = format!("run-{}", runner.compteur.fetch_add(1, Ordering::Relaxed) + 1);
 
-    let dossier_run = base.join("run");
-    std::fs::create_dir_all(&dossier_run).map_err(|e| e.to_string())?;
-    let fichier_config = dossier_run.join(format!("{run_id}.json"));
-    std::fs::write(
-        &fichier_config,
-        serde_json::to_vec_pretty(&config).map_err(|e| e.to_string())?,
-    )
-    .map_err(|e| format!("ecriture de la configuration : {e}"))?;
+    let config_json = serde_json::to_string(&config).map_err(|e| e.to_string())?;
+    // Windows plafonne une variable d'environnement a 32767 caracteres. Un
+    // refus clair vaut mieux qu'une troncature silencieuse qui donnerait au
+    // script une configuration a moitie lue.
+    if config_json.len() > 30_000 {
+        return Err(format!(
+            "La configuration de ce script est trop volumineuse ({} caracteres)              pour etre transmise a PowerShell.",
+            config_json.len()
+        ));
+    }
 
     // --- Journal technique -------------------------------------------------
     let dossier_logs = base.join("logs");
@@ -528,7 +570,7 @@ pub fn lancer(
         cible.chemin.display(),
         empreinte,
         chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-        serde_json::to_string(&config).unwrap_or_default(),
+        config_json,
         "-".repeat(72)
     );
 
@@ -543,7 +585,18 @@ pub fn lancer(
         .arg("-File")
         .arg(&cible.chemin)
         .current_dir(&dossier_script)
-        .env("WINTOOL_CONFIG", &fichier_config)
+        .env("WINTOOL_CONFIG", &config_json)
+        // `Import-Module Truc` cherche d'abord dans les dossiers de modules de
+        // l'utilisateur, sous Documents, inscriptibles sans elevation : y
+        // deposer un module du bon nom suffirait a le faire charger en
+        // administrateur. Meme raisonnement que `-NoProfile`, qui ferme le
+        // profil PowerShell pour exactement la meme raison. L'enfant ne recoit
+        // donc que les chemins de modules du systeme.
+        //
+        // Residu assume : le `PATH` reste intact, donc un script qui appelle un
+        // outil sans chemin absolu suit toujours l'ordre du PATH. Le restreindre
+        // casserait `winget`, qui vit justement dans un dossier utilisateur.
+        .env("PSModulePath", chemins_modules_systeme(&nom_moteur))
         // stdin ferme : un script qui attendrait une saisie echoue tout de
         // suite au lieu de rester bloque sans que rien ne l'indique.
         .stdin(Stdio::null())
@@ -639,7 +692,6 @@ pub fn lancer(
         let run_id = run_id.clone();
         let script_id = cible.id.clone();
         let chemin_log = fichier_log.clone();
-        let fichier_config = fichier_config.clone();
         std::thread::spawn(move || {
             let statut = enfant.wait();
             // Le verrou est relache ici, et pas avant : il a protege le fichier
@@ -672,8 +724,6 @@ pub fn lancer(
                     }
                 );
             }
-
-            let _ = std::fs::remove_file(&fichier_config);
 
             // L'emplacement est libere avant d'annoncer la fin : si l'interface
             // enchaine sur le script suivant des reception du bilan, la place
@@ -733,9 +783,10 @@ pub fn run_script<R: Runtime>(
         ));
     }
 
-    let racine = discovery::scripts_root(app)?;
     let cible = Cible {
-        chemin: racine.join(entree.path.replace('/', "\\")),
+        // Le chemin vient de la decouverte, pas de l'interface : il n'y a pas
+        // de nom de fichier a reconstruire, donc rien a detourner.
+        chemin: PathBuf::from(&entree.abs_path),
         id: entree.id,
         titre: entree.meta.title,
         hash: entree.hash,
@@ -818,7 +869,14 @@ pub fn cancel_script(runner: &Runner, run_id: &str, force: bool) -> Result<Cance
 fn tuer_arborescence(pid: u32) -> Result<(), String> {
     #[cfg(windows)]
     {
-        let mut c = Command::new("taskkill");
+        // Chemin absolu, comme pour l'interpreteur : `Command::new("taskkill")`
+        // laisserait l'ordre du PATH designer l'executable qui recoit les
+        // droits administrateur. Il suffit alors d'un `taskkill.exe` depose
+        // dans un dossier inscriptible du PATH pour obtenir une elevation au
+        // moment ou l'utilisateur clique sur « Arreter ».
+        let sysroot = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
+        let outil = PathBuf::from(sysroot).join("System32").join("taskkill.exe");
+        let mut c = Command::new(&outil);
         c.args(["/PID", &pid.to_string(), "/T", "/F"])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -959,7 +1017,7 @@ mod bout_en_bout {
 
 # --- WinTool override (ne pas supprimer) ---
 if ($env:WINTOOL_CONFIG) {
-    (Get-Content $env:WINTOOL_CONFIG -Raw | ConvertFrom-Json).PSObject.Properties |
+    ($env:WINTOOL_CONFIG | ConvertFrom-Json).PSObject.Properties |
         ForEach-Object { $CONFIG[$_.Name] = $_.Value }
 }
 
@@ -1136,9 +1194,12 @@ exit 0
             "l'execution terminee occupe encore la place"
         );
 
-        // Le fichier de configuration temporaire est retire.
-        let reste = bac.0.join("run").join(format!("{}.json", demarre.run_id));
-        assert!(!reste.exists(), "le fichier de configuration n'a pas ete nettoye");
+        // Aucun fichier de configuration n'est ecrit : le JSON ne passe que par
+        // l'environnement, justement pour qu'il n'y ait rien a substituer.
+        assert!(
+            !bac.0.join("run").exists(),
+            "un fichier de configuration a ete ecrit sur le disque"
+        );
     }
 
     #[test]

@@ -487,8 +487,25 @@ function Test-Traduction {
 function Test-Override {
     param([string] $Fichier, [string[]] $Lignes)
 
-    foreach ($l in $Lignes) { if ($l -match '\$env:WINTOOL_CONFIG') { return } }
-    Add-Constat $Fichier 1 'erreur' 'OVERRIDE_ABSENT' "Ligne d'override absente : sans elle, les réglages choisis dans l'interface sont ignorés et le script tourne toujours avec ses valeurs par défaut."
+    $trouve = $false
+    for ($i = 0; $i -lt $Lignes.Count; $i++) {
+        $l = $Lignes[$i]
+        if ($l -notmatch '\$env:WINTOOL_CONFIG') { continue }
+        $trouve = $true
+
+        # WinTool transmet désormais le JSON dans la variable elle-même, et non
+        # le chemin d'un fichier. L'ancienne forme passerait donc du JSON à
+        # Get-Content, qui échouerait : le script tournerait avec ses valeurs par
+        # défaut sans que rien ne le signale. Ce contrôle existe pour que ce
+        # basculement ne puisse pas passer inaperçu.
+        if ($l -match 'Get-Content\s') {
+            Add-Constat $Fichier ($i + 1) 'erreur' 'OVERRIDE_OBSOLETE' "Ancienne ligne d'override : WINTOOL_CONFIG contient le JSON, plus un chemin de fichier. Remplacez par ( `$env:WINTOOL_CONFIG | ConvertFrom-Json )."
+        }
+    }
+
+    if (-not $trouve) {
+        Add-Constat $Fichier 1 'erreur' 'OVERRIDE_ABSENT' "Ligne d'override absente : sans elle, les réglages choisis dans l'interface sont ignorés et le script tourne toujours avec ses valeurs par défaut."
+    }
 }
 
 function Test-Marqueurs {

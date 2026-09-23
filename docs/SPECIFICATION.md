@@ -119,22 +119,35 @@ script ne réécrit plus jamais automatiquement.
 
 ### 4.3 Emplacement des scripts
 
-Toute l'arborescence vit dans **`%LOCALAPPDATA%\WinTool\scripts\`** — inscriptible, hors
-`Program Files`. **Les sous-dossiers sont autorisés et la découverte est récursive.**
+**Deux racines, et c'est une décision de sécurité autant que de rangement.**
 
 ```
-%LOCALAPPDATA%\WinTool\scripts\
-├─ Default\          ← scripts livrés avec l'application
-│   ├─ 01_disable_sleep.ps1
+<dossier d'installation>\scripts\Default\   ← scripts livrés, lecture seule
+│   ├─ 200_DISABLE_SLEEP.ps1
 │   └─ …
-├─ MesScripts\       ← l'utilisateur organise comme il veut
+%LOCALAPPDATA%\WinTool\scripts\             ← scripts de l'utilisateur
+├─ MesScripts\                              ← il organise comme il veut
 └─ Essais\
 ```
 
-**Règle de mise à jour** : une mise à jour de l'application ne remplace **que** `Default\`.
-Les autres sous-dossiers ne sont jamais touchés.
-Si un fichier de `Default\` a été modifié à la main, il est **sauvegardé avant
-remplacement** et l'utilisateur en est informé.
+**Les scripts livrés restent dans le dossier d'installation** et ne sont recopiés nulle
+part. `Program Files` n'est pas inscriptible sans élévation : du code lancé sous le compte
+de l'utilisateur ne peut donc pas les remplacer — alors que ce sont précisément ceux qu'un
+débutant lancera en mode Simple sans les lire. La protection vient des **droits du
+système**, pas d'un mécanisme qu'il faudrait écrire et maintenir.
+
+Corollaire à assumer : l'installation doit être **par machine** (`perMachine`), jamais
+« pour moi seul ». Une installation dans un dossier inscriptible sans élévation rendrait
+tout le reste sans objet — on y remplacerait aussi bien l'exécutable lui-même.
+
+Le dossier de l'utilisateur, lui, **reste inscriptible** : c'est le principe du projet, on
+dépose un `.ps1` et il apparaît. C'est aussi la raison pour laquelle tout ce qui s'y trouve
+passe par l'approbation avant première exécution (§12.1). **Les sous-dossiers sont
+autorisés et la découverte est récursive.**
+
+**Règle de mise à jour** : `Default\` est remplacé avec l'application, puisqu'il en fait
+partie. Les scripts de l'utilisateur vivent ailleurs et ne sont jamais touchés — il n'y a
+plus de fusion à opérer, ni de modification locale à sauvegarder.
 
 **Identifiant d'un script — le champ `id` de l'entête (§5.1), pas le chemin.** Un chemin
 change au moindre renommage ou déplacement ; l'`id` survit, ce qui préserve la
@@ -152,6 +165,9 @@ configuration, le classement dans les catégories et l'historique.
   fichier découvert** (ordre alphabétique du chemin) garde l'`id` ; les suivants portant le
   même `id` sont traités comme des doublons, signalés par le lint avec leur chemin, et
   identifiés provisoirement par leur chemin en attendant qu'un nouvel `id` soit généré.
+  **Les scripts livrés sont parcourus en premier**, et ce n'est pas un détail d'ordre : un
+  script déposé dans le dossier utilisateur ne peut donc pas s'approprier l'`id` d'un
+  script livré pour hériter de sa configuration ou de son approbation.
 
 Un script référencé par une catégorie mais introuvable (par `id` ou, à défaut, par chemin)
 est affiché comme **manquant** et ignoré à l'exécution — jamais une erreur bloquante.
@@ -239,7 +255,7 @@ $CONFIG = @{
 
 # --- WinTool override (ne pas supprimer) ---
 if ($env:WINTOOL_CONFIG) {
-    (Get-Content $env:WINTOOL_CONFIG -Raw | ConvertFrom-Json).PSObject.Properties |
+    ($env:WINTOOL_CONFIG | ConvertFrom-Json).PSObject.Properties |
         ForEach-Object { $CONFIG[$_.Name] = $_.Value }
 }
 ```
@@ -261,10 +277,22 @@ ligne. La v3 ne vérifiait rien de tout cela.
 
 **Pourquoi la ligne d'override est décisive.** La v3 reconstruisait le bloc `$CONFIG` par
 expression régulière, écrivait un `.ps1` temporaire et l'exécutait — mécanisme fragile et
-déjà cassé. Désormais WinTool écrit un simple fichier JSON, pose la variable
-`WINTOOL_CONFIG`, et exécute **le script original tel quel**. Plus de réécriture, plus de
-fichier temporaire. Le script reste parfaitement exécutable seul en double-clic : sans la
-variable d'environnement, il utilise ses valeurs par défaut.
+déjà cassé. Désormais WinTool pose le JSON des valeurs choisies **dans la variable
+`WINTOOL_CONFIG` elle-même**, et exécute **le script original tel quel**. Plus de
+réécriture, plus de fichier temporaire. Le script reste parfaitement exécutable seul en
+double-clic : sans la variable d'environnement, il utilise ses valeurs par défaut.
+
+**La variable contient le JSON, jamais le chemin d'un fichier.** Un fichier aurait dû
+vivre dans un dossier inscriptible sans élévation, et un processus tiers aurait pu le
+remplacer entre notre écriture et la lecture par PowerShell ; ses valeurs auraient alors
+atterri dans `$CONFIG`, **en administrateur**. Pas besoin d'`Invoke-Expression` pour que ce
+soit grave : un `Remove-Item $CONFIG.Chemin -Recurse -Force` suffit. L'environnement d'un
+processus déjà lancé ne peut pas être modifié de l'extérieur — il n'y a donc plus
+d'intervalle à exploiter, parce qu'il n'y a plus de fichier.
+
+Plafond : Windows limite une variable d'environnement à 32 767 caractères. Au-delà de
+30 000, WinTool refuse le lancement avec un message clair plutôt que de transmettre une
+configuration tronquée.
 
 ### 5.3 Sortie normalisée
 
@@ -537,6 +565,48 @@ du lancement d'un script — pas de `-EncodedCommand` ni d'autre mécanisme qui 
 le scan que Windows Defender effectue déjà par défaut sur le contenu d'un script. C'est une
 couche de défense gratuite déjà présente sur la machine ; l'implémentation ne doit pas la
 casser par inadvertance en cherchant à optimiser le lancement du processus.
+
+### 12.4 Élévation : où WinTool pourrait servir d'escalier
+
+**Modèle de menace.** L'attaquant est du code qui tourne **sous le compte de l'utilisateur,
+sans élévation**. C'est le seul qui compte : celui qui est déjà administrateur n'a pas
+besoin de WinTool. Toute la question est donc de savoir où WinTool, qui est élevé, lui
+tiendrait l'échelle.
+
+Chaque étape entre le lancement de l'application et la fin d'un script a été passée en
+revue. Les mesures ci-dessous ne sont pas des précautions générales : chacune ferme un
+chemin identifié.
+
+| Étape | Ce qui serait exploitable | Mesure |
+|---|---|---|
+| Installation | Dossier d'installation inscriptible → on remplace l'exécutable ou une DLL voisine | Installation **`perMachine`** imposée (§4.3) |
+| Interface | Les fichiers de l'interface sont **embarqués dans le binaire**, pas lus du disque | Rien à remplacer |
+| Découverte | Le champ `icon` vient du script et sert à charger un fichier inséré dans la page | Nom filtré sur la forme Lucide (`^[a-z0-9]+(-[a-z0-9]+)*$`) |
+| Approbation | Voir la règle de lecture unique ci-dessous | §12.1 |
+| Configuration | Un fichier JSON dans un dossier inscriptible, relu par PowerShell | Le JSON passe **dans la variable**, il n'y a plus de fichier (§5.2) |
+| Lancement | Le script peut être remplacé entre sa vérification et son ouverture | Fichier **ouvert en interdisant le partage en écriture**, empreinte calculée depuis ce handle, handle gardé ouvert pendant toute l'exécution |
+| Lancement | Le profil PowerShell vit sous `Documents`, inscriptible | `-NoProfile` |
+| Lancement | `Import-Module` cherche d'abord sous `Documents`, inscriptible | `PSModulePath` réduit aux **chemins système** |
+| Lancement | L'interpréteur résolu par le `PATH` | **Chemin absolu** (§6.7) |
+| Bouton Arrêter | `taskkill` résolu par le `PATH`, exécuté en administrateur | **Chemin absolu** |
+
+**Règle de lecture unique — approbation.** L'écran d'approbation affiche le contenu du
+script et enregistre son empreinte. **Les deux viennent d'une seule et même lecture**, sous
+le même verrou en partage-lecture. Deux lectures distinctes ouvriraient un intervalle où
+l'utilisateur approuverait ce qu'il a vu pendant que l'application enregistrerait
+l'empreinte d'un contenu substitué — l'approbation porterait alors sur un contenu que
+personne n'a jamais lu.
+
+**Magasin d'approbations.** La liste des empreintes approuvées vit dans un emplacement que
+seul un administrateur peut écrire. Dans un fichier de réglages inscriptible par
+l'utilisateur, un logiciel malveillant y ajouterait simplement sa propre empreinte, et tout
+le dispositif du §12.1 deviendrait décoratif.
+
+**Résidu assumé.** Le `PATH` n'est pas restreint : un script qui appelle un outil sans
+chemin absolu suit toujours l'ordre du `PATH`, qui contient des dossiers inscriptibles sans
+élévation — `winget` vit précisément dans l'un d'eux. Le restreindre casserait des scripts
+légitimes. C'est une limite connue, à réexaminer quand les scripts livrés seront écrits et
+qu'on saura lesquels appellent quoi.
 
 ---
 

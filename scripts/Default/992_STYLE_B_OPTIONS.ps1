@@ -63,7 +63,7 @@ $CONFIG = @{
 
 # --- WinTool override (ne pas supprimer) ---
 if ($env:WINTOOL_CONFIG) {
-    (Get-Content $env:WINTOOL_CONFIG -Raw | ConvertFrom-Json).PSObject.Properties |
+    ($env:WINTOOL_CONFIG | ConvertFrom-Json).PSObject.Properties |
         ForEach-Object { $CONFIG[$_.Name] = $_.Value }
 }
 

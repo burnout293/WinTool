@@ -125,7 +125,7 @@ $CONFIG = @{
 
 # --- WinTool override (ne pas supprimer) ---
 if ($env:WINTOOL_CONFIG) {
-    (Get-Content $env:WINTOOL_CONFIG -Raw | ConvertFrom-Json).PSObject.Properties |
+    ($env:WINTOOL_CONFIG | ConvertFrom-Json).PSObject.Properties |
         ForEach-Object { $CONFIG[$_.Name] = $_.Value }
 }
 
@@ -316,7 +316,7 @@ seulement qu'une seconde langue existe.
 ```powershell
 # --- WinTool override (ne pas supprimer) ---
 if ($env:WINTOOL_CONFIG) {
-    (Get-Content $env:WINTOOL_CONFIG -Raw | ConvertFrom-Json).PSObject.Properties |
+    ($env:WINTOOL_CONFIG | ConvertFrom-Json).PSObject.Properties |
         ForEach-Object { $CONFIG[$_.Name] = $_.Value }
 }
 ```
@@ -326,8 +326,16 @@ le script tourne toujours avec ses valeurs par défaut, sans que rien ne le sign
 
 Elle remplace un mécanisme bien pire. La v3 reconstruisait le bloc `$CONFIG` à coups
 d'expression régulière, écrivait un `.ps1` temporaire et exécutait *celui-là* — fragile,
-et déjà cassé au moment de la refonte. Désormais WinTool écrit un fichier JSON, pose la
-variable `WINTOOL_CONFIG`, et exécute **votre fichier, tel quel**.
+et déjà cassé au moment de la refonte. Désormais WinTool pose vos réglages dans la
+variable `WINTOOL_CONFIG` et exécute **votre fichier, tel quel**.
+
+> **La variable contient le JSON, pas un chemin de fichier.** Une version antérieure de ce
+> guide écrivait `Get-Content $env:WINTOOL_CONFIG -Raw | ConvertFrom-Json` : cette forme
+> ne fonctionne plus, et le validateur la refuse (`OVERRIDE_OBSOLETE`). Le fichier
+> intermédiaire a été supprimé parce qu'il vivait dans un dossier inscriptible sans
+> élévation : un autre programme pouvait le remplacer entre l'écriture par WinTool et la
+> lecture par votre script, et faire ainsi entrer ses propres valeurs dans `$CONFIG` —
+> en administrateur.
 
 Bénéfice secondaire : sans cette variable, votre script reste parfaitement exécutable seul,
 en double-clic, avec ses valeurs par défaut.
@@ -437,6 +445,7 @@ validateur sans l'ajouter ici est un défaut.**
 | `TRADUCTION_CHOIX` | avertissement | Un choix sans libellé traduit |
 | `TRADUCTION_ORPHELINE` | erreur | Traduction d'une option ou d'un choix qui n'existe pas |
 | `OVERRIDE_ABSENT` | erreur | Ligne d'override manquante |
+| `OVERRIDE_OBSOLETE` | erreur | Ancienne ligne d'override lisant un fichier — `WINTOOL_CONFIG` contient le JSON |
 | `MARQUEUR_INCONNU` | erreur | Balise proche d'un marqueur connu — `[REBBOT]` → `[REBOOT]` |
 | `MARQUEUR_CASSE` | avertissement | Marqueur pas en majuscules |
 | `SORTIE_NON_ANGLAISE` | avertissement | Message affiché contenant des accents |

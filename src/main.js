@@ -35,8 +35,18 @@ async function injecterSprite() {
 /** Cache des icones chargees a la demande, pour ne les lire qu'une fois. */
 const cacheIcones = new Map();
 
+/**
+ * Forme d'un nom Lucide : minuscules, chiffres et tirets simples.
+ *
+ * Le nom vient du fichier de script, donc d'une source non fiable, et le SVG
+ * obtenu est insere tel quel dans la page. Sans ce filtre, un script pourrait
+ * ecrire `icon : ../../autre-chose` et faire injecter dans l'interface un
+ * fichier qui n'est pas une icone.
+ */
+const NOM_ICONE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
 async function iconeSVG(nom) {
-  if (!nom) return '';
+  if (!nom || !NOM_ICONE.test(nom)) return '';
   if (cacheIcones.has(nom)) return cacheIcones.get(nom);
   try {
     const reponse = await fetch(`icons/${nom}.svg`);
@@ -223,6 +233,12 @@ async function rendreCarte(entree) {
     m.interruptible ? '' : '<span class="badge med">Non interruptible</span>',
     m.admin ? '<span class="badge">Admin requis</span>' : '',
     entree.declared_id ? '' : '<span class="badge med">Sans id</span>',
+    // L'origine n'est pas decorative : un script livre vit dans le dossier
+    // d'installation, que du code non eleve ne peut pas modifier. Un script
+    // perso vit dans un dossier inscriptible, d'ou l'approbation.
+    entree.origin === 'shipped'
+      ? '<span class="badge acc">Livré</span>'
+      : '<span class="badge">Perso</span>',
   ]
     .filter(Boolean)
     .join('');
@@ -263,7 +279,9 @@ async function chargerScripts() {
 
   try {
     const resultat = await invoke('list_scripts');
-    document.getElementById('rootPath').textContent = resultat.root;
+    document.getElementById('rootPath').innerHTML =
+      `Livrés : ${esc(resultat.shipped_root)} <span class="muted">(lecture seule)</span>` +
+      `<br />Perso : ${esc(resultat.root)}`;
 
     if (resultat.problems?.length) {
       soucis.innerHTML = resultat.problems
