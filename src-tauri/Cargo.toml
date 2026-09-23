@@ -11,6 +11,15 @@ edition = "2021"
 name = "wintool_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[[bin]]
+name = "wintool"
+path = "src/main.rs"
+# Le manifeste impose requireAdministrator : lancer ce binaire depuis le
+# harnais de test echouerait avec « l'operation necessite une elevation »
+# (os error 740). Il ne contient aucun test — toute la logique est dans la
+# bibliotheque, qui elle est testable sans elevation.
+test = false
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -22,6 +31,9 @@ serde_json = "1"
 # Empreinte du contenu des scripts : identification des modifications et base
 # de l'approbation avant premiere execution (specification 12.1).
 sha2 = "0.10"
+# Horodatage local des journaux. Deja present dans l'arbre de dependances de
+# Tauri : l'ajouter en direct ne coute pas de compilation supplementaire.
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 
 [profile.release]
 codegen-units = 1

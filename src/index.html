@@ -77,7 +77,7 @@
               fill="none" stroke="var(--acc)" stroke-width="2.5" opacity="0.55" />
       </svg>
 
-      <div class="scroll">
+      <div class="scroll" id="scroll">
         <div class="wrap">
           <div class="head">
             <h1>Scripts découverts</h1>
@@ -87,6 +87,25 @@
           <div id="list" class="list"></div>
         </div>
       </div>
+
+      <!-- La sortie réelle du script, ligne par ligne. La v3 n'affichait
+           jamais rien d'authentique ici : c'est le défaut que ce panneau
+           corrige. -->
+      <section class="term" id="term" hidden aria-live="polite">
+        <div class="term-head">
+          <div>
+            <div class="term-title" id="termTitle">…</div>
+            <div class="term-sub" id="termSub">…</div>
+          </div>
+          <div class="term-actions">
+            <button class="btn danger" type="button" id="btnStop">Arrêter</button>
+            <button class="btn" type="button" id="btnLog" hidden>Ouvrir le journal</button>
+            <button class="btn" type="button" id="btnCloseTerm" hidden>Fermer</button>
+          </div>
+        </div>
+        <div class="term-prog"><i id="termProg"></i></div>
+        <div class="term-body" id="termBody"></div>
+      </section>
     </main>
 
   </div>

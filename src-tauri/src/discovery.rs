@@ -19,7 +19,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, Runtime};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ScriptEntry {
@@ -44,13 +44,22 @@ pub struct DiscoveryResult {
     pub problems: Vec<String>,
 }
 
-/// Racine des scripts : `%LOCALAPPDATA%\WinTool\scripts`.
-pub fn scripts_root(app: &AppHandle) -> Result<PathBuf, String> {
+/// Dossier de travail de l'application : `%LOCALAPPDATA%\WinTool`.
+///
+/// Une seule definition, parce que trois modules en ont besoin (scripts,
+/// journaux, fichiers de configuration d'execution) et que deux definitions qui
+/// divergent donneraient deux arborescences.
+pub fn base_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     let base = app
         .path()
         .local_data_dir()
         .map_err(|e| format!("dossier local introuvable : {e}"))?;
-    Ok(base.join("WinTool").join("scripts"))
+    Ok(base.join("WinTool"))
+}
+
+/// Racine des scripts : `%LOCALAPPDATA%\WinTool\scripts`.
+pub fn scripts_root<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(base_dir(app)?.join("scripts"))
 }
 
 fn sha256_hex(octets: &[u8]) -> String {
@@ -64,7 +73,7 @@ fn sha256_hex(octets: &[u8]) -> String {
 /// Volontairement limite a la creation initiale : le remplacement lors d'une
 /// mise a jour, avec sauvegarde des fichiers modifies a la main, releve de
 /// l'updater et sera traite avec lui.
-fn seed_default(app: &AppHandle, root: &Path) -> Result<(), String> {
+fn seed_default<R: Runtime>(app: &AppHandle<R>, root: &Path) -> Result<(), String> {
     let cible = root.join("Default");
     if cible.exists() {
         return Ok(());
@@ -112,7 +121,7 @@ fn collect_ps1(dir: &Path, out: &mut Vec<PathBuf>, problems: &mut Vec<String>) {
     }
 }
 
-pub fn discover(app: &AppHandle) -> Result<DiscoveryResult, String> {
+pub fn discover<R: Runtime>(app: &AppHandle<R>) -> Result<DiscoveryResult, String> {
     let root = scripts_root(app)?;
     fs::create_dir_all(&root).map_err(|e| format!("creation de {} : {e}", root.display()))?;
 
