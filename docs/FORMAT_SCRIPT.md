@@ -18,7 +18,10 @@ Référence normative : `docs/SPECIFICATION.md` §5.
 5. Vérifiez : `.\tools\lint-scripts.ps1`
 
 Un script non conforme **s'exécute quand même** : WinTool signale, il ne bloque pas
-(§5.4). La seule exception est l'approbation de sécurité (§12.1), qui, elle, bloque.
+(§5.4). **Mais plusieurs situations font refuser le lancement** — approbation manquante,
+ancienne ligne d'override, script non simulable en mode test, interpréteur absent, fichier
+modifié depuis son analyse. Elles sont toutes listées dans **« Ce qui empêche un script de
+se lancer »**, plus bas : lisez cette section avant d'écrire votre premier script.
 
 ---
 
@@ -104,6 +107,7 @@ Tous les scripts officiels vivent à plat dans `Default\`, sans sous-dossiers.
 ##   quad9      : Quad9 — 9.9.9.9, blocks known malicious domains
 ## ApplyToIPv6  : [bool]   Apply to IPv6 — equivalent resolvers
 ## FlushCache   : [hidden] Flush the resolver cache afterwards
+## SafeTest     : [bool]   Safe test — simulates every change, modifies nothing
 ## WINTOOL:END
 
 ## WINTOOL:LANG fr
@@ -115,12 +119,14 @@ Tous les scripts officiels vivent à plat dans `Default\`, sans sous-dossiers.
 ##   quad9      : Quad9 — 9.9.9.9, bloque les domaines malveillants connus
 ## ApplyToIPv6  : Appliquer à l'IPv6 — résolveurs équivalents
 ## FlushCache   : Vider le cache de résolution ensuite
+## SafeTest     : Test sans risque — simule chaque modification, ne change rien
 ## WINTOOL:END
 
 $CONFIG = @{
     DnsProvider = "cloudflare"
     ApplyToIPv6 = $true
     FlushCache  = $true
+    SafeTest    = $false
 }
 
 # --- WinTool override (ne pas supprimer) ---
@@ -131,8 +137,16 @@ if ($env:WINTOOL_CONFIG) {
 
 # ==============================================================================
 
+# Comparaison de CHAINE, pas de booleen : la valeur arrive par JSON et peut
+# valoir $true, "True" ou 1 selon le chemin emprunte.
+$SafeTest = ("$($CONFIG.SafeTest)" -eq 'True')
+
 Write-Host "[STEP] 1/1 Applying DNS settings"
-Write-Host "[OK]   Provider set to $($CONFIG.DnsProvider)"
+if ($SafeTest) {
+    Write-Host "[INFO] SafeTest - would set the resolver to $($CONFIG.DnsProvider)"
+} else {
+    Write-Host "[OK]   Provider set to $($CONFIG.DnsProvider)"
+}
 Write-Host "[DONE] Done"
 exit 0
 ```
@@ -171,6 +185,22 @@ Tous ces champs sont **obligatoires**. `tags` est le seul facultatif.
 | `interruptible` | `true` / `false` | `false` = ne peut pas être tué sans risque |
 | `reboot` | `true` / `false` | `true` **pré-coche** « nécessite un redémarrage » |
 | `engine` | `auto` / `winps` / `pwsh` | Interpréteur requis |
+
+### Les tokens acceptés par `category`
+
+Chaque catégorie d'usine a **un id anglais et un id français**, tous deux acceptés — écrivez
+celui qui correspond à la langue de votre `lang`, sans avoir à traduire. La liste vit dans
+**`tools/categories.json`** (`id` = token anglais, `id_fr` = token français) — c'est la seule
+source, lue à la fois par `tools/lint-scripts.ps1` (`CATEGORIE_INCONNUE` si vous en sortez) et
+par l'application (`src-tauri/src/settings.rs`) pour éviter que la liste ne diverge d'un côté
+comme c'est arrivé avec `CREER_UN_SCRIPT.txt`. Au 23/09/2026 : `cleaning`/`nettoyage`,
+`performance`/`performance`, `privacy`/`vieprivee`, `apps`/`applications`, `health`/`sante`,
+`tools`/`outillage`.
+
+Une catégorie **créée par l'utilisateur** en mode Expert n'a ni id anglais ni traduction :
+un seul id, dans la langue tapée à la création (SPECIFICATION.md §10). Un script ne peut
+donc viser par `category` qu'une catégorie d'usine, jamais une catégorie personnelle d'une
+installation particulière.
 
 ### Ce que « suggestion » veut dire pour `category`
 
@@ -237,10 +267,31 @@ Une ligne par réglage : `## Clé : [type] Libellé — Description`.
 | `string` | champ texte libre |
 | `select` | **liste déroulante, un seul choix** |
 | `multi` | **cases à cocher, plusieurs choix** |
-| `hidden` | **visible en mode Expert seulement** |
+| `hidden` | **interrupteur, comme `bool`** — mais visible en mode Expert seulement |
 
-Le séparateur entre libellé et description est un tiret cadratin `—`. La description est
-facultative ; le libellé ne l'est pas.
+> **`hidden` n'est pas un modificateur de visibilité.** C'est un `bool` caché : sa valeur
+> par défaut doit être `$true` ou `$false`, et l'interface lui injectera **toujours** un
+> booléen. Un `[hidden]` posé sur une chaîne ou un nombre passe le validateur **sans un
+> seul constat**, puis casse à l'exécution — le script reçoit `false` là où il attend son
+> texte. Pour cacher un réglage non booléen, il n'existe aucun moyen aujourd'hui.
+
+Le séparateur entre libellé et description est un tiret cadratin `—`, **entouré d'un espace
+de chaque côté**. Sans ces espaces, toute la chaîne devient le libellé et la description
+disparaît. La description est facultative ; le libellé ne l'est pas.
+
+### Un espace pour une option, deux pour un choix
+
+C'est l'indentation **après `##`**, et elle seule, qui distingue une option d'un choix :
+
+```
+## MaCle      : [bool] Une option          ← UN espace  : c'est une option
+##   monchoix : Un choix                   ← DEUX espaces : c'est un choix
+```
+
+**Alignez les deux-points en garnissant APRÈS le nom de la clé, jamais avant.** Une option
+écrite `##  MaCle : [bool] X` (deux espaces) n'est plus une option : elle devient un choix
+de l'option précédente. La clé disparaît de l'interface, et vous récoltez
+`CHOIX_INATTENDU` puis `OPTION_NON_DECLAREE` sans comprendre pourquoi.
 
 ### Listes et multi-listes
 
@@ -351,12 +402,24 @@ détail technique » ; c'est l'interface qui traduit la progression à partir de
 [INFO]   message           ligne neutre
 [OK]     message           succès d'une étape
 [WARN]   message           avertissement, n'échoue pas
-[ERR]    message           erreur — marque le script en échec
+[ERR]    message erreur affichée et comptée — **ne suffit PAS à faire échouer le script**
 [STEP]   3/7 message       alimente la barre de progression
 [CKPT]   message           « interruption sans risque à partir d'ici »
 [REBOOT] message           un redémarrage est réellement nécessaire
 [DONE]   message           fin nominale
 ```
+
+> ### Le seul verdict est `exit`
+>
+> `[ERR]` n'est qu'un affichage : il colore une ligne et incrémente un compteur. Il
+> **n'échoue pas** le script. Un script qui écrit `[ERR] ...` puis se termine par `exit 0`
+> — ou sans `exit` du tout, PowerShell renvoyant alors 0 — est enregistré comme une
+> **réussite**, avec « 1 erreur » en petit à côté.
+>
+> Si votre script a rencontré une erreur, il **doit** se terminer par `exit 1`.
+>
+> C'est exactement le « succès fictif » que la v3 produisait et que cette refonte corrige :
+> ne le réintroduisez pas depuis le script.
 
 **Le verdict de réussite vient du code de sortie** (`exit 0` = succès), jamais du fait que
 le script ait démarré. Terminez donc explicitement par `exit 0` ou `exit 1`. La v3 se
@@ -403,7 +466,7 @@ Dans VS Code : *Sélectionner l'encodage → Enregistrer avec l'encodage → UTF
 .\tools\lint-scripts.ps1 -Path .\scripts\Default -Strict   # exigence CI
 ```
 
-`-Strict` traite les avertissements comme des erreurs. Les scripts livrés dans `Default\`
+`-Strict` traite les avertissements comme des erreurs. Les scripts destinés à `Default\`
 doivent passer en `-Strict`.
 
 ### Les contrôles, un par un
@@ -446,6 +509,7 @@ validateur sans l'ajouter ici est un défaut.**
 | `TRADUCTION_ORPHELINE` | erreur | Traduction d'une option ou d'un choix qui n'existe pas |
 | `OVERRIDE_ABSENT` | erreur | Ligne d'override manquante |
 | `OVERRIDE_OBSOLETE` | erreur | Ancienne ligne d'override lisant un fichier — `WINTOOL_CONFIG` contient le JSON |
+| `OVERRIDE_FICHIER` | erreur | Repli vers un fichier de configuration — **WinTool refuse de lancer le script** |
 | `MARQUEUR_INCONNU` | erreur | Balise proche d'un marqueur connu — `[REBBOT]` → `[REBOOT]` |
 | `MARQUEUR_CASSE` | avertissement | Marqueur pas en majuscules |
 | `SORTIE_NON_ANGLAISE` | avertissement | Message affiché contenant des accents |
@@ -453,3 +517,167 @@ validateur sans l'ajouter ici est un défaut.**
 Le contrôle des marqueurs ne regarde que les balises **en tête de chaîne affichée**.
 Sans cette restriction, les transtypages PowerShell deviennent des faux positifs :
 `[long]` ressemble à `[DONE]` à deux caractères près, et `[int]` à `[INFO]`.
+
+---
+
+## Votre modèle : le squelette de ce document
+
+`scripts/Default/` est **vide** : le catalogue est en cours de réécriture. Vous n'avez donc
+aucun script existant à imiter, et c'est tant mieux — les précédents portaient tous une
+ancienne forme de bloc d'override que WinTool refuse désormais de lancer.
+
+**Le squelette donné plus haut est le seul modèle fiable.** Il est vérifié : on l'extrait de
+ce fichier et on le passe au validateur en `-Strict` à chaque relecture de la documentation.
+
+---
+
+## Pièges silencieux — ce que le validateur ne vous dira pas
+
+Ces règles sont appliquées par le code mais **ne produisent aucun constat**. Un script qui
+les enfreint passe `-Strict` sans un mot, puis se comporte mal.
+
+### Le type s'écrit en minuscules
+
+`[Bool]` ou `[Select]` **passent le validateur** — la comparaison PowerShell y est
+insensible à la casse. Mais l'interface compare en respectant la casse : elle ne reconnaît
+pas le type et affiche un champ de texte libre à la place de l'interrupteur ou de la liste.
+
+Écrivez toujours `[bool]`, `[number]`, `[string]`, `[select]`, `[multi]`, `[hidden]`.
+
+### Le code de langue fait exactement deux lettres
+
+`## WINTOOL:LANG fr` — pas `fr-FR`, pas `french`. Le validateur n'accepte que deux lettres
+et signalerait `TRADUCTION_ABSENTE` sans expliquer pourquoi.
+
+### L'accolade fermante de `$CONFIG` est seule sur sa ligne
+
+```powershell
+$CONFIG = @{        # l'ouverture aussi tient sur une seule ligne
+    MaCle = $true
+}                   # rien d'autre sur cette ligne, pas même un commentaire
+```
+
+Un `}  # fin de config` empêche le parseur de trouver la fin du bloc.
+
+### Le bloc d'override ne peut pas être en commentaire
+
+Il doit contenir littéralement `$env:WINTOOL_CONFIG`, sur une ligne non commentée. Un
+exemple mis en commentaire dans un en-tête `<# … #>` ne compte pas, et vous récoltez
+`OVERRIDE_ABSENT`.
+
+### Une clé d'option ne contient pas d'espace
+
+Et elle doit être **identique aux trois endroits** : `WINTOOL:OPTIONS`, `WINTOOL:LANG` et
+`$CONFIG`. Le validateur croise les trois dans les deux sens.
+
+### `category` ne peut pas viser « Entretien complet »
+
+Cette catégorie est un agrégat : elle rassemble automatiquement ce qui est rangé ailleurs.
+Aucun script ne peut la désigner. Utilisez un des six jetons d'usine.
+
+### Une valeur d'`engine` inconnue se comporte comme `auto`
+
+`engine : powershell` ou `engine : ps7` ne produisent aucune erreur : WinTool prend
+simplement l'interpréteur le plus récent disponible. Les trois seules valeurs qui ont un
+sens sont `auto`, `winps` et `pwsh`.
+
+### La configuration injectée est plafonnée
+
+Au-delà de **30 000 caractères** de JSON, WinTool refuse le lancement (limite Windows sur
+une variable d'environnement). Un `[multi]` à très nombreux choix ou une `[string]` très
+longue peuvent y conduire.
+
+---
+
+## Ce qui empêche un script de se lancer
+
+WinTool applique partout le principe « **constater, jamais bloquer** » : un script
+non conforme s'exécute quand même, ses anomalies sont simplement affichées. Il
+existe exactement **trois exceptions**, et toutes les trois portent sur
+l'exécution avec les droits administrateur — jamais sur la forme du fichier.
+
+Si vous écrivez des scripts pour WinTool, ce sont les seules choses qui peuvent
+faire refuser le lancement :
+
+### 1. Le script n'est pas approuvé
+
+Tout script qui ne vient pas de `Default\` doit être approuvé une fois, par son
+empreinte exacte. Toute modification du fichier invalide l'approbation. Voir §12.1
+de la spécification.
+
+### 2. La ligne d'override lit un fichier
+
+**C'est le refus qui surprend le plus, donc lisez-le en entier.**
+
+`WINTOOL_CONFIG` **contient le JSON** de vos réglages. Elle ne contient pas, et
+n'a jamais à contenir, le chemin d'un fichier. La bonne forme est :
+
+```powershell
+# --- WinTool override (ne pas supprimer) ---
+if ($env:WINTOOL_CONFIG) {
+    ($env:WINTOOL_CONFIG | ConvertFrom-Json).PSObject.Properties |
+        ForEach-Object { $CONFIG[$_.Name] = $_.Value }
+}
+```
+
+WinTool **refuse de lancer** un script dont le bloc d'override passe
+`WINTOOL_CONFIG` — ou une variable qui la porte — à `Get-Content` :
+
+```powershell
+# REFUSÉ : mécanisme retiré pour raison de sécurité
+$wtJson = $env:WINTOOL_CONFIG
+if (-not $wtJson.TrimStart().StartsWith('{')) { $wtJson = Get-Content -LiteralPath $wtJson -Raw }
+```
+
+**Pourquoi.** Ce repli vient d'une version antérieure où la variable donnait le
+chemin d'un fichier JSON. Ce fichier vivait dans un dossier inscriptible sans
+élévation : un autre programme pouvait le remplacer entre le moment où WinTool
+l'écrivait et celui où PowerShell le lisait, et faire entrer ses propres valeurs
+dans votre `$CONFIG` — **avec les droits administrateur**. Le fichier a disparu,
+mais tant que le repli existe dans un script, la porte peut être rouverte.
+
+**Ce contrôle ne regarde que votre bloc d'override.** Un script qui lit des
+fichiers pour son propre compte n'est pas concerné, même s'il utilise
+`Get-Content` partout ailleurs :
+
+```powershell
+# Parfaitement accepté : rien à voir avec la configuration injectée
+$hosts = Get-Content -LiteralPath "$env:SystemRoot\System32\drivers\etc\hosts" -Raw
+```
+
+Le validateur signale le même problème sous le code `OVERRIDE_FICHIER`, avec le
+numéro de ligne, avant même que vous n'essayiez de lancer le script.
+
+### 3. Le mode test, pour un script qui ne sait pas se simuler
+
+Quand le **mode test** est actif, WinTool impose `SafeTest = true` à chaque script.
+Un script qui ne déclare pas cette option est **refusé**, pas exécuté.
+
+C'est volontaire : injecter une clé qu'un script n'utilise pas ajouterait une
+entrée inerte à sa table, et il modifierait la machine pendant que l'interface
+annonce une simulation. Un refus visible vaut mieux qu'une garantie fausse.
+
+Pour qu'un script soit utilisable en mode test, déclarez l'option et honorez-la :
+
+```powershell
+## SafeTest      : [bool]   Safe test — simulates every change, modifies nothing
+```
+
+```powershell
+$SafeTest = ("$($CONFIG.SafeTest)" -eq 'True')
+
+if ($SafeTest) {
+    Write-Host "[INFO] SafeTest - would delete $($files.Count) file(s)"
+} else {
+    Remove-Item @files -Force
+}
+```
+
+**Deux pièges à éviter**, observés dans des scripts existants :
+
+- **Ne simulez pas à moitié.** Une commande qui contacte le réseau, accepte un
+  contrat de licence ou modifie un réglage global doit être derrière le garde,
+  elle aussi — pas seulement la suppression finale.
+- **N'inventez jamais un résultat.** Écrire `[OK] simulated: no corruption found`
+  sans avoir rien vérifié fait mentir le journal. Dites ce que vous *auriez* fait,
+  jamais ce que vous *auriez trouvé*.

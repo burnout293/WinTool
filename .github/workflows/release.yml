@@ -1,0 +1,93 @@
+# Publication d'une version.
+#
+#   git tag v4.0.1 && git push origin v4.0.1
+#
+# Produit l'installeur NSIS, publie la Release et y joint l'empreinte SHA-256 :
+# l'executable n'etant pas signe, c'est le seul moyen offert a quelqu'un de
+# verifier ce qu'il telecharge (voir le README, section SmartScreen).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+# Necessaire pour que l'action puisse creer la Release.
+permissions:
+  contents: write
+
+jobs:
+  publier:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run icons:sync
+
+      # On ne publie pas ce qui n'a pas passe les tests, meme si la CI est
+      # deja verte sur la branche : le tag peut pointer ailleurs.
+      - name: Tests
+        working-directory: src-tauri
+        run: cargo test --lib
+
+      - name: Construire et publier
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signature de l'updater (§11). Ces deux secrets sont a creer une
+          # fois, apres `npx tauri signer generate`. Sans eux la Release se
+          # publie quand meme, mais sans mise a jour automatique.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'WinTool ${{ github.ref_name }}'
+          releaseDraft: true
+          prerelease: false
+          releaseBody: |
+            ## Installation
+
+            Telechargez l'installeur ci-dessous et executez-le.
+
+            **« Windows a protege votre PC » apparaitra** : WinTool n'est pas
+            signe numeriquement. Cliquez sur **Informations complementaires**,
+            puis **Executer quand meme**. Voir le README pour le detail.
+
+            ### Verifier ce que vous telechargez
+
+            ```powershell
+            Get-FileHash .\WinTool_*_x64-setup.exe -Algorithm SHA256
+            ```
+
+            Comparez avec l'empreinte publiee dans le commentaire ci-dessous.
+
+      - name: Publier l'empreinte de l'installeur
+        shell: pwsh
+        run: |
+          $installeurs = @(Get-ChildItem -Recurse -Path src-tauri/target/release/bundle -Filter *-setup.exe)
+          if ($installeurs.Count -eq 0) {
+            Write-Host "::warning::aucun installeur trouve, empreinte non publiee"
+            exit 0
+          }
+          foreach ($f in $installeurs) {
+            $h = (Get-FileHash $f.FullName -Algorithm SHA256).Hash
+            Write-Host "::notice::$($f.Name) : $h"
+            Add-Content -Path empreintes.txt -Value "$($f.Name)  SHA256  $h"
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: empreintes
+          path: empreintes.txt
+          if-no-files-found: ignore

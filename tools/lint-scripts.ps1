@@ -65,9 +65,15 @@ $MARQUEURS = @('INFO', 'OK', 'WARN', 'ERR', 'STEP', 'CKPT', 'REBOOT', 'DONE')
 $TYPES_OPTION     = @('bool', 'number', 'string', 'hidden', 'select', 'multi')
 $TYPES_AVEC_CHOIX = @('select', 'multi')
 
-$CATEGORIES_USINE = @(
-    'menage', 'performance', 'vieprivee', 'applications', 'sante', 'outillage'
-)
+# Catégories d'usine : un id anglais ET un id français par domaine, les deux acceptés
+# dans `category:` (un script écrit en `lang: en` comme en `lang: fr` doit pouvoir viser
+# la même catégorie sans traduire). Source unique : tools/categories.json, aussi lue par
+# l'application Tauri (src-tauri/src/settings.rs) — pour que les deux ne puissent pas
+# diverger comme CREER_UN_SCRIPT.txt l'avait fait. Voir docs/FORMAT_SCRIPT.md et
+# SPECIFICATION.md §4.1.
+$FICHIER_CATEGORIES = Join-Path $PSScriptRoot 'categories.json'
+$CATEGORIES_JSON = Get-Content $FICHIER_CATEGORIES -Raw -Encoding UTF8 | ConvertFrom-Json
+$CATEGORIES_USINE = @($CATEGORIES_JSON | ForEach-Object { $_.id }) + @($CATEGORIES_JSON | ForEach-Object { $_.id_fr })
 
 # Noms d'icônes Lucide valides. La liste est versionnée à côté de ce script pour que
 # la vérification fonctionne hors ligne — WinTool sert justement quand la machine va
@@ -488,18 +494,36 @@ function Test-Override {
     param([string] $Fichier, [string[]] $Lignes)
 
     $trouve = $false
+    # Variables locales qui recoivent WINTOOL_CONFIG. Le repli vers un fichier
+    # passe presque toujours par l'une d'elles, une ou deux lignes plus bas :
+    # ne regarder que la ligne courante laissait passer la forme la plus
+    # repandue. Meme logique que `runner::trappe_de_substitution`, cote Rust.
+    $portees = New-Object System.Collections.Generic.List[string]
+
     for ($i = 0; $i -lt $Lignes.Count; $i++) {
         $l = $Lignes[$i]
-        if ($l -notmatch '\$env:WINTOOL_CONFIG') { continue }
-        $trouve = $true
+        if ($l.TrimStart().StartsWith('#')) { continue }
+        $bas = $l.ToLowerInvariant()
 
-        # WinTool transmet désormais le JSON dans la variable elle-même, et non
-        # le chemin d'un fichier. L'ancienne forme passerait donc du JSON à
-        # Get-Content, qui échouerait : le script tournerait avec ses valeurs par
-        # défaut sans que rien ne le signale. Ce contrôle existe pour que ce
-        # basculement ne puisse pas passer inaperçu.
-        if ($l -match 'Get-Content\s') {
-            Add-Constat $Fichier ($i + 1) 'erreur' 'OVERRIDE_OBSOLETE' "Ancienne ligne d'override : WINTOOL_CONFIG contient le JSON, plus un chemin de fichier. Remplacez par ( `$env:WINTOOL_CONFIG | ConvertFrom-Json )."
+        if ($bas -match '\$env:wintool_config') {
+            $trouve = $true
+            $gauche = ($l -split '=')[0].Trim()
+            if ($gauche.StartsWith('$') -and $gauche -notmatch '\s') {
+                $portees.Add($gauche.TrimStart('$').ToLowerInvariant()) | Out-Null
+            }
+            if ($bas -match 'get-content') {
+                Add-Constat $Fichier ($i + 1) 'erreur' 'OVERRIDE_OBSOLETE' "Ancienne ligne d'override : WINTOOL_CONFIG contient le JSON, plus un chemin de fichier. Remplacez par ( `$env:WINTOOL_CONFIG | ConvertFrom-Json )."
+                continue
+            }
+        }
+
+        if ($bas -match 'get-content') {
+            foreach ($v in $portees) {
+                if ($bas -match [regex]::Escape('$' + $v)) {
+                    Add-Constat $Fichier ($i + 1) 'erreur' 'OVERRIDE_FICHIER' "Repli vers un FICHIER de configuration : mecanisme retire pour raison de securite (§5.2). WinTool refuse de lancer ce script. Supprimez cette ligne, `$env:WINTOOL_CONFIG contient deja le JSON."
+                    break
+                }
+            }
         }
     }
 

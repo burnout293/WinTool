@@ -47,6 +47,15 @@ const SPRITE = {
   'arrow-right': 'arrow-right',
   'arrow-left': 'arrow-left',
   chevron: 'chevron-down',
+  plus: 'plus',
+  pencil: 'pencil',
+  pin: 'pin',
+  trash: 'trash-2',
+  folder: 'folder',
+  x: 'x',
+  // Bulle d'aide : sert partout ou un reglage a besoin d'etre explique sans
+  // allonger son libelle (ex. la politique d'execution PowerShell).
+  help: 'circle-help',
 };
 
 if (!existsSync(source)) {
@@ -97,4 +106,9 @@ const sprite =
 
 writeFileSync(destSprite, sprite, 'utf8');
 console.log(`[OK]   Sprite de ${symboles.length} icones ecrit dans src/icons.svg`);
+// Index lisible par l'interface : la fenetre de choix d'icone a besoin de la
+// liste complete, et une page ne peut pas parcourir un dossier.
+const noms = readdirSync(destDossier).filter((f) => f.endsWith('.svg')).map((f) => f.slice(0, -4)).sort();
+writeFileSync(join(destDossier, '_index.txt'), `${noms.join('\n')}\n`, 'utf8');
+console.log(`[OK]   Index de ${noms.length} noms ecrit dans src/icons/_index.txt`);
 console.log('[DONE] Icones synchronisees');

@@ -15,3 +15,6 @@ src/icons.svg
 # Divers
 dist/
 *.log
+
+# Raccourcis crees localement pour tester le binaire construit.
+*.lnk

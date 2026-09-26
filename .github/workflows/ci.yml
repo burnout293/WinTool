@@ -1,0 +1,84 @@
+# Verification a chaque poussee.
+#
+# Tout tourne sous Windows : la suite de tests lance reellement PowerShell
+# (execution de scripts, analyse syntaxique, verrouillage de fichier), et le
+# validateur est lui-meme un script PowerShell. Un runner Linux ne prouverait
+# rien de ce qui compte ici.
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# Une seule verification par branche : une poussee annule la precedente.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      # Le cache porte sur target/ et sur le registre cargo : sans lui, chaque
+      # verification recompile tout Tauri, ce qui prend une dizaine de minutes.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Installer les dependances
+        run: npm ci
+
+      # Les icones ne sont pas versionnees (2112 fichiers) : elles se
+      # regenerent depuis lucide-static, qui est une dependance npm.
+      - name: Regenerer les icones
+        run: npm run icons:sync
+
+      - name: Verifier la syntaxe du frontend
+        shell: bash
+        run: |
+          for f in src/main.js src/i18n.js tools/bench/fixtures.js tools/sync-icons.mjs; do
+            node --check "$f"
+          done
+
+      - name: Valider les scripts livres
+        shell: pwsh
+        run: |
+          $dossier = 'scripts/Default'
+          $scripts = @(Get-ChildItem -Path $dossier -Filter *.ps1 -ErrorAction SilentlyContinue)
+          if ($scripts.Count -eq 0) {
+            # Catalogue en cours de reecriture : rien a valider n'est pas un
+            # echec, mais doit se voir dans le journal.
+            Write-Host "::notice::aucun script dans $dossier, validation ignoree"
+            exit 0
+          }
+          ./tools/lint-scripts.ps1 -Path $dossier -Strict
+
+      - name: Clippy
+        working-directory: src-tauri
+        run: cargo clippy --lib --all-targets -- -D warnings
+
+      - name: Format
+        working-directory: src-tauri
+        run: cargo fmt --check
+
+      # `--lib` seulement : le binaire porte un manifeste `asInvoker` et n'a
+      # aucun test ; c'est la bibliotheque qui contient toute la logique.
+      - name: Tests
+        working-directory: src-tauri
+        run: cargo test --lib
+
+      - name: Construire l'installeur
+        run: npm run build

@@ -90,6 +90,13 @@ Une catégorie porte :
 | `pinned` | épinglée en grand dans l'étape 1 du mode Simple |
 | `scripts[]` | **liste ordonnée** de références de scripts |
 
+**Fr/en (§10) ne s'applique qu'aux catégories d'usine**, et seulement à elles : `id` y est
+doublé (`id_en` + `id_fr`, ex. `privacy` / `vieprivee`) — les deux sont acceptés par
+`category` dans l'entête d'un script (docs/FORMAT_SCRIPT.md) — et `name` y est traduit
+fr/en. Une catégorie **créée par l'utilisateur** n'a qu'un seul `id` et un seul `name`,
+dans la langue tapée à la création : aucun script ne peut la viser par `category`, elle ne
+se remplit qu'à la main.
+
 Le mode Expert permet de **créer, renommer, réordonner et supprimer** des catégories.
 
 **Appartenance multiple** : un script peut figurer dans plusieurs catégories.
@@ -420,6 +427,50 @@ au processus enfant** lancé par WinTool pour exécuter le script — jamais à 
 la machine ou de l'utilisateur, qui ne sont jamais lues ni modifiées. Rien à restaurer à la
 désinstallation. Alternative réglable dans les paramètres Expert : `RemoteSigned` ou
 `Unrestricted`, toujours au niveau du processus enfant seul.
+
+---
+
+### 6.8 Vérifier un script sans l'exécuter
+
+Une action **Vérifier**, disponible sur chaque script, répond à une seule question : *ce
+fichier est-il lisible et conforme ?* Elle fait deux choses, sans jamais rien exécuter :
+
+1. **relire le contrat** — la même analyse qu'à la découverte (§5.5), qui produit les
+   anomalies avec leur numéro de ligne ;
+2. **faire analyser le fichier par PowerShell** — l'arbre syntaxique est construit, aucune
+   commande n'est évaluée.
+
+Le chemin du fichier est transmis par une variable d'environnement, jamais dans le texte de
+la commande : aucun caractère du chemin ne peut en changer le sens (même règle qu'au §5.2).
+
+**Ce que ce contrôle ne dit pas**, et que l'interface énonce noir sur blanc sous le
+résultat : qu'un script qui s'analyse réussira. Les droits, l'état de la machine, une
+applet absente ou une erreur de logique ne se voient qu'à l'exécution. C'est un contrôle de
+forme, pas un essai à blanc — et laisser croire l'inverse serait pire que ne rien afficher
+(même principe qu'au §12.2).
+
+### 6.9 Mode test global
+
+Une bascule **Mode test** impose `SafeTest = true` à la configuration de chaque script
+lancé, quel que soit le mode. Un lot entier en hérite donc sans réglage script par script.
+
+Trois règles non négociables :
+
+- **L'état vit en mémoire de session, jamais dans les réglages.** Un mode test qui
+  survivrait au redémarrage ferait passer un entretien réel pour une simulation. WinTool
+  repart toujours en mode réel.
+- **Un script qui ne déclare pas l'option `SafeTest` est refusé, pas exécuté.** Injecter
+  une clé qu'il n'utilise pas ajouterait une entrée inerte à sa table, et il modifierait la
+  machine pendant que l'interface annonce une simulation. Un refus visible vaut mieux
+  qu'une garantie fausse.
+- **L'état est rappelé à deux endroits** — la pastille de la barre de titre et un bandeau
+  en tête d'écran. Croire qu'on simule alors qu'on modifie est le pire résultat possible,
+  et une seule pastille se perd dans une barre chargée.
+
+**Limite assumée** : `SafeTest` est une convention de script. WinTool garantit que la clé
+est transmise et que les scripts qui ne la déclarent pas ne partent pas ; il ne peut pas
+garantir qu'un script qui la déclare l'honore complètement. Cette responsabilité est celle
+de l'auteur du script, et `docs/FORMAT_SCRIPT.md` la lui rappelle.
 
 ---
 

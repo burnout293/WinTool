@@ -1,0 +1,8 @@
+[
+  { "id": "cleaning",    "id_fr": "nettoyage",     "name_fr": "Faire le ménage", "name_en": "Cleaning",     "icon": "broom" },
+  { "id": "performance", "id_fr": "performance",   "name_fr": "Performance",     "name_en": "Performance",  "icon": "zap" },
+  { "id": "privacy",     "id_fr": "vieprivee",     "name_fr": "Vie privée",      "name_en": "Privacy",      "icon": "shield" },
+  { "id": "apps",        "id_fr": "applications",  "name_fr": "Applications",    "name_en": "Applications", "icon": "app-window" },
+  { "id": "health",      "id_fr": "sante",         "name_fr": "Santé",           "name_en": "Health",       "icon": "activity" },
+  { "id": "tools",       "id_fr": "outillage",     "name_fr": "Outillage",       "name_en": "Tools",        "icon": "wrench" }
+]
