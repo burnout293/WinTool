@@ -45,11 +45,16 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Signature de l'updater (§11). Ces deux secrets sont a creer une
-          # fois, apres `npx tauri signer generate`. Sans eux la Release se
-          # publie quand meme, mais sans mise a jour automatique.
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Pas de secret de signature ici, et c'est delibere : la mise a jour
+          # automatique n'est pas branchee. tauri-plugin-updater n'est pas une
+          # dependance et src-tauri/src/update.rs dit pourquoi (il ne contient
+          # que la comparaison de version et la verification de checksum,
+          # testables sans reseau). Passer TAURI_SIGNING_PRIVATE_KEY
+          # maintenant donnerait a croire que la chaine existe.
+          #
+          # Quand elle existera : `npx tauri signer generate`, deposer la cle
+          # privee et son mot de passe en secrets du depot, les remettre ici,
+          # et ajouter `createUpdaterArtifacts` au bundle.
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'WinTool ${{ github.ref_name }}'
