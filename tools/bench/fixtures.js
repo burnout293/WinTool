@@ -259,7 +259,7 @@
   }
 
   const REPONSES = {
-    app_info: () => ({ version: '4.0.0', elevated: !new URLSearchParams(location.search).has('sansadmin') }),
+    app_info: () => ({ version: '1.0.0', elevated: !new URLSearchParams(location.search).has('sansadmin') }),
     engines: () => ({ winps: 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', pwsh: null }),
     scripts_root: () => 'C:\\Users\\Buly\\AppData\\Local\\WinTool\\scripts',
     get_settings: () => JSON.parse(JSON.stringify(reglages)),

@@ -353,7 +353,7 @@ vers une langue **différente** de celle déclarée par `lang` :
 rien ne casse, le validateur émet un avertissement.
 
 **En revanche, une traduction qui ne correspond à aucune option ou à aucun choix est une
-erreur.** C'est le contrôle qui manquait à la v3 : renommez une clé et laissez sa
+erreur.** C'est le contrôle qui manquait à la v0.3 : renommez une clé et laissez sa
 traduction derrière vous, et plus rien ne le signalait.
 
 Les scripts officiels sont rédigés en anglais et traduits vers le français. Un script
@@ -375,7 +375,7 @@ if ($env:WINTOOL_CONFIG) {
 **Sans elle, les réglages choisis dans l'interface sont purement et simplement ignorés** :
 le script tourne toujours avec ses valeurs par défaut, sans que rien ne le signale.
 
-Elle remplace un mécanisme bien pire. La v3 reconstruisait le bloc `$CONFIG` à coups
+Elle remplace un mécanisme bien pire. La v0.3 reconstruisait le bloc `$CONFIG` à coups
 d'expression régulière, écrivait un `.ps1` temporaire et exécutait *celui-là* — fragile,
 et déjà cassé au moment de la refonte. Désormais WinTool pose vos réglages dans la
 variable `WINTOOL_CONFIG` et exécute **votre fichier, tel quel**.
@@ -418,11 +418,11 @@ détail technique » ; c'est l'interface qui traduit la progression à partir de
 >
 > Si votre script a rencontré une erreur, il **doit** se terminer par `exit 1`.
 >
-> C'est exactement le « succès fictif » que la v3 produisait et que cette refonte corrige :
+> C'est exactement le « succès fictif » que la v0.3 produisait et que cette refonte corrige :
 > ne le réintroduisez pas depuis le script.
 
 **Le verdict de réussite vient du code de sortie** (`exit 0` = succès), jamais du fait que
-le script ait démarré. Terminez donc explicitement par `exit 0` ou `exit 1`. La v3 se
+le script ait démarré. Terminez donc explicitement par `exit 0` ou `exit 1`. La v0.3 se
 contentait de constater le démarrage, et enregistrait ainsi des succès fictifs.
 
 ### `[CKPT]`, le marqueur qui rend l'annulation sûre

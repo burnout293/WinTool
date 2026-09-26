@@ -34,7 +34,7 @@ Si vous préférez vérifier avant, chaque Release publie l'empreinte SHA-256 de
 Comparez-la avec :
 
 ```powershell
-Get-FileHash .\WinTool_4.0.0_x64-setup.exe -Algorithm SHA256
+Get-FileHash .\WinTool_1.0.0_x64-setup.exe -Algorithm SHA256
 ```
 
 ### Droits administrateur

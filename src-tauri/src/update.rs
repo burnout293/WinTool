@@ -79,16 +79,16 @@ mod tests {
 
     #[test]
     fn detecte_une_version_plus_recente() {
-        assert!(version_plus_recente_disponible("4.0.0", "4.0.1"));
-        assert!(version_plus_recente_disponible("4.0.0", "v4.1.0"));
-        assert!(!version_plus_recente_disponible("4.1.0", "4.0.9"));
-        assert!(!version_plus_recente_disponible("4.0.0", "4.0.0"));
+        assert!(version_plus_recente_disponible("1.0.0", "1.0.1"));
+        assert!(version_plus_recente_disponible("1.0.0", "v1.1.0"));
+        assert!(!version_plus_recente_disponible("1.1.0", "1.0.9"));
+        assert!(!version_plus_recente_disponible("1.0.0", "1.0.0"));
     }
 
     #[test]
     fn tolere_un_prefixe_v_et_des_segments_manquants() {
-        assert_eq!(comparer_versions("v4.0", "4.0.0"), Ordering::Equal);
-        assert_eq!(comparer_versions("4", "4.0.1"), Ordering::Less);
+        assert_eq!(comparer_versions("v1.0", "1.0.0"), Ordering::Equal);
+        assert_eq!(comparer_versions("1", "1.0.1"), Ordering::Less);
     }
 
     #[test]

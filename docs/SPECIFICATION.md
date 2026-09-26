@@ -1,11 +1,23 @@
-# WinTool v4 — Spécification fonctionnelle
+# WinTool v0.4 — Spécification fonctionnelle
 
 > Ce document fait autorité sur le comportement de l'application.
 > Toute divergence entre ce document et le code est un défaut, à corriger d'un côté
 > ou de l'autre — jamais à laisser courir. C'est précisément cette dérive qui a rendu
-> la v3 inexploitable.
+> la v0.3 inexploitable.
 
-Version du document : 1.0 — 22/09/2026
+Version du document : 0.1 — 22/09/2026
+
+> **Trois numérotations coexistent dans ce projet, ne pas les confondre :**
+>
+> | Axe | Où | État |
+> |---|---|---|
+> | Génération de l'application | « v0.3 », « v0.4 » dans ce document | Quatre réécritures internes, **aucune publiée** |
+> | Version publiée | `tauri.conf.json`, `Cargo.toml`, les tags git | **1.0.0** sera la première mise à disposition du public |
+> | Contrat de script | « contrat v2 », `docs/FORMAT_SCRIPT.md` | Format des `.ps1`, indépendant des deux autres |
+>
+> Les générations antérieures sont donc numérotées en `v0.x` : rien n'a jamais
+> été distribué avant la 1.0.0, et afficher « v4.0.0 » à un utilisateur
+> laisserait croire à trois versions publiées qui n'ont pas existé.
 
 ---
 
@@ -14,11 +26,11 @@ Version du document : 1.0 — 22/09/2026
 Un outil de maintenance Windows qui exécute des scripts PowerShell derrière une interface
 graphique. Distribué publiquement sur GitHub sous forme d'un `.exe` unique (Tauri 2).
 
-**Principe fondateur, hérité de la v3 et conservé** : déposer un fichier `.ps1` dans le
+**Principe fondateur, hérité de la v0.3 et conservé** : déposer un fichier `.ps1` dans le
 dossier des scripts suffit pour qu'il apparaisse dans l'application. Aucun couplage,
 aucune recompilation, aucune liste à tenir à jour.
 
-**Principe central de la v4** :
+**Principe central de la v0.4** :
 
 > **Le mode Expert est le panneau de configuration du mode Simple.**
 
@@ -77,7 +89,7 @@ Les cibles cliquables du mode Simple ne descendent **jamais sous 56 px**
 
 ### 4.1 Catégories — données **utilisateur**
 
-C'est l'inversion majeure par rapport à la v3, où la catégorie était figée dans le script.
+C'est l'inversion majeure par rapport à la v0.3, où la catégorie était figée dans le script.
 
 Une catégorie porte :
 
@@ -280,9 +292,9 @@ Un tableau JSON injecté par l'override redevient bien un tableau PowerShell.
 le prix de cette structure, et il est couvert : le validateur croise les trois **dans les
 deux sens**. Une option sans valeur par défaut, une valeur sans option déclarée, une
 traduction qui ne correspond à rien — chacune est une erreur, signalée avec son numéro de
-ligne. La v3 ne vérifiait rien de tout cela.
+ligne. La v0.3 ne vérifiait rien de tout cela.
 
-**Pourquoi la ligne d'override est décisive.** La v3 reconstruisait le bloc `$CONFIG` par
+**Pourquoi la ligne d'override est décisive.** La v0.3 reconstruisait le bloc `$CONFIG` par
 expression régulière, écrivait un `.ps1` temporaire et l'exécutait — mécanisme fragile et
 déjà cassé. Désormais WinTool pose le JSON des valeurs choisies **dans la variable
 `WINTOOL_CONFIG` elle-même**, et exécute **le script original tel quel**. Plus de
@@ -317,7 +329,7 @@ configuration tronquée.
 ```
 
 **Le verdict de réussite vient du code de sortie du processus** (`0` = succès), jamais du
-simple fait que le script ait démarré. C'était l'un des défauts majeurs de la v3, dont
+simple fait que le script ait démarré. C'était l'un des défauts majeurs de la v0.3, dont
 l'historique enregistrait des succès fictifs.
 
 ### 5.4 Conformité : constater, jamais bloquer
@@ -334,7 +346,7 @@ les anomalies dans le mode Expert, chacune **avec son numéro de ligne** :
 - `id` en collision avec un autre script déjà découvert → doublon signalé avec son chemin
   (§4.3)
 
-C'est ce qui corrige la v3 : elle acceptait en silence, d'où **zéro script conforme sur
+C'est ce qui corrige la v0.3 : elle acceptait en silence, d'où **zéro script conforme sur
 treize** alors que la convention était documentée. Ici la non-conformité est visible sans
 que le script cesse de fonctionner.
 
@@ -763,7 +775,7 @@ remplacé par `#54697A` (5,2).
 
 **Aucun emoji dans l'interface, nulle part.** Un emoji est rendu par la police du système :
 son aspect change d'une machine à l'autre, il ne peut pas hériter de la couleur du texte et
-ne s'aligne pas sur la grille. La v3 en utilisait (🧹 ⚡ 🛡️ 😴) ; c'est proscrit.
+ne s'aligne pas sur la grille. La v0.3 en utilisait (🧹 ⚡ 🛡️ 😴) ; c'est proscrit.
 
 | Décision | Détail |
 |---|---|

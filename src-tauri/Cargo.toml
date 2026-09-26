@@ -1,6 +1,6 @@
 [package]
 name = "wintool"
-version = "4.0.0"
+version = "1.0.0"
 description = "Outil de maintenance Windows"
 authors = ["Buly"]
 edition = "2021"
