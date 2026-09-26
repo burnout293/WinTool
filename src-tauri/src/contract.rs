@@ -219,8 +219,20 @@ pub fn parse(source: &str) -> Script {
     let get = |k: &str| head.get(k).cloned().unwrap_or_default();
 
     for requis in [
-        "id", "lang", "title", "desc", "category", "icon", "version", "admin", "risk",
-        "duration", "reversible", "interruptible", "reboot", "engine",
+        "id",
+        "lang",
+        "title",
+        "desc",
+        "category",
+        "icon",
+        "version",
+        "admin",
+        "risk",
+        "duration",
+        "reversible",
+        "interruptible",
+        "reboot",
+        "engine",
     ] {
         if !head.contains_key(requis) {
             findings.push(Finding {
@@ -246,7 +258,11 @@ pub fn parse(source: &str) -> Script {
                     // Sous-ligne : un choix rattache a l'option precedente.
                     let (label, desc) = split_label(&reste);
                     match options.last_mut() {
-                        Some(o) => o.choices.push(Choice { value: nom, label, desc }),
+                        Some(o) => o.choices.push(Choice {
+                            value: nom,
+                            label,
+                            desc,
+                        }),
                         None => findings.push(Finding {
                             line: no_ligne,
                             severity: Severity::Error,
@@ -292,7 +308,8 @@ pub fn parse(source: &str) -> Script {
             line: 1,
             severity: Severity::Error,
             code: "OPTIONS_ABSENT".into(),
-            message: "Aucun bloc ## WINTOOL:OPTIONS ; l'interface afficherait les cles brutes.".into(),
+            message: "Aucun bloc ## WINTOOL:OPTIONS ; l'interface afficherait les cles brutes."
+                .into(),
         }),
     }
 
@@ -328,7 +345,8 @@ pub fn parse(source: &str) -> Script {
             if indent >= 2 {
                 if !derniere_option.is_empty() {
                     let (lab, de) = split_label(&reste);
-                    tr.choices.insert(format!("{derniere_option}/{nom}"), (lab, de));
+                    tr.choices
+                        .insert(format!("{derniere_option}/{nom}"), (lab, de));
                 }
                 continue;
             }
@@ -365,7 +383,12 @@ pub fn parse(source: &str) -> Script {
                     continue;
                 }
                 // Un commentaire de fin de ligne n'appartient pas a la valeur.
-                let valeur = v.split('#').next().unwrap_or("").trim().trim_end_matches(',');
+                let valeur = v
+                    .split('#')
+                    .next()
+                    .unwrap_or("")
+                    .trim()
+                    .trim_end_matches(',');
                 config.insert(
                     cle.to_string(),
                     (parse_default(valeur), debut + decalage + 2),
@@ -389,7 +412,10 @@ pub fn parse(source: &str) -> Script {
                 line: 1,
                 severity: Severity::Error,
                 code: "OPTION_ORPHELINE".into(),
-                message: format!("'{}' est declaree dans OPTIONS mais absente de $CONFIG.", o.key),
+                message: format!(
+                    "'{}' est declaree dans OPTIONS mais absente de $CONFIG.",
+                    o.key
+                ),
             }),
         }
     }
@@ -410,13 +436,18 @@ pub fn parse(source: &str) -> Script {
             line: 1,
             severity: Severity::Error,
             code: "OVERRIDE_ABSENT".into(),
-            message: "Ligne d'override absente : les reglages de l'interface seraient ignores.".into(),
+            message: "Ligne d'override absente : les reglages de l'interface seraient ignores."
+                .into(),
         });
     }
 
     Script {
         id: get("id"),
-        lang: if head.contains_key("lang") { get("lang") } else { "en".into() },
+        lang: if head.contains_key("lang") {
+            get("lang")
+        } else {
+            "en".into()
+        },
         title: get("title"),
         desc: get("desc"),
         category: get("category"),
@@ -433,7 +464,11 @@ pub fn parse(source: &str) -> Script {
         reversible: as_bool(&get("reversible")),
         interruptible: as_bool(&get("interruptible")),
         reboot: as_bool(&get("reboot")),
-        engine: if head.contains_key("engine") { get("engine") } else { "auto".into() },
+        engine: if head.contains_key("engine") {
+            get("engine")
+        } else {
+            "auto".into()
+        },
         options,
         translations,
         findings,
@@ -524,7 +559,10 @@ if ($env:WINTOOL_CONFIG) { }
         let s = parse(EXEMPLE);
         assert!(matches!(&s.options[0].default, Some(DefaultValue::Text(t)) if t == "cloudflare"));
         assert!(matches!(&s.options[1].default, Some(DefaultValue::List(v)) if v.len() == 2));
-        assert!(matches!(s.options[2].default, Some(DefaultValue::Bool(true))));
+        assert!(matches!(
+            s.options[2].default,
+            Some(DefaultValue::Bool(true))
+        ));
     }
 
     #[test]
@@ -539,7 +577,11 @@ if ($env:WINTOOL_CONFIG) { }
     #[test]
     fn un_script_conforme_ne_produit_aucune_anomalie() {
         let s = parse(EXEMPLE);
-        assert!(s.findings.is_empty(), "anomalies inattendues : {:?}", s.findings);
+        assert!(
+            s.findings.is_empty(),
+            "anomalies inattendues : {:?}",
+            s.findings
+        );
     }
 
     /// Fait passer les vrais scripts livres dans le parseur.
@@ -547,58 +589,75 @@ if ($env:WINTOOL_CONFIG) { }
     /// C'est ce test qui detectera une divergence entre `tools/lint-scripts.ps1`
     /// et ce module : les deux lisent le meme format et doivent rester d'accord.
     /// Un echec ici signifie que l'un des deux a evolue sans l'autre.
+    /// Le squelette de `docs/FORMAT_SCRIPT.md` doit se lire sans une seule
+    /// anomalie.
+    ///
+    /// Ce test lit le document lui-meme, pas une copie : c'est ce qui empeche
+    /// l'exemple de reference de diverger du parseur. Une convention que rien
+    /// ne verifie finit toujours morte — c'est ce qui a tue la v3, ou 0 script
+    /// sur 13 respectait une convention pourtant documentee.
+    ///
+    /// Il a remplace un test qui lisait `scripts/Default/`. Ce dossier peut
+    /// etre vide (catalogue en cours de reecriture), et un test qui depend de
+    /// son contenu echoue alors pour une raison qui n'a rien a voir avec le
+    /// parseur.
     #[test]
-    fn lit_les_scripts_reellement_livres() {
-        let dossier = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+    fn le_squelette_de_la_documentation_se_lit_sans_anomalie() {
+        let doc = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("..")
-            .join("scripts")
-            .join("Default");
+            .join("docs")
+            .join("FORMAT_SCRIPT.md");
+        let texte = std::fs::read_to_string(&doc)
+            .unwrap_or_else(|e| panic!("{} illisible : {e}", doc.display()));
 
-        let entrees = std::fs::read_dir(&dossier)
-            .unwrap_or_else(|e| panic!("{} illisible : {e}", dossier.display()));
+        // Premier bloc ```powershell qui contient l'entete : c'est le squelette.
+        let squelette = texte
+            .split("```powershell")
+            .skip(1)
+            .filter_map(|bloc| bloc.split("```").next())
+            .find(|bloc| bloc.contains("WINTOOL:START"))
+            .expect("aucun squelette dans docs/FORMAT_SCRIPT.md");
 
-        let mut vus = 0;
-        for entree in entrees.flatten() {
-            let chemin = entree.path();
-            if chemin.extension().and_then(|e| e.to_str()) != Some("ps1") {
-                continue;
-            }
-            let octets = std::fs::read(&chemin).expect("lecture du script");
-            let texte = String::from_utf8_lossy(&octets);
-            // Les scripts sont en UTF-8 avec BOM : il colle sinon au premier
-            // caractere de l'entete et fait echouer la lecture du bloc START.
-            let texte = texte.strip_prefix('\u{feff}').unwrap_or(&texte);
+        let s = parse(squelette);
 
-            let s = parse(texte);
-            let nom = chemin.file_name().unwrap().to_string_lossy().to_string();
+        let erreurs: Vec<_> = s
+            .findings
+            .iter()
+            .filter(|f| f.severity == Severity::Error)
+            .collect();
+        assert!(
+            erreurs.is_empty(),
+            "le squelette documente porte des anomalies : {erreurs:?}"
+        );
 
-            let erreurs: Vec<_> = s
-                .findings
-                .iter()
-                .filter(|f| f.severity == Severity::Error)
-                .collect();
-            assert!(erreurs.is_empty(), "{nom} : anomalies {erreurs:?}");
+        assert!(!s.id.is_empty(), "squelette sans id");
+        assert!(!s.title.is_empty(), "squelette sans titre");
+        assert!(!s.options.is_empty(), "squelette sans option");
+        assert!(
+            s.translations.contains_key("fr"),
+            "squelette sans bloc de traduction fr"
+        );
 
-            assert!(!s.id.is_empty(), "{nom} : pas d'id");
-            assert!(!s.title.is_empty(), "{nom} : pas de titre");
-            assert!(!s.options.is_empty(), "{nom} : aucune option lue");
-            assert!(
-                s.translations.contains_key("fr"),
-                "{nom} : pas de bloc de traduction fr"
-            );
-            // Chaque option doit avoir recu sa valeur par defaut depuis $CONFIG.
-            for o in &s.options {
-                assert!(o.default.is_some(), "{nom} : '{}' sans valeur par defaut", o.key);
-            }
-            vus += 1;
+        // Chaque option doit avoir recu sa valeur par defaut depuis $CONFIG.
+        for o in &s.options {
+            assert!(o.default.is_some(), "'{}' sans valeur par defaut", o.key);
         }
-        assert!(vus >= 2, "attendu au moins deux scripts livres, vu {vus}");
+
+        // Le mode test refuse un script qui ne declare pas cette option : le
+        // modele que tout le monde copie doit donc la porter (§6.9).
+        assert!(
+            s.options.iter().any(|o| o.key == "SafeTest"),
+            "le squelette ne declare pas SafeTest : un script copie dessus serait refuse en mode test"
+        );
     }
 
     #[test]
     fn constate_sans_bloquer() {
         // Cle presente dans $CONFIG mais absente du bloc OPTIONS.
-        let casse = EXEMPLE.replace("## FlushCache   : [hidden] Flush the cache afterwards\n", "");
+        let casse = EXEMPLE.replace(
+            "## FlushCache   : [hidden] Flush the cache afterwards\n",
+            "",
+        );
         let s = parse(&casse);
         assert!(s.findings.iter().any(|f| f.code == "OPTION_NON_DECLAREE"));
         // Le script reste lisible malgre l'anomalie.

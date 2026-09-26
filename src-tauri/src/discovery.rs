@@ -25,6 +25,7 @@
 //! aux scripts de l'utilisateur, qui vivent ailleurs.
 
 use crate::contract::{self, Finding, Script, Severity};
+use crate::security::{self, PointAttention};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -47,6 +48,9 @@ pub struct ScriptEntry {
     pub hash: String,
     /// Faux si le script ne declare pas d'`id` et n'est identifie que par son chemin.
     pub declared_id: bool,
+    /// Points d'attention detectes dans le corps du script (specification
+    /// 12.2) — liste non exhaustive, jamais un verdict de securite.
+    pub attention: Vec<PointAttention>,
     pub meta: Script,
 }
 
@@ -71,7 +75,7 @@ pub fn base_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
         .path()
         .local_data_dir()
         .map_err(|e| format!("dossier local introuvable : {e}"))?;
-    Ok(base.join("WinTool"))
+    Ok(sans_prefixe_long(base.join("WinTool")))
 }
 
 /// Racine des scripts de l'utilisateur : `%LOCALAPPDATA%\WinTool\scripts`.
@@ -80,13 +84,50 @@ pub fn scripts_root<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
 }
 
 /// Racine des scripts livres, dans le dossier d'installation.
+///
+/// Tauri renvoie ici un chemin canonicalise, donc prefixe `\\?\` sous Windows.
+/// On le nettoie a la source : tous les chemins derives — ceux qui partent a
+/// PowerShell comme ceux affiches dans l'interface — en heritent.
 pub fn shipped_root<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     app.path()
         .resolve("scripts/Default", tauri::path::BaseDirectory::Resource)
+        .map(sans_prefixe_long)
         .map_err(|e| format!("ressources introuvables : {e}"))
 }
 
-fn sha256_hex(octets: &[u8]) -> String {
+/// Retire le prefixe de chemin long (`\\?\`) que Windows ajoute lors d'une
+/// canonicalisation.
+///
+/// Ce prefixe n'est pas cosmetique : PowerShell ne parvient pas a etablir la
+/// zone de securite d'un chemin qui le porte. Un chemin normal se resout en
+/// `MyComputer`, le meme en `\\?\` se resout en `NoZone` — et sous la
+/// politique `RemoteSigned`, PowerShell exige alors une signature et refuse
+/// d'executer le script :
+///
+/// ```text
+/// Impossible de charger le fichier \\?\D:\...\600_INSTALL_POWERSHELL_7.ps1.
+/// Le fichier n'est pas signe numeriquement.
+/// ```
+///
+/// Sous `Bypass`, la politique par defaut, le probleme ne se voit pas : c'est
+/// en choisissant `RemoteSigned` (specification 6.7) que tous les scripts
+/// livres deviennent soudain inexecutables.
+///
+/// Contrepartie assumee : on reperd la capacite d'adresser des chemins de plus
+/// de 260 caracteres. Les scripts vivent dans le dossier d'installation ou
+/// sous `%LOCALAPPDATA%`, tres loin de cette limite.
+fn sans_prefixe_long(chemin: PathBuf) -> PathBuf {
+    let texte = chemin.to_string_lossy();
+    if let Some(reste) = texte.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{reste}"));
+    }
+    if let Some(reste) = texte.strip_prefix(r"\\?\") {
+        return PathBuf::from(reste.to_string());
+    }
+    chemin
+}
+
+pub(crate) fn sha256_hex(octets: &[u8]) -> String {
     let mut h = Sha256::new();
     h.update(octets);
     h.finalize().iter().map(|b| format!("{b:02x}")).collect()
@@ -166,6 +207,8 @@ fn lire_entree(
         ids_vus.push(id.clone());
     }
 
+    let attention = security::detecter(texte);
+
     Ok(ScriptEntry {
         id,
         path: relatif,
@@ -173,6 +216,7 @@ fn lire_entree(
         origin,
         hash: sha256_hex(&octets),
         declared_id,
+        attention,
         meta,
     })
 }
@@ -219,7 +263,13 @@ pub fn discover<R: Runtime>(app: &AppHandle<R>) -> Result<DiscoveryResult, Strin
     let mut ids_vus: Vec<String> = Vec::new();
 
     // Les scripts livres d'abord : ils gardent leur id en cas de collision.
-    parcourir(&racine_livree, "shipped", &mut scripts, &mut ids_vus, &mut problems);
+    parcourir(
+        &racine_livree,
+        "shipped",
+        &mut scripts,
+        &mut ids_vus,
+        &mut problems,
+    );
     parcourir(
         &racine_utilisateur,
         "user",
@@ -305,8 +355,16 @@ mod tests {
     fn distingue_les_deux_racines() {
         let livre = Bac::neuf("livre");
         let perso = Bac::neuf("perso");
-        livre.poser("200_SLEEP.ps1", "11111111-1111-4111-8111-111111111111", "Livre");
-        perso.poser("MesScripts/900_A_MOI.ps1", "22222222-2222-4222-8222-222222222222", "A moi");
+        livre.poser(
+            "200_SLEEP.ps1",
+            "11111111-1111-4111-8111-111111111111",
+            "Livre",
+        );
+        perso.poser(
+            "MesScripts/900_A_MOI.ps1",
+            "22222222-2222-4222-8222-222222222222",
+            "A moi",
+        );
 
         let (scripts, problemes) = parcours(&livre, &perso);
         assert!(problemes.is_empty(), "{problemes:?}");
@@ -363,7 +421,31 @@ mod tests {
         assert!(!scripts[0].declared_id);
         // A defaut d'id declare, le chemin fait office d'identifiant.
         assert_eq!(scripts[0].id, "sans_id.ps1");
-        assert!(scripts[0].meta.findings.iter().any(|f| f.code == "ID_ABSENT"));
+        assert!(scripts[0]
+            .meta
+            .findings
+            .iter()
+            .any(|f| f.code == "ID_ABSENT"));
+    }
+
+    #[test]
+    fn retire_le_prefixe_qui_casse_la_zone_de_securite() {
+        // Un chemin prefixe se resout en zone NoZone cote PowerShell, et
+        // RemoteSigned refuse alors d executer un script non signe.
+        assert_eq!(
+            sans_prefixe_long(PathBuf::from(r"\\?\D:\WinTool\a.ps1")),
+            PathBuf::from(r"D:\WinTool\a.ps1")
+        );
+        // Forme UNC : le prefixe redevient un chemin reseau ordinaire.
+        assert_eq!(
+            sans_prefixe_long(PathBuf::from(r"\\?\UNC\srv\part\a.ps1")),
+            PathBuf::from(r"\\srv\part\a.ps1")
+        );
+        // Un chemin deja normal n est pas touche.
+        assert_eq!(
+            sans_prefixe_long(PathBuf::from(r"C:\Program Files\WinTool")),
+            PathBuf::from(r"C:\Program Files\WinTool")
+        );
     }
 
     #[test]
@@ -375,14 +457,19 @@ mod tests {
         // Cas reel : l'application lancee depuis un emplacement ou les
         // ressources ne sont pas en place.
         parcourir(
-            Path::new(r"Z:
-existe\pas"),
+            Path::new(
+                r"Z:
+existe\pas",
+            ),
             "shipped",
             &mut scripts,
             &mut ids,
             &mut problemes,
         );
         parcourir(&perso.0, "user", &mut scripts, &mut ids, &mut problemes);
-        assert!(problemes.is_empty(), "une racine absente ne doit pas alarmer");
+        assert!(
+            problemes.is_empty(),
+            "une racine absente ne doit pas alarmer"
+        );
     }
 }

@@ -2,10 +2,18 @@
 <!--
   Manifeste applicatif Windows.
 
-  requireAdministrator : WinTool demande l'elevation UNE SEULE FOIS, au lancement.
-  Tous les scripts qu'il execute heritent ensuite de ces droits. C'est ce qui
-  supprime la rafale d'invites UAC de la v3, qui elevait chaque script separement
-  (une categorie de quatre scripts = quatre invites).
+  asInvoker : WinTool s'ouvre TOUJOURS, eleve ou non.
+
+  `requireAdministrator` empechait purement et simplement de lancer
+  l'application sans elevation : double-cliquer sur l'executable depuis une
+  session ordinaire echouait avec « l'operation demandee necessite une
+  elevation » (os error 740), sans fenetre ni explication. Un utilisateur qui
+  ne sait pas ce qu'est l'UAC n'avait aucun moyen de comprendre.
+
+  Desormais l'application demarre, CONSTATE qu'elle n'a pas les droits, le dit
+  clairement et propose de se relancer en administrateur. L'elevation reste
+  demandee UNE SEULE FOIS, et tous les scripts en heritent — la rafale
+  d'invites de la v3 (une par script) ne revient pas.
 
   Voir docs/SPECIFICATION.md - elevation.
 -->
@@ -16,7 +24,7 @@
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>

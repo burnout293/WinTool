@@ -7,10 +7,11 @@
 //! l'execution au lieu d'etre inventee.
 //!
 //! Enchainement :
-//!   1. les valeurs choisies sont ecrites dans un fichier JSON ;
-//!   2. `WINTOOL_CONFIG` pointe vers ce fichier ;
+//!   1. les valeurs choisies sont serialisees en JSON ;
+//!   2. ce JSON est pose **dans** `WINTOOL_CONFIG` — la variable contient les
+//!      valeurs, jamais le chemin d'un fichier (specification 5.2) ;
 //!   3. **le script original est execute tel quel** — ni reecriture, ni copie
-//!      temporaire, contrairement a la v3 (specification 5.2) ;
+//!      temporaire, contrairement a la v3 ;
 //!   4. deux fils lisent stdout et stderr et publient chaque ligne ;
 //!   5. a la fin, le bilan porte le vrai code de sortie et la duree.
 //!
@@ -110,7 +111,12 @@ pub fn engines() -> Engines {
             // Les versions majeures futures s'installent dans un dossier frere ;
             // on ne les devine pas, le PATH prendra le relais.
             for v in ["7", "8"] {
-                connus.push(PathBuf::from(&base).join("PowerShell").join(v).join("pwsh.exe"));
+                connus.push(
+                    PathBuf::from(&base)
+                        .join("PowerShell")
+                        .join(v)
+                        .join("pwsh.exe"),
+                );
             }
         }
     }
@@ -127,12 +133,16 @@ pub fn engines() -> Engines {
 /// qu'un refus clair avant de commencer.
 fn resoudre_moteur(demande: &str, dispo: &Engines) -> Result<(String, String), String> {
     match demande.trim().to_ascii_lowercase().as_str() {
-        "pwsh" => dispo.pwsh.clone().map(|p| ("pwsh".into(), p)).ok_or_else(|| {
-            "Ce script exige PowerShell 7, qui n'est pas installe sur cette machine. \
+        "pwsh" => dispo
+            .pwsh
+            .clone()
+            .map(|p| ("pwsh".into(), p))
+            .ok_or_else(|| {
+                "Ce script exige PowerShell 7, qui n'est pas installe sur cette machine. \
              WinTool ne se rabat pas sur PowerShell 5.1 : la syntaxe pourrait ne pas \
              etre comprise et le script s'arreterait en cours de route."
-                .into()
-        }),
+                    .into()
+            }),
         "winps" => dispo
             .winps
             .clone()
@@ -165,7 +175,7 @@ pub struct Ligne {
     /// ordre d'affichage stable.
     pub seq: u64,
     /// Millisecondes ecoulees depuis le debut de l'execution.
-    pub at_ms: u128,
+    pub at_ms: u64,
     /// Marqueur reconnu, sans les crochets. Absent si la ligne n'en porte pas.
     pub marker: Option<String>,
     /// Etape courante et total, pour `[STEP] 3/7 ...`.
@@ -186,7 +196,7 @@ pub struct RunEnd {
     /// le script a demarre.
     pub success: bool,
     pub killed: bool,
-    pub duration_ms: u128,
+    pub duration_ms: u64,
     pub checkpoint_reached: bool,
     /// Le script a emis `[REBOOT]` : un redemarrage est reellement necessaire.
     pub reboot_requested: bool,
@@ -398,7 +408,13 @@ fn horodatage_fichier() -> String {
 fn assainir(nom: &str) -> String {
     let filtre: String = nom
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '-' })
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '-'
+            }
+        })
         .collect();
     let filtre = filtre.trim_matches('-').to_string();
     if filtre.is_empty() {
@@ -424,10 +440,19 @@ fn chemins_modules_systeme(moteur: &str) -> String {
         .join("Modules")];
 
     if moteur == "pwsh" {
-        chemins.push(PathBuf::from(&progfiles).join("PowerShell").join("7").join("Modules"));
+        chemins.push(
+            PathBuf::from(&progfiles)
+                .join("PowerShell")
+                .join("7")
+                .join("Modules"),
+        );
         chemins.push(PathBuf::from(&progfiles).join("PowerShell").join("Modules"));
     } else {
-        chemins.push(PathBuf::from(&progfiles).join("WindowsPowerShell").join("Modules"));
+        chemins.push(
+            PathBuf::from(&progfiles)
+                .join("WindowsPowerShell")
+                .join("Modules"),
+        );
     }
 
     chemins
@@ -435,6 +460,84 @@ fn chemins_modules_systeme(moteur: &str) -> String {
         .map(|p| p.to_string_lossy().to_string())
         .collect::<Vec<_>>()
         .join(";")
+}
+
+/// Cherche la trappe de substitution dans le bloc d'override d'un script.
+///
+/// Le contrat pose que `WINTOOL_CONFIG` **contient** le JSON (§5.2). Certains
+/// scripts gardent un repli de l'ancienne epoque :
+///
+/// ```powershell
+/// $wtJson = $env:WINTOOL_CONFIG
+/// if (-not $wtJson.TrimStart().StartsWith('{')) { $wtJson = Get-Content -LiteralPath $wtJson -Raw }
+/// ```
+///
+/// Traduction : « si la variable ne ressemble pas a du JSON, lis le fichier
+/// qu'elle designe ». C'est exactement la fenetre de substitution que le §5.2
+/// a fermee — un autre processus remplace le fichier entre notre ecriture et
+/// la lecture, et ses valeurs entrent dans `$CONFIG` en administrateur.
+///
+/// Inerte tant que WinTool met du JSON dans la variable. Mais une trappe
+/// inerte reste une trappe, et le refus ne coute rien.
+///
+/// **Portee volontairement etroite** : on ne cherche `Get-Content` que dans
+/// les lignes qui parlent de `WINTOOL_CONFIG` ou de la variable qui la porte,
+/// jamais ailleurs. Un script qui lit un fichier pour son propre compte n'est
+/// pas concerne.
+pub fn trappe_de_substitution(source: &str) -> Option<usize> {
+    let lignes: Vec<&str> = source.lines().collect();
+    // Variables locales qui recoivent WINTOOL_CONFIG : c'est par elles que le
+    // repli passe (`$wtJson = $env:WINTOOL_CONFIG`).
+    let mut portées: Vec<String> = Vec::new();
+
+    for (i, brute) in lignes.iter().enumerate() {
+        let ligne = brute.trim();
+        if ligne.starts_with('#') {
+            continue;
+        }
+        let bas = ligne.to_ascii_lowercase();
+
+        if bas.contains("$env:wintool_config") {
+            if let Some(gauche) = ligne.split('=').next() {
+                let g = gauche.trim();
+                if g.starts_with('$') && !g.contains(' ') {
+                    portées.push(g.trim_start_matches('$').to_ascii_lowercase());
+                }
+            }
+            if bas.contains("get-content") {
+                return Some(i + 1);
+            }
+        }
+
+        if bas.contains("get-content") && portées.iter().any(|v| mentionne_variable(&bas, v)) {
+            return Some(i + 1);
+        }
+    }
+    None
+}
+
+/// Vrai si `ligne` utilise la variable PowerShell `nom`, et pas seulement une
+/// variable dont le nom commence pareil.
+///
+/// Une recherche de sous-chaine suffisait a faire refuser un script
+/// parfaitement legitime : avec `$c = $env:WINTOOL_CONFIG`, la ligne
+/// `Get-Content $config` contient bien `$c`, et le script se voyait accuse de
+/// porter la trappe. Un nom de variable s'arrete au premier caractere qui
+/// n'est ni alphanumerique ni `_` — on verifie donc ce qui SUIT.
+fn mentionne_variable(ligne_minuscule: &str, nom: &str) -> bool {
+    let motif = format!("${nom}");
+    let mut depuis = 0;
+    while let Some(pos) = ligne_minuscule[depuis..].find(&motif) {
+        let debut = depuis + pos;
+        let apres = debut + motif.len();
+        let suivant = ligne_minuscule[apres..].chars().next();
+        match suivant {
+            Some(c) if c.is_alphanumeric() || c == '_' => {}
+            _ => return true,
+        }
+        depuis = apres;
+    }
+    false
 }
 
 /// Coeur du moteur : lance le processus et publie ce qu'il produit.
@@ -498,6 +601,24 @@ pub fn lancer(
         h.finalize().iter().map(|b| format!("{b:02x}")).collect()
     };
 
+    // La source verrouillee est ce qui va reellement s'executer : c'est le
+    // seul endroit ou ce controle a un sens. Le refus est volontaire, et c'est
+    // une exception assumee au « constater, jamais bloquer » du §5.4 — au meme
+    // titre que l'approbation du §12.1, parce qu'il s'agit d'execution avec
+    // les droits administrateur et non de conformite de forme.
+    let texte_source = String::from_utf8_lossy(&contenu);
+    let texte_source = texte_source
+        .strip_prefix('\u{feff}')
+        .unwrap_or(&texte_source);
+    if let Some(ligne) = trappe_de_substitution(texte_source) {
+        return Err(format!(
+            "Ce script n'a pas ete lance. Sa ligne d'override (ligne {ligne}) lit encore un \
+             FICHIER de configuration, un mecanisme retire pour raison de securite : un autre \
+             programme pourrait remplacer ce fichier au moment du lancement. Remplacez ce bloc \
+             par ($env:WINTOOL_CONFIG | ConvertFrom-Json) — voir docs/FORMAT_SCRIPT.md."
+        ));
+    }
+
     if !cible.hash.is_empty() && empreinte != cible.hash {
         return Err(format!(
             "Le contenu de « {} » ne correspond plus a ce qui a ete analyse.              Le fichier a ete modifie entre-temps ; il n'a pas ete execute.",
@@ -509,7 +630,10 @@ pub fn lancer(
     let (nom_moteur, exe) = resoudre_moteur(&cible.engine, &engines())?;
 
     let politique = politique_demandee.unwrap_or_else(|| "Bypass".into());
-    if !POLITIQUES.iter().any(|p| p.eq_ignore_ascii_case(&politique)) {
+    if !POLITIQUES
+        .iter()
+        .any(|p| p.eq_ignore_ascii_case(&politique))
+    {
         return Err(format!(
             "Politique d'execution inconnue : {politique}. Valeurs admises : {}.",
             POLITIQUES.join(", ")
@@ -528,7 +652,10 @@ pub fn lancer(
     // L'environnement d'un processus deja lance ne peut pas etre modifie de
     // l'exterieur sans privilege de debogage. Il n'y a donc plus d'intervalle
     // a exploiter, parce qu'il n'y a plus de fichier.
-    let run_id = format!("run-{}", runner.compteur.fetch_add(1, Ordering::Relaxed) + 1);
+    let run_id = format!(
+        "run-{}",
+        runner.compteur.fetch_add(1, Ordering::Relaxed) + 1
+    );
 
     let config_json = serde_json::to_string(&config).map_err(|e| e.to_string())?;
     // Windows plafonne une variable d'environnement a 32767 caracteres. Un
@@ -666,7 +793,7 @@ pub fn lancer(
                     }
                 }
 
-                let at_ms = depart.elapsed().as_millis();
+                let at_ms = depart.elapsed().as_millis() as u64;
                 if let Ok(mut f) = journal.lock() {
                     let _ = writeln!(f, "{at_ms:>8} {nom:<6} {texte}");
                 }
@@ -702,10 +829,13 @@ pub fn lancer(
             let _ = t_out.join();
             let _ = t_err.join();
 
-            let duree = depart.elapsed().as_millis();
+            let duree = depart.elapsed().as_millis() as u64;
             let exit_code = statut.as_ref().ok().and_then(|s| s.code());
             let tue_par_nous = tue.load(Ordering::Relaxed);
-            let c = compteurs.lock().map(|c| (c.ok, c.warn, c.err)).unwrap_or((0, 0, 0));
+            let c = compteurs
+                .lock()
+                .map(|c| (c.ok, c.warn, c.err))
+                .unwrap_or((0, 0, 0));
 
             if let Ok(mut f) = journal.lock() {
                 let _ = writeln!(
@@ -713,7 +843,9 @@ pub fn lancer(
                     "{}\nfin        : {}\ncode       : {}\nduree      : {} ms\nverdict    : {}",
                     "-".repeat(72),
                     chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                    exit_code.map(|c| c.to_string()).unwrap_or_else(|| "aucun".into()),
+                    exit_code
+                        .map(|c| c.to_string())
+                        .unwrap_or_else(|| "aucun".into()),
                     duree,
                     if tue_par_nous {
                         "interrompu par l'utilisateur"
@@ -802,6 +934,99 @@ pub fn run_script<R: Runtime>(
         runner,
         Arc::new(VersInterface { app: app.clone() }),
     )
+}
+
+// ---------------------------------------------------------------------------
+// Verification sans execution
+// ---------------------------------------------------------------------------
+
+/// Une erreur de syntaxe relevee par l'analyseur de PowerShell.
+#[derive(Debug, Clone, Serialize)]
+pub struct ErreurSyntaxe {
+    pub line: u32,
+    pub column: u32,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CheckResult {
+    /// Vrai si le fichier s'analyse sans erreur. Ne dit **rien** de ce que le
+    /// script ferait s'il tournait : voir la note ci-dessous.
+    pub parses: bool,
+    pub errors: Vec<ErreurSyntaxe>,
+    pub engine: String,
+}
+
+/// Programme d'analyse. Le chemin arrive par l'environnement, jamais dans le
+/// texte : aucun guillemet ni caractere special du chemin ne peut changer le
+/// sens de la commande.
+const PROGRAMME_ANALYSE: &str = concat!(
+    "$ErrorActionPreference='Stop';",
+    "$e=$null;",
+    "[void][System.Management.Automation.Language.Parser]::ParseFile(",
+    "$env:WINTOOL_CHECK_PATH,[ref]$null,[ref]$e);",
+    "if($e){$e|ForEach-Object{'{0}|{1}|{2}' -f ",
+    "$_.Extent.StartLineNumber,$_.Extent.StartColumnNumber,($_.Message -replace '\r?\n',' ')}}"
+);
+
+/// Analyse un script **sans l'executer** (specification 6.8).
+///
+/// PowerShell lit le fichier et construit son arbre syntaxique, rien de plus :
+/// aucune commande du script n'est evaluee, aucun effet de bord n'a lieu.
+///
+/// **Ce que cela ne dit pas** : qu'un script qui s'analyse tournera sans
+/// probleme. Les droits, l'etat de la machine, une applet absente ou une erreur
+/// de logique ne se voient qu'a l'execution. C'est un controle de forme, pas un
+/// essai a blanc — et l'interface doit le dire ainsi.
+pub fn verifier_syntaxe(chemin: &Path) -> Result<CheckResult, String> {
+    let (nom_moteur, exe) = resoudre_moteur("auto", &engines())?;
+
+    let mut commande = Command::new(&exe);
+    commande
+        .arg("-NoProfile")
+        .arg("-NonInteractive")
+        .arg("-ExecutionPolicy")
+        .arg("Bypass")
+        .arg("-Command")
+        .arg(PROGRAMME_ANALYSE)
+        .env("WINTOOL_CHECK_PATH", chemin)
+        .env("PSModulePath", chemins_modules_systeme(&nom_moteur))
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    #[cfg(windows)]
+    commande.creation_flags(CREATE_NO_WINDOW);
+
+    let sortie = commande
+        .output()
+        .map_err(|e| format!("analyse impossible : {e}"))?;
+
+    let texte = decoder(&sortie.stdout);
+    let mut errors = Vec::new();
+    for ligne in texte.lines() {
+        let ligne = ligne.trim();
+        if ligne.is_empty() {
+            continue;
+        }
+        let mut morceaux = ligne.splitn(3, '|');
+        let l = morceaux.next().unwrap_or("0").trim().parse().unwrap_or(0);
+        let c = morceaux.next().unwrap_or("0").trim().parse().unwrap_or(0);
+        let m = morceaux.next().unwrap_or("").trim().to_string();
+        if !m.is_empty() {
+            errors.push(ErreurSyntaxe {
+                line: l,
+                column: c,
+                message: m,
+            });
+        }
+    }
+
+    Ok(CheckResult {
+        parses: errors.is_empty(),
+        errors,
+        engine: nom_moteur,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -902,6 +1127,57 @@ pub fn logs_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(d)
 }
 
+/// Plafonne le dossier des journaux par taille, pas par ancienneté
+/// (specification §9) : c'est la taille qui gêne réellement l'utilisateur, et
+/// il serait contradictoire qu'un outil de nettoyage laisse ses propres
+/// journaux s'accumuler sans limite. `0` = pas de limite (le réglage par
+/// défaut, ajustable, va jusqu'à « Pas de limite »).
+pub fn appliquer_plafond_journaux<R: Runtime>(
+    app: &AppHandle<R>,
+    plafond_mb: u32,
+) -> Result<(), String> {
+    appliquer_plafond_sur(&logs_dir(app)?, plafond_mb)
+}
+
+/// Coeur de `appliquer_plafond_journaux`, separe pour rester testable sur un
+/// dossier jetable sans `AppHandle` (meme raison que `settings::load_from`).
+fn appliquer_plafond_sur(dossier: &Path, plafond_mb: u32) -> Result<(), String> {
+    if plafond_mb == 0 {
+        return Ok(());
+    }
+    let plafond_octets = u64::from(plafond_mb) * 1024 * 1024;
+
+    let mut fichiers: Vec<(PathBuf, u64, std::time::SystemTime)> = std::fs::read_dir(dossier)
+        .map_err(|e| format!("{} : {e}", dossier.display()))?
+        .filter_map(|e| e.ok())
+        .filter_map(|e| {
+            let meta = e.metadata().ok()?;
+            if !meta.is_file() {
+                return None;
+            }
+            let modifie = meta.modified().ok()?;
+            Some((e.path(), meta.len(), modifie))
+        })
+        .collect();
+
+    let mut total: u64 = fichiers.iter().map(|(_, taille, _)| taille).sum();
+    if total <= plafond_octets {
+        return Ok(());
+    }
+
+    // Le plus ancien d'abord : c'est lui qui part en premier.
+    fichiers.sort_by_key(|(_, _, modifie)| *modifie);
+    for (chemin, taille, _) in fichiers {
+        if total <= plafond_octets {
+            break;
+        }
+        if std::fs::remove_file(&chemin).is_ok() {
+            total = total.saturating_sub(taille);
+        }
+    }
+    Ok(())
+}
+
 /// Refuse d'ouvrir un chemin qui sortirait du dossier des journaux.
 pub fn verifier_log<R: Runtime>(app: &AppHandle<R>, chemin: &str) -> Result<PathBuf, String> {
     let dossier = logs_dir(app)?;
@@ -981,6 +1257,42 @@ mod tests {
         assert_eq!(assainir("Default/200 SLEEP.ps1"), "Default-200-SLEEP-ps1");
         assert_eq!(assainir("///"), "script");
         assert!(assainir(&"a".repeat(200)).len() <= 60);
+    }
+
+    #[test]
+    fn zero_veut_dire_pas_de_limite() {
+        let dir =
+            std::env::temp_dir().join(format!("wintool-test-plafond-zero-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("a.log"), vec![0u8; 1024]).unwrap();
+        appliquer_plafond_sur(&dir, 0).unwrap();
+        assert!(dir.join("a.log").exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn supprime_les_plus_anciens_jusqu_a_repasser_sous_le_plafond() {
+        let dir = std::env::temp_dir().join(format!("wintool-test-plafond-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+
+        // Trois journaux d'1 Mo chacun, ecrits dans l'ordre pour garantir des
+        // dates de modification croissantes.
+        for nom in ["a.log", "b.log", "c.log"] {
+            std::fs::write(dir.join(nom), vec![0u8; 1024 * 1024]).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+
+        // Plafond a 2 Mo : le plus ancien (a.log) doit partir, les deux autres rester.
+        appliquer_plafond_sur(&dir, 2).unwrap();
+
+        assert!(
+            !dir.join("a.log").exists(),
+            "le plus ancien doit etre supprime"
+        );
+        assert!(dir.join("b.log").exists());
+        assert!(dir.join("c.log").exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -1091,7 +1403,11 @@ exit 0
 
     fn cible(chemin: PathBuf, interruptible: bool) -> Cible {
         Cible {
-            hash: if chemin.is_file() { empreinte(&chemin) } else { String::new() },
+            hash: if chemin.is_file() {
+                empreinte(&chemin)
+            } else {
+                String::new()
+            },
             id: "test-probe".into(),
             titre: "Sonde de test".into(),
             chemin,
@@ -1143,7 +1459,11 @@ exit 0
 
         // Le point central : le verdict vient du code de sortie, pas du fait
         // que le processus a demarre. C'etait le defaut majeur de la v3.
-        assert_eq!(fin.exit_code, Some(3), "le code de sortie du script est perdu");
+        assert_eq!(
+            fin.exit_code,
+            Some(3),
+            "le code de sortie du script est perdu"
+        );
         assert!(!fin.success, "un exit 3 a ete pris pour un succes");
         assert!(!fin.killed);
         assert_eq!((fin.counts_ok, fin.counts_warn, fin.counts_err), (1, 1, 1));
@@ -1155,7 +1475,10 @@ exit 0
         let tout = tout.join("\n");
 
         // La configuration a bien atteint le script, chaine comme tableau.
-        assert!(tout.contains("label=injected!"), "chaine non injectee :\n{tout}");
+        assert!(
+            tout.contains("label=injected!"),
+            "chaine non injectee :\n{tout}"
+        );
         assert!(
             tout.contains("targets=temp+logs") && tout.contains("count=2"),
             "un tableau JSON n'est pas redevenu un tableau PowerShell :\n{tout}"
@@ -1180,12 +1503,22 @@ exit 0
         let total = seqs.len();
         seqs.sort_unstable();
         seqs.dedup();
-        assert_eq!(seqs.len(), total, "deux lignes portent le meme numero d'ordre");
+        assert_eq!(
+            seqs.len(),
+            total,
+            "deux lignes portent le meme numero d'ordre"
+        );
 
         // Le journal technique porte la sortie et le verdict.
         let contenu = std::fs::read_to_string(&fin.log_path).expect("journal illisible");
-        assert!(contenu.contains("label=injected!"), "le journal ne contient pas la sortie");
-        assert!(contenu.contains("code       : 3"), "le code de sortie n'est pas journalise");
+        assert!(
+            contenu.contains("label=injected!"),
+            "le journal ne contient pas la sortie"
+        );
+        assert!(
+            contenu.contains("code       : 3"),
+            "le code de sortie n'est pas journalise"
+        );
         assert!(contenu.contains("verdict    : echec"));
 
         // L'emplacement est libere : le script suivant peut demarrer.
@@ -1220,7 +1553,9 @@ exit 0
         )
         .expect("le lancement aurait du reussir");
 
-        let fin = rx.recv_timeout(Duration::from_secs(90)).expect("pas de bilan");
+        let fin = rx
+            .recv_timeout(Duration::from_secs(90))
+            .expect("pas de bilan");
         assert_eq!(fin.exit_code, Some(0));
         assert!(fin.success, "un exit 0 n'est pas reconnu comme un succes");
 
@@ -1266,13 +1601,20 @@ exit 0
         assert!(refus.is_err(), "deux executions ont demarre en meme temps");
 
         // Et l'interruption libere bien la place.
-        let instantane = runner.snapshot().expect("rien n'est enregistre comme actif");
+        let instantane = runner
+            .snapshot()
+            .expect("rien n'est enregistre comme actif");
         let issue = cancel_script(&runner, &instantane.run_id, false).expect("arret");
         assert!(issue.killed, "un script interruptible n'a pas ete arrete");
 
-        let fin = rx.recv_timeout(Duration::from_secs(60)).expect("pas de bilan");
+        let fin = rx
+            .recv_timeout(Duration::from_secs(60))
+            .expect("pas de bilan");
         assert!(fin.killed, "l'arret n'est pas signale comme tel");
-        assert!(!fin.success, "un script tue ne doit jamais compter comme un succes");
+        assert!(
+            !fin.success,
+            "un script tue ne doit jamais compter comme un succes"
+        );
     }
 
     #[test]
@@ -1298,14 +1640,22 @@ exit 0
         // Premier refus : le moteur demande une confirmation explicite
         // (specification 6.3), il ne tue pas.
         let prudent = cancel_script(&runner, &instantane.run_id, false).expect("arret prudent");
-        assert!(!prudent.killed, "un script non interruptible a ete tue sans confirmation");
-        assert!(prudent.needs_confirmation, "aucune confirmation n'a ete demandee");
+        assert!(
+            !prudent.killed,
+            "un script non interruptible a ete tue sans confirmation"
+        );
+        assert!(
+            prudent.needs_confirmation,
+            "aucune confirmation n'a ete demandee"
+        );
 
         // Avec la confirmation explicite, l'arret a lieu.
         let force = cancel_script(&runner, &instantane.run_id, true).expect("arret force");
         assert!(force.killed, "l'arret force n'a pas eu lieu");
 
-        let fin = rx.recv_timeout(Duration::from_secs(60)).expect("pas de bilan");
+        let fin = rx
+            .recv_timeout(Duration::from_secs(60))
+            .expect("pas de bilan");
         assert!(fin.killed);
     }
 
@@ -1326,6 +1676,115 @@ exit 0
 
         let erreur = issue.expect_err("une politique hors liste doit etre refusee");
         assert!(erreur.contains("AllSigned"), "message inattendu : {erreur}");
+    }
+
+    // ----- Verification sans execution (§6.8) ---------------------------
+
+    #[test]
+    fn l_analyse_n_execute_rien() {
+        let bac = Bac::neuf("analyse-inerte");
+        let temoin = bac.0.join("temoin.txt");
+        // Ce script cree un fichier DES qu'il tourne. Si le temoin apparait,
+        // c'est que la « verification » a en realite execute le script — le
+        // defaut le plus grave que cette fonction puisse avoir.
+        let source = format!(
+            "Set-Content -LiteralPath '{}' -Value 'execute'\nWrite-Output '[DONE] ok'\n",
+            temoin.display()
+        );
+        let script = bac.poser("effet.ps1", &source);
+
+        let r = verifier_syntaxe(&script).expect("analyse");
+        assert!(
+            r.parses,
+            "un script valide a ete signale en erreur : {:?}",
+            r.errors
+        );
+        assert!(
+            !temoin.exists(),
+            "la verification a EXECUTE le script : le fichier temoin existe"
+        );
+    }
+
+    #[test]
+    fn l_analyse_signale_une_syntaxe_cassee() {
+        let bac = Bac::neuf("analyse-cassee");
+        // Accolade jamais refermee : PowerShell refuse de construire l'arbre.
+        let script = bac.poser("casse.ps1", "if ($true) {\n  Write-Output 'oups'\n");
+
+        let r = verifier_syntaxe(&script).expect("analyse");
+        assert!(!r.parses, "une syntaxe invalide est passee pour valide");
+        assert!(!r.errors.is_empty(), "aucune erreur rapportee");
+        assert!(
+            r.errors[0].line > 0,
+            "erreur sans numero de ligne exploitable"
+        );
+    }
+
+    // ----- Trappe de substitution (§5.2) --------------------------------
+
+    #[test]
+    fn repere_le_repli_vers_un_fichier() {
+        // Forme exacte portee par 14 des 16 scripts livres.
+        let src = "$wtJson = $env:WINTOOL_CONFIG\n\
+                   if (-not $wtJson.TrimStart().StartsWith('{')) { $wtJson = Get-Content -LiteralPath $wtJson -Raw }\n";
+        assert_eq!(trappe_de_substitution(src), Some(2));
+
+        // Forme sur une seule ligne, l'ancienne du guide.
+        let direct = "(Get-Content $env:WINTOOL_CONFIG -Raw | ConvertFrom-Json)\n";
+        assert_eq!(trappe_de_substitution(direct), Some(1));
+    }
+
+    #[test]
+    fn laisse_passer_le_contrat_actuel() {
+        let bon = "if ($env:WINTOOL_CONFIG) {\n\
+                   ($env:WINTOOL_CONFIG | ConvertFrom-Json).PSObject.Properties |\n\
+                   ForEach-Object { $CONFIG[$_.Name] = $_.Value }\n}\n";
+        assert_eq!(trappe_de_substitution(bon), None);
+    }
+
+    #[test]
+    fn n_accuse_pas_une_variable_au_nom_voisin() {
+        // Faux positif reel : `$config` contient `$c`. Une recherche de
+        // sous-chaine faisait refuser ce script parfaitement legitime.
+        let voisin = "$c = $env:WINTOOL_CONFIG\n\
+                      ($c | ConvertFrom-Json).PSObject.Properties | ForEach-Object { }\n\
+                      $config = 'C:\\app\\reglages.json'\n\
+                      $x = Get-Content -LiteralPath $config -Raw\n";
+        assert_eq!(
+            trappe_de_substitution(voisin),
+            None,
+            "faux positif sur un nom voisin"
+        );
+
+        // Mais la vraie trappe sur la meme variable courte reste vue.
+        let vraie = "$c = $env:WINTOOL_CONFIG\n\
+                     if (-not $c.StartsWith('{')) { $c = Get-Content -LiteralPath $c -Raw }\n";
+        assert_eq!(
+            trappe_de_substitution(vraie),
+            Some(2),
+            "la vraie trappe echappe au controle"
+        );
+    }
+
+    #[test]
+    fn n_accuse_pas_un_script_qui_lit_ses_propres_fichiers() {
+        // Un script de maintenance lit evidemment des fichiers. Le controle ne
+        // doit viser QUE la configuration injectee, sinon il devient un piege.
+        let legitime = "$liste = Get-Content -LiteralPath 'C:\\hosts' -Raw\n\
+                        ($env:WINTOOL_CONFIG | ConvertFrom-Json).PSObject.Properties |\n\
+                        ForEach-Object { $CONFIG[$_.Name] = $_.Value }\n";
+        assert_eq!(trappe_de_substitution(legitime), None);
+
+        // Meme chose avec une variable homonyme mais sans rapport.
+        let homonyme = "$data = 'ailleurs'\n$x = Get-Content $data\n";
+        assert_eq!(trappe_de_substitution(homonyme), None);
+    }
+
+    #[test]
+    fn ignore_un_exemple_en_commentaire() {
+        let commente = "# $wt = Get-Content $env:WINTOOL_CONFIG -Raw\n\
+                        ($env:WINTOOL_CONFIG | ConvertFrom-Json)\n";
+        assert_eq!(trappe_de_substitution(commente), None);
     }
 
     #[test]
@@ -1374,9 +1833,12 @@ exit 0
     fn interdit_toute_reecriture_pendant_l_execution() {
         let bac = Bac::neuf("verrou");
         // Assez long pour qu'on tente la substitution pendant l'execution.
-        let lent = bac.poser("lent.ps1", "Start-Sleep -Seconds 3
+        let lent = bac.poser(
+            "lent.ps1",
+            "Start-Sleep -Seconds 3
 exit 0
-");
+",
+        );
         let (collecteur, rx) = attelage();
         let runner = Arc::new(Runner::default());
 
@@ -1404,7 +1866,9 @@ exit 0
             "le script a pu etre supprime pendant son execution"
         );
 
-        let fin = rx.recv_timeout(Duration::from_secs(60)).expect("pas de bilan");
+        let fin = rx
+            .recv_timeout(Duration::from_secs(60))
+            .expect("pas de bilan");
         assert!(fin.success);
 
         // Le verrou est bien relache une fois l'execution terminee.

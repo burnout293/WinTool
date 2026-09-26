@@ -36,7 +36,8 @@
       }
     },
     "resources": {
-      "../scripts/Default": "scripts/Default"
+      "../scripts/Default": "scripts/Default",
+      "../tools/categories.json": "categories.json"
     },
     "icon": [
       "icons/32x32.png",
