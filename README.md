@@ -139,4 +139,36 @@ par zéro script sur treize.
 
 ## Licence
 
-À définir.
+**Apache-2.0, assortie d'avenants restrictifs** — le texte complet est dans
+[`LICENSE`](LICENSE), et une traduction française de courtoisie des avenants dans
+[`LICENSE.fr.md`](LICENSE.fr.md).
+
+En une phrase : WinTool est gratuit pour tout le monde, entreprises comprises, et
+personne ne peut en faire un produit payant.
+
+| Vous pouvez | Vous ne pouvez pas |
+|---|---|
+| L'utiliser, y compris dans une entreprise | Le vendre, le louer, en faire un abonnement |
+| Facturer une prestation d'installation, de dépannage ou de formation | Faire payer son téléchargement ou son accès |
+| Le modifier, le forker, le redistribuer gratuitement | Réclamer un don en échange de son accès |
+| Le diffuser depuis un site financé par la publicité | Faire dépendre le prix d'un pack de sa présence |
+| Vendre vos propres scripts | Présenter un fork comme la version officielle |
+
+Deux obligations si vous distribuez une version modifiée : **remettre son code source à
+chaque personne qui en reçoit le binaire** (aucune publication ouverte exigée — un usage
+interne à une entreprise ne déclenche rien), et **signaler toute collecte de données que
+vous ajoutez**.
+
+**Ce n'est pas une licence Open Source** au sens de l'Open Source Initiative : la clause
+de non-vente discrimine un champ d'activité, ce que la définition OSI interdit. C'est
+assumé et écrit en tête du fichier plutôt que laissé à découvrir.
+
+**Les scripts ne font pas partie de WinTool** et ne sont pas soumis à cette licence. Leurs
+auteurs choisissent librement leurs conditions, y compris commerciales — un script
+conforme au contrat v2 reste exécutable sans WinTool, il ne lui doit donc rien.
+
+Les composants tiers conservent leurs propres licences, énumérées dans
+[`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
+
+> Ce texte n'a pas été relu par un juriste. Le §28 du cahier des charges de la licence
+> prévoit cette relecture avant de le considérer comme définitif.

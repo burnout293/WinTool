@@ -1,0 +1,453 @@
+WinTool
+Copyright 2026 Buly
+
+This license has two parts, and both apply:
+
+  1. The Apache License, Version 2.0, reproduced in full below. It grants the
+     rights: use, copy, modify, distribute, and a patent license. It also
+     carries the clauses on contributions (Section 5) and on trade names
+     (Section 6) that this project relies on.
+
+  2. The WinTool Additional Terms, which follow the Apache License below. They
+     restrict it on four points: you may not sell WinTool, you must hand the
+     source to anyone you hand a modified binary to, you must disclose any data
+     collection you add, and you may not pass a fork off as the official
+     version.
+
+In one sentence: WinTool is free for everyone, companies included, and nobody
+may turn it into something you have to pay for.
+
+Because part 2 restricts part 1, the result is NOT the Apache License 2.0 and
+must not be called that. It is also not an Open Source license as the Open
+Source Initiative defines the term. That is deliberate, and stated up front
+rather than left to be discovered.
+
+Scripts are not part of WinTool. Their authors license them as they wish,
+including commercially. See Section 5 of the Additional Terms.
+
+Third-party components keep their own licenses. See THIRD-PARTY-NOTICES.md.
+
+A French translation of the Additional Terms is provided in LICENSE.fr.md for
+convenience. This English text is the one that governs.
+
+================================================================================
+
+
+
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright [yyyy] [name of copyright owner]
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+================================================================================
+
+                        WINTOOL ADDITIONAL TERMS
+                              Version 1.0
+
+================================================================================
+
+These Additional Terms modify the Apache License, Version 2.0 reproduced above.
+They are the "additional or different license terms and conditions" contemplated
+by Section 4 of that License. Where these Additional Terms conflict with the
+Apache License, these Additional Terms prevail.
+
+Because these Additional Terms restrict rights that the Apache License grants,
+the result is NOT the Apache License 2.0 and MUST NOT be described as such. It
+is also NOT an Open Source license as the Open Source Initiative defines that
+term, because Section 1 below discriminates against a field of endeavour. The
+Licensor states this plainly rather than let anyone discover it later.
+
+--------------------------------------------------------------------------------
+DEFINITIONS
+--------------------------------------------------------------------------------
+
+The definitions of the Apache License apply. In addition:
+
+"WinTool" means the Work licensed under these terms, of which the Licensor is
+the author.
+
+"Modified Version" means a Derivative Work of WinTool, including a fork.
+
+"Script" means a file that WinTool can read, configure or execute, and that
+keeps its essential function when run without WinTool. A Script is NOT part of
+WinTool and is NOT licensed under these terms, whoever wrote it.
+
+"Script Source" means a catalogue from which WinTool can obtain Scripts.
+
+"Corresponding Source" means the source code of a Modified Version in the form
+preferred for making modifications to it, together with the scripts and
+configuration needed to build it into the form distributed. It does not include
+Scripts, Script Sources, or third-party components that are publicly available
+under their own licenses, for which a reference and a version suffice.
+
+--------------------------------------------------------------------------------
+1. NO SALE
+--------------------------------------------------------------------------------
+
+You may not Sell WinTool or any Modified Version.
+
+"Sell" means doing any of the following for a fee or other consideration:
+
+  (a) transferring a copy of WinTool or of a Modified Version;
+  (b) granting access to it, including by download, hosting, streaming, or
+      preinstallation on hardware;
+  (c) granting a license to use it;
+  (d) charging a subscription, rental, or any recurring fee for it or for
+      continued access to it;
+  (e) placing it behind a paywall, a paid registration, or a required donation;
+  (f) making the price of any product, bundle, or package depend, in whole or in
+      part, on the inclusion of WinTool;
+  (g) charging for any feature of it, or for the removal of any limitation of it;
+  (h) charging for access to a Script Source on which WinTool or a Modified
+      Version depends in order to function.
+
+You may not solicit or accept a donation, tip, or other payment in exchange for
+access to WinTool or to a Modified Version, or as a condition of obtaining it.
+
+CHARGING FOR SOMETHING ELSE IS NOT SELLING. The following are expressly
+permitted, and nothing in this Section may be read to forbid them:
+
+  (i)   using WinTool in the ordinary course of any activity, including the
+        activity of a for-profit company of any size;
+  (ii)  charging for installation, configuration, repair, maintenance, training,
+        or support services, including services performed with the help of
+        WinTool;
+  (iii) charging for an IT service of which WinTool is a tool rather than the
+        object;
+  (iv)  distributing WinTool from a website, forum, or channel funded by
+        advertising;
+  (v)   monetising content that describes, reviews, or demonstrates WinTool,
+        including sponsored content;
+  (vi)  charging for a Script, which is not part of WinTool.
+
+In each permitted case, WinTool itself must remain obtainable free of charge, and
+the payment must correspond to goods or services other than WinTool.
+
+--------------------------------------------------------------------------------
+2. CORRESPONDING SOURCE ON DISTRIBUTION
+--------------------------------------------------------------------------------
+
+If You distribute a Modified Version in Object form to anyone, You must provide
+its Corresponding Source to each recipient of that Object form, at no charge,
+either together with the distribution or by a written offer, valid for three
+years from the last distribution, to supply it on request.
+
+You are NOT required to publish the Corresponding Source to the public, to the
+Licensor, or to anyone who did not receive the Object form.
+
+Using a Modified Version without distributing it to anyone outside the legal
+entity that made it creates no obligation under this Section. Internal use is
+not distribution.
+
+Providing the Object form to a third party that is not part of that legal entity
+is distribution, whatever the commercial relationship between them.
+
+--------------------------------------------------------------------------------
+3. DISCLOSURE OF ADDED DATA COLLECTION
+--------------------------------------------------------------------------------
+
+WinTool as published by the Licensor contains no telemetry.
+
+If a Modified Version You distribute collects, records, or transmits any
+information about its users, their devices, or their use of it, beyond what a
+feature the user has explicitly requested strictly requires, You must disclose
+that clearly and conspicuously before installation, and identify what is
+collected and to whom it is sent.
+
+This Section states a licensing condition only. It does not replace any
+obligation You may have under data protection law.
+
+--------------------------------------------------------------------------------
+4. IDENTITY OF THE PROJECT
+--------------------------------------------------------------------------------
+
+In addition to Section 6 of the Apache License:
+
+You may not present a Modified Version as the official WinTool, nor use the name
+"WinTool" or the project's visual identity in a way likely to suggest that a
+Modified Version originates from or is endorsed by the Licensor.
+
+A Modified Version You distribute must state clearly, where a user will see it,
+that it is a modified and unofficial version, and must keep a reference to the
+official repository.
+
+Naming the origin factually — "based on WinTool" — is permitted and is not an
+endorsement claim.
+
+--------------------------------------------------------------------------------
+5. SCRIPTS AND SCRIPT SOURCES
+--------------------------------------------------------------------------------
+
+Scripts and Script Sources are not part of WinTool and are not licensed under
+these terms. Their authors choose their own terms freely, including commercial
+ones.
+
+WinTool reads Scripts, may recognise a format, may classify, configure and run
+them. It adds no execution capability to a Script: a Script that does not work
+without WinTool does not become functional by being loaded into it.
+
+The Licensor does not control, review, endorse, or warrant Scripts or Script
+Sources, including those WinTool marks as coming from the official Script
+Source. Such a mark states provenance only. The Licensor is not liable for what
+a Script does.
+
+--------------------------------------------------------------------------------
+6. FUTURE VERSIONS
+--------------------------------------------------------------------------------
+
+The Licensor may publish future versions of WinTool under different terms,
+including more permissive ones. Doing so does not affect the rights You have
+already received in any version published under these terms, which remain
+governed by them.
+
+You may not apply the terms of a future version to a version published under
+these terms.
+
+--------------------------------------------------------------------------------
+7. TERMINATION
+--------------------------------------------------------------------------------
+
+If You breach Section 1, the rights granted to You terminate automatically and
+immediately.
+
+If You breach Section 2, 3, or 4, and do not cure the breach within thirty days
+of being notified of it, the rights granted to You terminate.
+
+Termination does not affect anyone who received WinTool or a Modified Version
+from You in good faith before the breach, whose rights continue so long as they
+comply with these terms. Your obligation under Section 2 towards recipients who
+already received an Object form from You survives termination.
+
+--------------------------------------------------------------------------------
+8. THIRD-PARTY COMPONENTS
+--------------------------------------------------------------------------------
+
+WinTool incorporates components licensed by third parties under their own terms,
+listed in THIRD-PARTY-NOTICES.md. Nothing in these Additional Terms restricts
+the rights those licenses grant You in those components, and nothing in this
+license may be read to do so.
+
+--------------------------------------------------------------------------------
+9. NO WARRANTY, LIMITATION OF LIABILITY
+--------------------------------------------------------------------------------
+
+Sections 7 and 8 of the Apache License apply, subject to the following.
+
+WinTool runs with administrator privileges and executes Scripts that can change
+the system substantially. The Licensor does not warrant any result and is not
+liable for the consequences of a Script, a Script Source, a Modified Version, or
+a use that does not comply with these terms.
+
+Nothing in this license excludes or limits liability that applicable law does not
+permit to be excluded or limited, including liability for death or personal
+injury, for gross negligence, or for wilful misconduct.
+
+--------------------------------------------------------------------------------
+10. GOVERNING LAW
+--------------------------------------------------------------------------------
+
+This license is governed by French law.
+
+If any provision is held unenforceable, the remainder stays in force. The
+prohibition on Selling in Section 1 is an essential condition of the Licensor's
+consent: where it is held unenforceable, the rights to distribute and to
+distribute a Modified Version are not granted in that jurisdiction.
+
+================================================================================
