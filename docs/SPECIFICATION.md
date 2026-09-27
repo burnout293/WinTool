@@ -592,10 +592,13 @@ et la visibilité au bon moment**, pas une prétendue détection de malware.
 
 Tout script est identifié par un **hash de son contenu**, calculé à l'analyse (§5.5).
 
-- Un script de `Default\` **dont le hash correspond** à ce que l'application a livré est
-  **implicitement approuvé** — déjà vérifié en CI (§5.4).
-- **Tout le reste** — script utilisateur, ou script de `Default\` dont le hash a changé
-  depuis l'installation (modification locale, potentiellement malveillante) — doit être
+- Un script **dont l'empreinte correspond à celle déclarée dans l'index signé de la source
+  officielle** est **implicitement approuvé**. Depuis le §16, l'installeur ne livre plus
+  aucun script : la signature Ed25519 de l'index a remplacé le bundle comme ancrage de
+  confiance. Le détail des provenances et de ce qu'elles accordent est au §16.4.
+- **Tout le reste** — script déposé à la main, script de source tierce, ou script dont
+  l'empreinte a changé depuis son installation (modification locale, potentiellement
+  malveillante) — doit être
   **explicitement approuvé avant sa toute première exécution** : un écran affiche le
   contenu du script (accessible même en mode Simple via un lien, sans jamais l'imposer en
   lecture) et demande une confirmation nommée, jamais une case cochée par réflexe.
@@ -678,6 +681,10 @@ qu'on saura lesquels appellent quoi.
 Un écran d'accueil unique et court : ce que fait l'outil, le fait qu'il s'exécute en
 administrateur, le choix de la langue et du thème, un bouton « Commencer ». Puis l'étape 1
 de l'assistant, avec les catégories d'usine déjà en place.
+
+L'installation étant livrée **sans aucun script** (§16.1), cet écran enchaîne sur la
+proposition de sources décrite au §16.6 — proposition qu'il doit rester possible de
+refuser sans quitter l'application.
 
 Il pose le cadre — notamment pourquoi Windows a réclamé une élévation, après un
 avertissement SmartScreen — sans transformer le démarrage en formulaire.
@@ -794,3 +801,188 @@ icône, et sans jeu d'icônes en double pour le thème sombre.
 **Outillage** : `tools/lucide-icon-names.txt` versionne la liste des noms valides pour que
 le validateur fonctionne hors ligne et en intégration continue. Les SVG eux-mêmes arrivent
 par npm (`lucide-static`) côté frontend — ils ne sont pas versionnés dans le dépôt.
+
+## 16. Sources de scripts
+
+> **État : spécifié, non implémenté au 27/09/2026.** Aucune ligne de code ne réalise
+> encore cette section. Elle est écrite avant l'implémentation, pas après, pour que le
+> modèle de sécurité soit arrêté avant qu'un raccourci ne le décide à notre place.
+>
+> **La 1.0.0 livre donc le catalogue dans l'installeur**, comme aujourd'hui, et les
+> scripts de `Default\` y restent implicitement approuvés par comparaison d'empreinte
+> avec ce que l'installeur a posé (§12.1, première règle). Le basculement vers les
+> sources — installeur vide, confiance ancrée sur la signature Ed25519 — vaut à partir
+> de la version qui implémentera cette section. Tant qu'elle n'est pas écrite, c'est la
+> règle du §12.1 qui s'applique, pas celle du §16.4.
+
+### 16.1 Pourquoi WinTool ne livre plus de scripts
+
+Jusqu'ici les scripts voyageaient dans l'installeur. Ils n'y sont plus : **WinTool est
+livré sans aucun script** et propose à l'utilisateur de les récupérer depuis une *source*.
+
+Deux raisons, l'une juridique et l'autre technique.
+
+La raison juridique commande. La licence de WinTool interdit d'en tirer un revenu direct,
+mais ne s'applique **pas** aux scripts, qui restent la propriété de leurs auteurs et
+peuvent avoir n'importe quelle licence — y compris commerciale. Cette séparation ne tient
+que si elle est réelle : un script embarqué dans l'installeur serait difficile à présenter
+comme indépendant du logiciel qui le distribue. En cessant de les livrer, WinTool rend la
+séparation juridique visible dans son fonctionnement, ce que le cahier des charges de la
+licence exige explicitement.
+
+La raison technique suit. Les scripts évoluent plus vite que l'application — un réglage
+Windows change, une clé de registre se déplace, une commande disparaît. Les lier au rythme
+des versions de WinTool condamnait soit l'application à sortir une version pour corriger un
+script, soit les scripts à vieillir entre deux versions.
+
+**Conséquence assumée** : une installation neuve ne sait rien faire tant que l'utilisateur
+n'a pas ajouté une source ou déposé ses propres scripts. L'écran d'accueil doit donc
+proposer, jamais imposer (§16.6).
+
+### 16.2 Ce qu'est une source
+
+Une source est un catalogue de scripts publié à une adresse, signé par son éditeur.
+
+| Champ | Rôle |
+|---|---|
+| `id` | identifiant court et stable, sert de nom de dossier local |
+| `name` | nom affiché |
+| `url` | adresse de l'index |
+| `public_key` | clé publique Ed25519 de l'éditeur |
+| `official` | vraie pour la seule source officielle, jamais modifiable par l'utilisateur |
+| `enabled` | une source peut être conservée sans être interrogée |
+
+**La clé publique de la source officielle est compilée dans le binaire.** Elle ne vit ni
+dans les réglages ni dans un fichier de configuration. Le raisonnement est celui du §12.4 :
+tout ce qui est inscriptible sans élévation est remplaçable par un logiciel malveillant, et
+une clé publique remplacée transforme le bandeau « source officielle » en décor.
+
+Pour la même raison, **la liste des sources vit dans l'emplacement réservé à
+l'administrateur**, avec le magasin d'approbations (§12.4). Ajouter ou retirer une source
+demande donc une élévation. C'est une friction volontaire : ajouter une source, c'est
+décider à qui l'on confiera l'exécution de code en administrateur.
+
+### 16.3 L'index et sa vérification
+
+Chaque source publie un index JSON et sa signature détachée. L'index déclare, pour chaque
+script : son identifiant, son nom de fichier, sa version, sa taille et l'empreinte SHA-256
+de son contenu.
+
+L'ordre des opérations n'est pas négociable :
+
+1. Télécharger l'index **et** sa signature.
+2. Vérifier la signature Ed25519 avec la clé publique de la source.
+3. **Si la vérification échoue, s'arrêter là** — ne rien analyser, ne rien écrire, ne rien
+   afficher du contenu de l'index. Un index non vérifié est une donnée hostile.
+4. Analyser l'index vérifié.
+
+Un index est refusé s'il déclare un chemin de fichier contenant un séparateur de dossier,
+un `..`, un caractère interdit par Windows ou un nom de périphérique réservé (`CON`, `PRN`,
+`AUX`, `NUL`, `COM1`…). Sans ce filtre, une source pourrait écrire hors de son dossier.
+
+### 16.4 Où la confiance est ancrée
+
+Le §12.1 accordait une approbation implicite aux scripts « livrés par l'installeur ».
+Puisqu'il n'en livre plus, cet ancrage disparaît et **la signature le remplace** :
+
+| Provenance | Approbation avant première exécution |
+|---|---|
+| Source officielle, empreinte conforme à l'index signé | **implicite** |
+| Source tierce, même signature valide | **explicite, écran du §12.1** |
+| Script déposé à la main par l'utilisateur | **explicite** |
+| N'importe quel script dont l'empreinte a changé depuis | **explicite, à nouveau** |
+
+Une signature valide prouve l'origine, pas l'innocuité. C'est pourquoi une source tierce
+correctement signée ne gagne aucune approbation implicite : WinTool sait alors de qui vient
+le script, ce qui est exactement ce dont l'utilisateur a besoin pour décider — et rien de
+plus.
+
+Le dossier des scripts restant inscriptible sans élévation, un script téléchargé peut être
+modifié après coup. Aucun mécanisme neuf n'est nécessaire : son empreinte cesse de
+correspondre à celle de l'index signé, il perd son approbation implicite et l'écran du
+§12.1 réapparaît. Le dispositif existant couvre ce cas, à condition que la comparaison se
+fasse **contre l'index signé** et non contre une empreinte recalculée localement.
+
+### 16.5 Installer et mettre à jour un script
+
+Un script téléchargé est d'abord reçu en mémoire, son empreinte calculée, puis comparée à
+celle de l'index signé. **Il n'est écrit sur le disque qu'après cette comparaison**, dans
+`%LOCALAPPDATA%\WinTool\scripts\<id-source>\`. Un dossier par source : deux sources ne
+peuvent pas se marcher dessus, et la provenance d'un script se lit dans son chemin.
+
+La mise à jour suit le §11 — **détecter et proposer, jamais installer sans accord**. Trois
+comportements au choix dans les réglages : vérifier au démarrage, vérifier à la demande,
+ne jamais vérifier. Par défaut, vérification au démarrage et **proposition** ; rien n'est
+téléchargé tant que l'utilisateur n'a pas dit oui.
+
+Une mise à jour change l'empreinte. Elle repasse donc par la règle du §16.4 : automatique
+pour la source officielle, écran d'approbation pour les autres. Un script mis à jour n'est
+jamais exécuté dans la foulée de son téléchargement.
+
+### 16.6 Ce que l'interface montre
+
+**Ni source ni script.** L'accueil affiche une liste de sources proposées, la source
+officielle en tête et identifiée comme telle. Un bouton permet de **continuer sans aucune
+source** : l'utilisateur qui veut seulement déposer ses propres scripts ne doit pas avoir à
+refuser un catalogue pour arriver à l'application.
+
+**Des scripts, mais aucune source.** Un rappel discret, une fois, expliquant que ces
+scripts ne recevront aucune mise à jour. Il porte une case **« ne plus afficher »** qui est
+respectée définitivement.
+
+**Sur chaque script**, sa provenance est visible sans avoir à la chercher : source
+officielle, nom de la source tierce, ou script local. Un script de source tierce porte la
+mention qu'il **n'est ni contrôlé ni approuvé par le projet WinTool**.
+
+**Dans les réglages**, la gestion des sources : ajouter, retirer, activer, vérifier
+maintenant, et le choix du comportement de mise à jour.
+
+Le mode Simple suit les règles de langage du §3. « Source » n'y apparaît pas : on y parle
+de **« catalogue d'entretiens »**, et une source tierce devient **« ajouté par vous, pas
+vérifié par WinTool »**.
+
+### 16.7 Vie privée
+
+La licence interdit toute télémétrie mais autorise la communication réseau nécessaire à une
+fonctionnalité. La frontière se tient ici, et elle est étroite : une vérification d'index
+qui identifierait l'appareil serait de la collecte déguisée.
+
+La requête ne transporte donc **aucun identifiant** : pas de numéro d'installation, pas
+d'identifiant machine, pas de paramètre d'URL, pas d'en-tête personnalisé permettant de
+distinguer une installation d'une autre. La source apprend qu'une adresse IP a demandé un
+fichier public — ce que tout hébergeur voit — et rien de plus.
+
+WinTool n'envoie jamais à une source la liste des scripts installés, l'historique
+d'exécution ou la configuration.
+
+### 16.8 Forks et sources tierces
+
+Aucune adresse n'est câblée ailleurs que dans la constante de la source officielle. Un fork
+remplace cette constante et sa clé publique, et dispose du même mécanisme pour son propre
+catalogue — c'est l'intention : le modèle est fait pour être repris.
+
+Le format d'index est documenté pour que n'importe qui publie une source sans demander
+d'autorisation. WinTool n'exerce aucun contrôle sur le contenu des sources tierces et ne
+répond pas de ce qu'elles distribuent.
+
+### 16.9 Si la clé officielle est compromise
+
+La clé publique étant dans le binaire, **la remplacer exige une mise à jour de
+l'application**. C'est le prix de l'ancrage : on gagne l'impossibilité de substituer la clé
+localement, on perd la rotation rapide.
+
+En cas de compromission : publier une version de WinTool portant la nouvelle clé, et
+considérer comme non approuvé tout script dont l'empreinte provient d'un index signé par
+l'ancienne. Les scripts déjà installés ne sont pas supprimés — WinTool ne supprime jamais
+un fichier de script (§14) — mais ils repassent par l'écran d'approbation.
+
+### 16.10 Ce qui reste hors de portée
+
+- WinTool **ne vérifie pas** ce que fait un script. La signature atteste l'origine, jamais
+  l'intention. Le §12.2 reste ce qu'il est : des points d'attention, pas un verdict.
+- Pas de dépendances entre scripts, pas de résolution de versions. Un index est une liste
+  plate.
+- Pas de miroir ni de reprise sur échec : une source injoignable est signalée, et
+  l'application fonctionne avec ce qui est déjà installé.
+
+---

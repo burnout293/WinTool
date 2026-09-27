@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "banc",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tools/bench/serve.mjs", "8123"],
+      "port": 8123
+    }
+  ]
+}

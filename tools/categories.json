@@ -4,5 +4,6 @@
   { "id": "privacy",     "id_fr": "vieprivee",     "name_fr": "Vie privée",      "name_en": "Privacy",      "icon": "shield" },
   { "id": "apps",        "id_fr": "applications",  "name_fr": "Applications",    "name_en": "Applications", "icon": "app-window" },
   { "id": "health",      "id_fr": "sante",         "name_fr": "Santé",           "name_en": "Health",       "icon": "activity" },
-  { "id": "tools",       "id_fr": "outillage",     "name_fr": "Outillage",       "name_en": "Tools",        "icon": "wrench" }
+  { "id": "tools",       "id_fr": "outillage",     "name_fr": "Outillage",       "name_en": "Tools",        "icon": "wrench" },
+  { "id": "customize",   "id_fr": "personnalisation", "name_fr": "Personnalisation", "name_en": "Customize",  "icon": "sliders-horizontal" }
 ]
