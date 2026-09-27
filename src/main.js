@@ -640,7 +640,8 @@ async function rendreDetailLot(id) {
       <button class="iconbtn" type="button" data-renommer-lot="${esc(cat.id)}" data-tip="${esc(t('expert.renommer'))}">
         <svg class="ico i17" aria-hidden="true"><use href="#pencil" /></svg>
       </button>
-      <button class="iconbtn" type="button" data-icone-lot="${esc(cat.id)}" data-tip="${esc(t('expert.changer_icone'))}">
+      <button class="iconbtn" type="button" data-icone-lot="${esc(cat.id)}"
+              data-tip="${esc(t('expert.changer_icone'))}" aria-label="${esc(t('expert.changer_icone'))}">
         <svg class="ico i17" aria-hidden="true"><use href="#folder" /></svg>
       </button>
       <button class="iconbtn" type="button" data-epingler-lot="${esc(cat.id)}"
@@ -798,26 +799,6 @@ async function ouvrirChoixIcone(id) {
   overlay.hidden = false;
   await rendreGrilleIcones('');
   recherche.focus();
-}
-
-/** Ancienne grille en ligne, plus utilisee. */
-async function ouvrirChoixIconeEnLigne(id) {
-  const zone = document.getElementById('choixIcone');
-  if (!zone) return;
-  if (!zone.hidden && zone.dataset.pour === id) {
-    zone.hidden = true;
-    return;
-  }
-  zone.dataset.pour = id;
-  const cases = await Promise.all(
-    ICONES_LOT.map(async (nom) => {
-      const svg = (await iconeSVG(nom)) || '';
-      return `<button class="ic-case" type="button" data-choisir-icone="${esc(nom)}"
-                      data-tip="${esc(nom)}" aria-label="${esc(nom)}">${svg}</button>`;
-    })
-  );
-  zone.innerHTML = cases.join('');
-  zone.hidden = false;
 }
 
 async function rendreDetailScript(entree) {
@@ -1856,19 +1837,6 @@ function cablerInteractions() {
 
     const ouvrirIcone = ev.target.closest('[data-icone-lot]');
     if (ouvrirIcone) return void ouvrirChoixIcone(ouvrirIcone.dataset.iconeLot);
-
-    const choisirIcone = ev.target.closest('[data-choisir-icone]');
-    if (choisirIcone) {
-      const zone = document.getElementById('iconesOverlay');
-      try {
-        await invoke('set_category_icon', { id: zone.dataset.pour, icon: choisirIcone.dataset.choisirIcone });
-        zone.hidden = true;
-      } catch (e) {
-        console.error("Icone non enregistree :", e);
-      }
-      await chargerLots();
-      return void rendreDetail();
-    }
 
     const renommer = ev.target.closest('[data-renommer-lot]');
     if (renommer) return void demarrerRenommageLot(renommer.dataset.renommerLot);
@@ -2959,10 +2927,30 @@ async function demarrer() {
   document.getElementById('rechercheIcone').addEventListener('input', (ev) => {
     rendreGrilleIcones(ev.target.value);
   });
-  document.getElementById('iconesGrille').addEventListener('click', (ev) => {
-    if (!ev.target.closest('[data-plus-icones]')) return;
-    plafondIcones += PAS_ICONES;
-    rendreGrilleIcones(document.getElementById('rechercheIcone').value, false);
+  // La grille vit dans un calque de premier niveau (`.backdrop`), hors du panneau
+  // de detail : le clic n'y remonte pas. Le choix d'une icone se traite donc ici,
+  // et nulle part ailleurs.
+  document.getElementById('iconesGrille').addEventListener('click', async (ev) => {
+    if (ev.target.closest('[data-plus-icones]')) {
+      plafondIcones += PAS_ICONES;
+      return void rendreGrilleIcones(document.getElementById('rechercheIcone').value, false);
+    }
+
+    const choisie = ev.target.closest('[data-choisir-icone]');
+    if (!choisie) return;
+
+    const overlay = document.getElementById('iconesOverlay');
+    try {
+      await invoke('set_category_icon', { id: overlay.dataset.pour, icon: choisie.dataset.choisirIcone });
+    } catch (e) {
+      // On laisse le calque ouvert : un refus qui ferme la fenetre sans rien dire
+      // se lit comme un enregistrement reussi.
+      document.getElementById('iconesCompte').textContent = String(e);
+      return;
+    }
+    overlay.hidden = true;
+    await chargerLots();
+    rendreDetail();
   });
   document.getElementById('iconesOverlay').addEventListener('click', (ev) => {
     // Clic hors de la carte : on ferme, comme pour les autres superpositions.
