@@ -14,10 +14,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [[bin]]
 name = "wintool"
 path = "src/main.rs"
-# Le manifeste impose requireAdministrator : lancer ce binaire depuis le
-# harnais de test echouerait avec « l'operation necessite une elevation »
-# (os error 740). Il ne contient aucun test — toute la logique est dans la
-# bibliotheque, qui elle est testable sans elevation.
+# Aucun test ici : toute la logique vit dans la bibliotheque, qui se teste
+# sans lancer l'application. Le binaire, lui, ouvre une fenetre — le harnais
+# de test n'en ferait rien.
 test = false
 
 [build-dependencies]
@@ -41,3 +40,16 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+# Profil de developpement : c'est lui qui remplissait le disque. Sans ces deux
+# reglages, `cargo test` produisait 7,3 Go d'artefacts — dont 1,4 Go de seuls
+# fichiers .pdb — pour un projet dont le code source fait 7 Mo.
+[profile.dev]
+# De quoi lire une trace d'appels avec ses numeros de ligne, pas de quoi
+# deboguer pas a pas. C'est ce dont on se sert reellement ici.
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+# Les dependances ne se deboguent pas : aucun symbole pour elles. C'est la
+# mesure qui pese, elles forment l'essentiel de l'arbre de compilation.
+debug = false

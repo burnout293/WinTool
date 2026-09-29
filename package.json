@@ -9,7 +9,8 @@
     "dev": "tauri dev",
     "build": "tauri build",
     "lint:scripts": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/lint-scripts.ps1 -Path ./scripts/Default -Strict",
-    "icons:sync": "node ./tools/sync-icons.mjs"
+    "icons:sync": "node ./tools/sync-icons.mjs",
+    "clean": "cargo clean --manifest-path src-tauri/Cargo.toml"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
