@@ -66,6 +66,27 @@ jobs:
           }
           ./tools/lint-scripts.ps1 -Path $dossier -Strict
 
+      # Les scripts complets de FORMAT_SCRIPT.md sont les modeles que l'agent
+      # catalogue recopie. Un exemple que le validateur refuserait apprendrait a
+      # mal ecrire : on les extrait et on les valide comme des scripts livres.
+      - name: Valider les exemples de la documentation
+        shell: pwsh
+        run: |
+          $doc = Get-Content docs/FORMAT_SCRIPT.md -Raw -Encoding UTF8
+          $dir = Join-Path $env:RUNNER_TEMP 'exemples-doc'
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          $n = 0
+          foreach ($m in [regex]::Matches($doc, '(?s)```powershell\r?\n(.*?)```')) {
+            $code = $m.Groups[1].Value
+            if ($code -notmatch '## WINTOOL:START') { continue }
+            $n++
+            $f = Join-Path $dir ('{0:D3}_EXEMPLE.ps1' -f $n)
+            [IO.File]::WriteAllText($f, $code, [Text.UTF8Encoding]::new($true))
+          }
+          Write-Host "$n exemple(s) complet(s) extrait(s)"
+          if ($n -lt 2) { Write-Host '::error::moins de deux exemples complets dans FORMAT_SCRIPT.md'; exit 1 }
+          ./tools/lint-scripts.ps1 -Path $dir -Strict
+
       - name: Clippy
         working-directory: src-tauri
         run: cargo clippy --lib --all-targets -- -D warnings

@@ -57,9 +57,11 @@ $VALEURS_ADMISES = @{
     reversible    = @('true', 'false')
     interruptible = @('true', 'false')
     reboot        = @('true', 'false')
+    # Facultatif : absent vaut false. Voir « Le mode analyse » dans FORMAT_SCRIPT.md.
+    scan          = @('true', 'false')
 }
 
-$MARQUEURS = @('INFO', 'OK', 'WARN', 'ERR', 'STEP', 'CKPT', 'REBOOT', 'DONE')
+$MARQUEURS = @('INFO', 'OK', 'WARN', 'ERR', 'STEP', 'CKPT', 'REBOOT', 'DONE', 'FIND', 'FREED')
 
 # Types d'option. 'select' et 'multi' exigent des choix déclarés en sous-lignes.
 $TYPES_OPTION     = @('bool', 'number', 'string', 'hidden', 'select', 'multi')
@@ -563,6 +565,94 @@ function Test-Marqueurs {
     }
 }
 
+function Test-Analyse {
+    <#
+      Le mode analyse (FORMAT_SCRIPT.md, « Le mode analyse »). Quatre choses se
+      verifient sans executer quoi que ce soit :
+        - un script qui se declare analysable lit bien WINTOOL_MODE et emet bien
+          des [FIND] — sans quoi WinTool l'interrogerait pour rien ;
+        - chaque [FIND] vise une option qui existe, et du bon type : c'est la case
+          que l'utilisateur cochera, elle doit pouvoir porter la selection ;
+        - la mesure n'emploie que des champs connus ;
+        - a l'inverse, un script qui sait analyser sans le declarer ne sera jamais
+          interroge : on le signale.
+      Seules les cles ecrites en toutes lettres sont verifiees. Une cle calculee
+      ("[FIND] $cle ...") echappe au controle statique, par construction.
+    #>
+    param([string] $Fichier, [string[]] $Lignes, [hashtable] $Champs, $Options)
+
+    $declare = $Champs.ContainsKey('scan') -and $Champs['scan'].Valeur.ToLower() -eq 'true'
+    $ligneScan = if ($Champs.ContainsKey('scan')) { $Champs['scan'].Ligne } else { 1 }
+
+    $litMode = $false
+    $emissions = @()
+    for ($i = 0; $i -lt $Lignes.Count; $i++) {
+        $ligne = $Lignes[$i]
+        if ($ligne -match '^\s*#') { continue }
+        if ($ligne -match 'WINTOOL_MODE') { $litMode = $true }
+        foreach ($m in [regex]::Matches($ligne, '["'']\s*\[FIND\]\s+([^\s"'']+)([^"'']*)')) {
+            $emissions += @{ Cle = $m.Groups[1].Value; Mesure = $m.Groups[2].Value; Ligne = $i + 1 }
+        }
+    }
+
+    $cibles = @($Options.Keys | Where-Object { @('bool', 'multi') -contains $Options[$_].Type })
+
+    if ($declare) {
+        if ($cibles.Count -eq 0) {
+            Add-Constat $Fichier $ligneScan 'erreur' 'SCAN_SANS_CIBLE' "'scan : true' exige au moins une option [bool] ou [multi] : c'est elle que l'utilisateur coche après l'analyse."
+        }
+        if (-not $litMode) {
+            Add-Constat $Fichier $ligneScan 'erreur' 'SCAN_NON_GERE' "'scan : true' mais le script ne lit jamais `$env:WINTOOL_MODE : il agirait au lieu d'analyser."
+        }
+        if ($emissions.Count -eq 0) {
+            Add-Constat $Fichier $ligneScan 'erreur' 'SCAN_SANS_FIND' "'scan : true' mais aucun [FIND] n'est émis : l'analyse ne rapporterait rien."
+        }
+    }
+    elseif ($litMode -or $emissions.Count -gt 0) {
+        Add-Constat $Fichier $ligneScan 'avertissement' 'FIND_SANS_SCAN' "Le script sait analyser mais ne le déclare pas : ajoutez '## scan : true' à l'entête, sinon WinTool ne l'interrogera jamais."
+    }
+
+    foreach ($e in $emissions) {
+        $cle = $e.Cle
+        if ($cle.StartsWith('$')) { continue }
+
+        $nom, $choix = $cle -split '\.', 2
+        if (-not $Options.Contains($nom)) {
+            Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] vise '$nom', qui n'est pas déclarée dans le bloc OPTIONS."
+            continue
+        }
+        $type = $Options[$nom].Type
+        if (@('bool', 'multi') -notcontains $type) {
+            Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] vise '$nom', de type [$type] : seule une option [bool] ou [multi] peut porter une case à cocher."
+            continue
+        }
+        if ($type -eq 'bool' -and $choix) {
+            Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] '$cle' : '$nom' est un [bool], il n'a pas de choix. Écrivez '[FIND] $nom ...'."
+        }
+        if ($type -eq 'multi') {
+            if (-not $choix) {
+                Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] '$nom' est un [multi] : visez l'un de ses choix, par exemple '[FIND] $nom.$(@($Options[$nom].Choix.Keys)[0]) ...'."
+            }
+            elseif (-not $choix.StartsWith('$') -and -not $Options[$nom].Choix.Contains($choix)) {
+                Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] vise le choix '$choix', que '$nom' ne déclare pas."
+            }
+        }
+
+        $champsMesure = @([regex]::Matches($e.Mesure, '(?<![\w$])([A-Za-z]+)=') | ForEach-Object { $_.Groups[1].Value })
+        if ($champsMesure.Count -eq 0) {
+            Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_MESURE' "[FIND] '$cle' sans mesure : ajoutez size=<octets>, count=<nombre> ou state=todo|ok."
+        }
+        foreach ($c in $champsMesure) {
+            if (@('size', 'count', 'state') -cnotcontains $c) {
+                Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_MESURE' "[FIND] '$cle' : champ '$c' inconnu. Champs admis : size, count, state."
+            }
+        }
+        if ($e.Mesure -match 'state=([A-Za-z]+)' -and @('todo', 'ok') -cnotcontains $Matches[1]) {
+            Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_MESURE' "[FIND] '$cle' : state vaut '$($Matches[1])' ; valeurs admises : todo | ok."
+        }
+    }
+}
+
 function Test-SortieAnglaise {
     param([string] $Fichier, [string[]] $Lignes)
 
@@ -611,6 +701,7 @@ foreach ($f in $fichiers) {
     Test-Override       $relatif $lignes
     Test-Marqueurs      $relatif $lignes
     Test-SortieAnglaise $relatif $lignes
+    Test-Analyse        $relatif $lignes $champs $options
 
     if ($champs.ContainsKey('id')) {
         $id = $champs['id'].Valeur.ToLower()

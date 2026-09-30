@@ -489,7 +489,9 @@ de l'auteur du script, et `docs/FORMAT_SCRIPT.md` la lui rappelle.
 ## 7. État affiché — historique local uniquement
 
 « Fait le 18 septembre » signifie **« lancé le 18 septembre »**, pas « vérifié appliqué ».
-Aucun script n'a de mode « vérifier ».
+Jusqu'à la 1.1, aucun script n'a de mode « vérifier ». À partir de la 1.2, un script peut
+savoir analyser (§17) — mais une analyse est un instantané montré avant d'agir, pas un
+suivi : elle n'écrit rien dans l'historique et ne change pas ce qu'affiche « Fait le … ».
 
 **Limite assumée et à ne pas masquer** : une mise à jour Windows qui réactiverait la
 télémétrie ne sera pas détectée, et un PC déjà configuré à la main affichera
@@ -984,5 +986,77 @@ un fichier de script (§14) — mais ils repassent par l'écran d'approbation.
   plate.
 - Pas de miroir ni de reprise sur échec : une source injoignable est signalée, et
   l'application fonctionne avec ce qui est déjà installé.
+
+---
+
+## 17. Analyser avant d'agir
+
+> **État : spécifié au 30/09/2026, prévu pour la 1.2.** Le contrat côté script — `scan`,
+> `WINTOOL_MODE`, `[FIND]`, `[FREED]` — est décrit dans `docs/FORMAT_SCRIPT.md`, section
+> « Le mode analyse ». Le validateur l'accepte dès la 1.1, pour que le catalogue puisse
+> être adapté avant que l'interface n'existe. Cette section décrit ce que fait
+> l'application.
+
+### 17.1 Le principe
+
+Le fonctionnement de CCleaner ou de Malwarebytes : **analyser, montrer, laisser choisir,
+puis agir**. L'utilisateur ne lance plus un nettoyage à l'aveugle ; il voit ce qui sera
+fait et en combien, et décoche ce qu'il veut garder.
+
+Ce n'est pas une nouvelle mécanique d'exécution. Un script analysable est lancé deux fois :
+une fois avec `WINTOOL_MODE=scan`, puis normalement, avec ses options `[bool]` et `[multi]`
+fixées d'après les cases cochées. La sélection voyage par `WINTOOL_CONFIG`, comme n'importe
+quel réglage (§5.2).
+
+### 17.2 Dans le mode Simple
+
+L'étape 2 de l'assistant cesse d'être un récapitulatif et devient l'analyse elle-même.
+
+1. **Choisir** — inchangé : un lot.
+2. **Analyser** — WinTool interroge chaque script analysable du lot et affiche ses constats,
+   regroupés par script, chacun avec sa case. Un total résume ce qui est en jeu
+   (« 1,1 Go à libérer, 3 réglages à appliquer »). Les scripts du lot qui ne savent pas
+   analyser apparaissent aussi, cochés, avec la mention qu'ils s'appliqueront tels quels.
+3. **Entretien** — seuls les éléments cochés sont traités.
+4. **Bilan** — reprend `[FREED]` quand le script l'a émis, sinon l'estimation de l'analyse
+   précédée de « environ ». Un chiffre n'est jamais présenté comme mesuré s'il est estimé.
+
+Les règles de langage du §3 s'appliquent : « 795 Mo de fichiers temporaires », jamais
+`size=795278422`.
+
+Une analyse n'écrit **rien** dans l'historique. Seule l'action compte pour « Fait le … »
+(§7) : avoir regardé n'est pas avoir fait.
+
+### 17.3 Dans le mode Expert
+
+Chaque script analysable propose « Analyser » dans son détail, qui affiche ses constats
+sans rien lancer d'autre. C'est l'outil de l'utilisateur avancé qui veut comprendre avant de
+composer un lot, et celui de l'auteur de script qui vérifie ce que son analyse rapporte.
+
+### 17.4 Sécurité : analyser, c'est exécuter
+
+C'est le point à ne jamais perdre de vue. L'analyse fait tourner le script, en
+administrateur si l'entête le demande. Que ce mode ne modifie rien est une **promesse de
+l'auteur**, que WinTool ne peut pas vérifier (§12, cadrage).
+
+En conséquence :
+
+- **L'approbation du §12.1 s'applique à l'analyse** exactement comme à l'action. Un script
+  non approuvé n'est pas plus analysé qu'exécuté.
+- L'analyse passe par le **même lanceur durci** que l'action (§12.4) : verrou en écriture
+  sur le fichier, `-NoProfile`, `PSModulePath` réduit, interpréteur par chemin absolu.
+- Un `[FIND]` qui vise une option que le script ne déclare pas est **ignoré** et relevé
+  comme anomalie : un script ne peut parler que de ses propres cases, jamais faire
+  apparaître une case au nom d'un autre.
+- Une mesure illisible — taille négative, texte à la place d'un nombre, `state` inconnu —
+  est ignorée et relevée, jamais interprétée au mieux.
+- L'interface ne présente jamais l'analyse comme « sans risque ». Elle dit ce qu'elle fait :
+  WinTool examine le PC.
+
+### 17.5 Arrêter une analyse
+
+Le bouton « Arrêter » s'applique à l'analyse. Elle ne modifie rien par contrat, et peut donc
+être interrompue à tout instant sans la précaution du §6 : aucune notion de `[CKPT]` ne s'y
+applique.
 
 ---

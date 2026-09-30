@@ -651,6 +651,52 @@ if ($env:WINTOOL_CONFIG) { }
         );
     }
 
+    /// Tous les scripts complets de la documentation, pas seulement le premier :
+    /// l'exemple du mode analyse est un modele que l'agent catalogue recopie, il
+    /// doit rester lisible par le parseur au meme titre que le squelette.
+    #[test]
+    fn chaque_exemple_de_la_documentation_se_lit_sans_anomalie() {
+        let doc = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("docs")
+            .join("FORMAT_SCRIPT.md");
+        let texte = std::fs::read_to_string(&doc)
+            .unwrap_or_else(|e| panic!("{} illisible : {e}", doc.display()));
+
+        let exemples: Vec<&str> = texte
+            .split("```powershell")
+            .skip(1)
+            .filter_map(|bloc| bloc.split("```").next())
+            .filter(|bloc| bloc.contains("WINTOOL:START"))
+            .collect();
+
+        // Le squelette et l'exemple d'analyse. Si l'un disparait, ce test doit le
+        // dire plutot que de passer en silence sur ce qui reste.
+        assert!(
+            exemples.len() >= 2,
+            "{} exemple(s) complet(s) seulement dans FORMAT_SCRIPT.md",
+            exemples.len()
+        );
+        assert!(
+            exemples.iter().any(|e| e.contains("[FIND]")),
+            "plus aucun exemple de mode analyse dans FORMAT_SCRIPT.md"
+        );
+
+        for exemple in exemples {
+            let s = parse(exemple);
+            let erreurs: Vec<_> = s
+                .findings
+                .iter()
+                .filter(|f| f.severity == Severity::Error)
+                .collect();
+            assert!(
+                erreurs.is_empty(),
+                "l'exemple '{}' porte des anomalies : {erreurs:?}",
+                s.title
+            );
+        }
+    }
+
     #[test]
     fn constate_sans_bloquer() {
         // Cle presente dans $CONFIG mais absente du bloc OPTIONS.

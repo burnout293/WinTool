@@ -166,7 +166,7 @@ script, pas à l'application.
 
 ## L'entête
 
-Tous ces champs sont **obligatoires**. `tags` est le seul facultatif.
+Tous ces champs sont **obligatoires**, sauf `tags` et `scan`.
 
 | Champ | Valeurs | Rôle |
 |---|---|---|
@@ -185,6 +185,7 @@ Tous ces champs sont **obligatoires**. `tags` est le seul facultatif.
 | `interruptible` | `true` / `false` | `false` = ne peut pas être tué sans risque |
 | `reboot` | `true` / `false` | `true` **pré-coche** « nécessite un redémarrage » |
 | `engine` | `auto` / `winps` / `pwsh` | Interpréteur requis |
+| `scan` | `true` / `false` | Facultatif. `true` = le script sait analyser avant d'agir — voir « Le mode analyse » |
 
 ### Les tokens acceptés par `category`
 
@@ -407,6 +408,8 @@ détail technique » ; c'est l'interface qui traduit la progression à partir de
 [CKPT]   message           « interruption sans risque à partir d'ici »
 [REBOOT] message           un redémarrage est réellement nécessaire
 [DONE]   message           fin nominale
+[FIND]   Option mesure     mode analyse seulement : un constat — voir « Le mode analyse »
+[FREED]  octets            espace réellement libéré, repris dans le bilan
 ```
 
 > ### Le seul verdict est `exit`
@@ -434,6 +437,254 @@ franchi. Émettez-en un dès que l'état du système redevient cohérent :
 ```powershell
 Write-Host "[CKPT] Backup complete - safe to interrupt from here"
 ```
+
+---
+
+## Le mode analyse
+
+> **Accepté par le validateur depuis la 1.1, exploité par WinTool à partir de la 1.2.**
+> Vous pouvez écrire et valider des scripts analysables dès maintenant ; l'interface qui
+> les interroge arrive avec la 1.2. D'ici là, un script analysable se comporte exactement
+> comme un autre.
+
+C'est le fonctionnement de CCleaner ou de Malwarebytes, en trois temps :
+
+1. **Analyser** — WinTool demande au script ce qu'il ferait, sans rien modifier.
+2. **Cocher** — l'utilisateur voit les constats (« 795 Mo de fichiers temporaires »,
+   « Télémétrie : activée ») et choisit ce qu'il veut traiter.
+3. **Nettoyer** — WinTool relance le script en ne lui transmettant que les cases cochées.
+
+Un script qui ne déclare rien de tout cela fonctionne comme avant. Le mode analyse est une
+capacité en plus, jamais une obligation.
+
+### Déclarer : une ligne dans l'entête
+
+```powershell
+## scan          : true
+```
+
+Facultatif, `false` s'il est absent. Il annonce que le script sait répondre à la question
+« que ferais-tu ? ».
+
+### Le contrat, en quatre règles
+
+**1. WinTool pose `WINTOOL_MODE=scan`.** C'est une variable d'environnement, distincte de
+`WINTOOL_CONFIG`. Absente — lancement normal, ou double-clic sur le fichier —, le script
+agit comme d'habitude.
+
+**2. En mode analyse, le script ne modifie RIEN.** Ni fichier, ni registre, ni service, ni
+tâche planifiée, ni réglage réseau. Il mesure, rapporte, et se termine par `exit 0`.
+Un code de sortie non nul signifie « l'analyse a échoué ».
+
+**3. Chaque constat s'écrit sur une ligne `[FIND]`**, qui vise une option du bloc
+`OPTIONS` — c'est elle qui deviendra la case à cocher :
+
+```
+[FIND] <Option> <mesure>              une option [bool]
+[FIND] <Option>.<choix> <mesure>      un choix d'une option [multi]
+```
+
+La mesure se compose d'un ou plusieurs de ces champs, séparés par des espaces :
+
+| Champ | Valeur | Sens |
+|---|---|---|
+| `size=` | entier, en **octets** | Espace récupérable. WinTool l'affiche dans l'unité et la langue de l'utilisateur. |
+| `count=` | entier | Nombre d'éléments trouvés : fichiers, entrées de démarrage… |
+| `state=` | `todo` ou `ok` | Pour un réglage : `todo` = pas encore en place, `ok` = déjà fait. |
+
+**4. La sélection revient par `$CONFIG`, comme n'importe quel réglage.** C'est le point qui
+rend le mode analyse presque gratuit à écrire : il n'y a **pas de mode « action » à
+implémenter**. Après l'analyse, WinTool lance le script normalement, avec :
+
+- une option `[bool]` à `$true` si sa case est cochée, `$false` sinon ;
+- une option `[multi]` réduite à la liste des choix cochés ;
+- toutes les autres options à leur valeur configurée, inchangée.
+
+Votre code d'action existe déjà : il lit `$CONFIG`, et fait ce qu'on lui dit.
+
+WinTool pré-coche un constat quand il rapporte `size` ou `count` supérieur à zéro, ou
+`state=todo`. Il le décoche quand il rapporte `state=ok` ou une taille nulle.
+
+### Pourquoi aucun texte libre dans `[FIND]`
+
+La sortie brute des scripts est en anglais, et l'interface est bilingue. Un `[FIND]` qui
+porterait sa propre phrase ne pourrait donc pas être affiché en français. Le libellé vient
+de l'option visée, qui est **déjà traduite** dans le bloc `LANG`. Le script ne fournit que
+des nombres et des jetons ; c'est l'interface qui compose la phrase.
+
+### `[FREED]` : ce qui a réellement été libéré
+
+L'analyse et le nettoyage sont deux exécutions distinctes. Entre les deux, des fichiers
+temporaires apparaissent, d'autres sont verrouillés et ne pourront pas être supprimés. Le
+chiffre de l'analyse est donc une **estimation**.
+
+Un script qui libère de l'espace peut le dire, en fin d'action :
+
+```powershell
+Write-Output "[FREED] $freed"      # en octets
+```
+
+Le bilan affiche alors le chiffre réel. Sans `[FREED]`, il affiche l'estimation de
+l'analyse, précédée de « environ ».
+
+### Exemple complet — un nettoyage
+
+Ce script est vérifié : il passe le validateur en `-Strict`, et sa branche d'analyse a été
+exécutée sur une vraie machine, où elle a rapporté 795 Mo de fichiers temporaires et 266 Mo
+de corbeille sans rien modifier.
+
+```powershell
+## WINTOOL:START
+## id            : 8d4e2f1a-6b3c-4a9e-b7d5-2c1f0e9a8b76
+## lang          : en
+## title         : Clean temporary files
+## desc          : Frees the space taken by leftover temporary files
+## category      : cleaning
+## icon          : trash-2
+## tags          : temp, cleanup, disk space
+## version       : 1.0
+## admin         : true
+## risk          : low
+## duration      : medium
+## reversible    : false
+## interruptible : true
+## reboot        : false
+## engine        : auto
+## scan          : true
+## WINTOOL:END
+
+## WINTOOL:OPTIONS
+## Targets    : [multi] What to clean
+##   user     : Your temporary files
+##   windows  : Windows temporary files
+## RecycleBin : [bool]  Empty the recycle bin
+## SafeTest   : [bool]  Safe test — simulates every change, modifies nothing
+## WINTOOL:END
+
+## WINTOOL:LANG fr
+## title      : Nettoyer les fichiers temporaires
+## desc       : Libère la place prise par les fichiers temporaires oubliés
+## Targets    : Ce qu'il faut nettoyer
+##   user     : Vos fichiers temporaires
+##   windows  : Les fichiers temporaires de Windows
+## RecycleBin : Vider la corbeille
+## SafeTest   : Test sans risque — simule chaque modification, ne change rien
+## WINTOOL:END
+
+$CONFIG = @{
+    Targets    = @("user", "windows")
+    RecycleBin = $false
+    SafeTest   = $false
+}
+
+# --- WinTool override (ne pas supprimer) ---
+if ($env:WINTOOL_CONFIG) {
+    ($env:WINTOOL_CONFIG | ConvertFrom-Json).PSObject.Properties |
+        ForEach-Object { $CONFIG[$_.Name] = $_.Value }
+}
+
+# ==============================================================================
+
+$Folders = @{
+    user    = $env:TEMP
+    windows = Join-Path $env:SystemRoot 'Temp'
+}
+
+function Get-FolderFiles([string] $Path) {
+    Get-ChildItem -LiteralPath $Path -Recurse -File -Force -ErrorAction SilentlyContinue
+}
+
+function Get-RecycleBinItems {
+    @((New-Object -ComObject Shell.Application).NameSpace(10).Items())
+}
+
+# --- Analyse : on mesure, on ne modifie RIEN ------------------------------------
+# Tout ce bloc doit etre en lecture seule. WinTool ne peut pas le verifier :
+# c'est une promesse de l'auteur, et l'utilisateur coche sur la foi de ce
+# qu'elle rapporte.
+if ($env:WINTOOL_MODE -eq 'scan') {
+    foreach ($target in $Folders.Keys) {
+        $m = Get-FolderFiles $Folders[$target] | Measure-Object -Property Length -Sum
+        Write-Output "[FIND] Targets.$target size=$([long]$m.Sum) count=$($m.Count)"
+    }
+    $bin = Get-RecycleBinItems
+    $binSize = ($bin | Measure-Object -Property Size -Sum).Sum
+    Write-Output "[FIND] RecycleBin size=$([long]$binSize) count=$($bin.Count)"
+    exit 0
+}
+
+# --- Action : uniquement ce que l'utilisateur a coche ---------------------------
+$SafeTest = ("$($CONFIG.SafeTest)" -eq 'True')
+$targets  = @($CONFIG.Targets | Where-Object { $Folders.ContainsKey("$_") })
+$doBin    = ("$($CONFIG.RecycleBin)" -eq 'True')
+$total    = $targets.Count + [int]$doBin
+$step     = 0
+$freed    = [long]0
+
+foreach ($target in $targets) {
+    $step++
+    Write-Host "[STEP] $step/$total Cleaning $target temporary files"
+    foreach ($f in Get-FolderFiles $Folders[$target]) {
+        if ($SafeTest) { $freed += $f.Length; continue }
+        try {
+            Remove-Item -LiteralPath $f.FullName -Force -ErrorAction Stop
+            $freed += $f.Length
+        } catch {
+            # Fichier ouvert par un programme : on le laisse, c'est normal.
+        }
+    }
+}
+
+if ($doBin) {
+    $step++
+    Write-Host "[STEP] $step/$total Emptying the recycle bin"
+    $freed += [long](Get-RecycleBinItems | Measure-Object -Property Size -Sum).Sum
+    if (-not $SafeTest) { Clear-RecycleBin -Force -ErrorAction SilentlyContinue }
+}
+
+Write-Output "[FREED] $freed"
+Write-Host "[DONE] Temporary files cleaned"
+exit 0
+```
+
+Remarquez que la clé `Targets.$target` est calculée. Le validateur ne peut vérifier que
+les clés écrites en toutes lettres ; une clé calculée lui échappe, par construction. À
+vous de garantir qu'elle ne produit que des choix déclarés.
+
+### Exemple court — un réglage
+
+Pour l'optimisation ou la vie privée, on ne mesure pas une taille : on constate un **état**.
+
+```powershell
+if ($env:WINTOOL_MODE -eq 'scan') {
+    $key   = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection'
+    $value = (Get-ItemProperty -Path $key -Name AllowTelemetry -ErrorAction SilentlyContinue).AllowTelemetry
+    $state = if ($value -eq 0) { 'ok' } else { 'todo' }
+    Write-Output "[FIND] DisableTelemetry state=$state"
+    exit 0
+}
+```
+
+`DisableTelemetry` est ici une option `[bool]`. Si la télémétrie est déjà coupée, la case
+arrive décochée avec la mention « déjà fait » ; sinon elle arrive cochée.
+
+### Ce qu'il faut respecter
+
+- **Une option ciblée signifie « fais-le » quand elle vaut `$true`.** La case cochée
+  transmet `$true`. Une option comme `KeepCookies`, dont `$true` veut dire « ne touche à
+  rien », ne peut pas porter un constat : la case cochée dirait l'inverse de ce qu'elle
+  montre. Nommez vos options par l'action.
+- **L'analyse se place après la ligne d'override et avant tout code qui modifie.** Après,
+  pour disposer de `$CONFIG` si l'analyse en a besoin. Avant, parce qu'une modification
+  qui s'exécuterait avant le test de `WINTOOL_MODE` aurait lieu pendant l'analyse.
+- **L'analyse rapporte tout ce qu'elle pourrait faire**, pas seulement ce que la
+  configuration actuelle sélectionne. C'est l'utilisateur qui choisit, après.
+- **Analyser, c'est exécuter.** WinTool lance le script en administrateur pour l'analyser,
+  exactement comme pour agir. Un script non approuvé ne sera pas plus analysé qu'exécuté
+  (§12.1 de la spécification), et un `[FIND]` visant une option que le script ne déclare
+  pas est ignoré : un script ne parle que de ses propres cases.
+- **L'analyse doit être rapide.** Elle précède chaque nettoyage et l'utilisateur l'attend
+  devant l'écran. Mesurez des tailles, ne calculez pas d'empreintes.
 
 ---
 
@@ -513,6 +764,12 @@ validateur sans l'ajouter ici est un défaut.**
 | `MARQUEUR_INCONNU` | erreur | Balise proche d'un marqueur connu — `[REBBOT]` → `[REBOOT]` |
 | `MARQUEUR_CASSE` | avertissement | Marqueur pas en majuscules |
 | `SORTIE_NON_ANGLAISE` | avertissement | Message affiché contenant des accents |
+| `SCAN_NON_GERE` | erreur | `scan : true` mais `$env:WINTOOL_MODE` n'est jamais lu : le script agirait au lieu d'analyser |
+| `SCAN_SANS_FIND` | erreur | `scan : true` mais aucun `[FIND]` n'est émis |
+| `SCAN_SANS_CIBLE` | erreur | `scan : true` sans option `[bool]` ni `[multi]` à cocher |
+| `FIND_SANS_SCAN` | avertissement | Le script sait analyser mais ne déclare pas `scan : true` : il ne sera jamais interrogé |
+| `FIND_CLE_INCONNUE` | erreur | `[FIND]` vise une option absente, d'un type autre que `[bool]`/`[multi]`, ou un choix non déclaré |
+| `FIND_MESURE` | erreur | `[FIND]` sans mesure, avec un champ autre que `size`/`count`/`state`, ou `state` hors `todo`/`ok` |
 
 Le contrôle des marqueurs ne regarde que les balises **en tête de chaîne affichée**.
 Sans cette restriction, les transtypages PowerShell deviennent des faux positifs :
@@ -522,11 +779,12 @@ Sans cette restriction, les transtypages PowerShell deviennent des faux positifs
 
 ## Votre modèle : le squelette de ce document
 
-`scripts/Default/` est **vide** : le catalogue est en cours de réécriture. Vous n'avez donc
-aucun script existant à imiter, et c'est tant mieux — les précédents portaient tous une
-ancienne forme de bloc d'override que WinTool refuse désormais de lancer.
+`scripts/Default/` contient le catalogue officiel, et chacun de ses scripts passe le
+validateur en `-Strict`. Ils sont de bons exemples de ce qu'on peut faire — mais ils
+évoluent, et aucun n'est garanti représentatif de toutes les règles.
 
-**Le squelette donné plus haut est le seul modèle fiable.** Il est vérifié : on l'extrait de
+**Le squelette donné plus haut reste le modèle de référence**, et pour un script
+analysable, l'exemple complet de « Le mode analyse ». Il est vérifié : on l'extrait de
 ce fichier et on le passe au validateur en `-Strict` à chaque relecture de la documentation.
 
 ---
@@ -535,6 +793,16 @@ ce fichier et on le passe au validateur en `-Strict` à chaque relecture de la d
 
 Ces règles sont appliquées par le code mais **ne produisent aucun constat**. Un script qui
 les enfreint passe `-Strict` sans un mot, puis se comporte mal.
+
+### En analyse, un refus d'accès se lit comme un zéro
+
+`-ErrorAction SilentlyContinue` transforme un dossier interdit en dossier vide. Lancée sans
+droits d'administrateur, l'analyse de l'exemple rapporte `size=0` pour
+`C:\Windows\Temp` — non parce qu'il est vide, mais parce qu'elle n'a pas pu y entrer.
+
+Dans WinTool, un script `admin : true` est analysé en administrateur et voit juste. Le piège
+guette **l'auteur qui teste à la main** : lancez vos analyses dans une console
+administrateur, sinon vous validerez des zéros qui n'en sont pas.
 
 ### Le type s'écrit en minuscules
 
