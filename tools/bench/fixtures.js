@@ -115,7 +115,15 @@
       script('ad-tracking', 'Désactiver le suivi publicitaire', 'Supprime l’identifiant de publicité', 'privacy', 'eye-off'),
     ],
     apps: [
-      script('bloatware', 'Retirer les applications inutiles', 'Désinstalle ce que Windows a ajouté', 'apps', 'package-minus', { risk: 'high', duration: 'slow', reversible: false }),
+      // ?anomalies : deux constats a la decouverte, pour voir le rapport de
+      // conformite autrement que vide.
+      script('bloatware', 'Retirer les applications inutiles', 'Désinstalle ce que Windows a ajouté', 'apps', 'package-minus', {
+        risk: 'high', duration: 'slow', reversible: false,
+        findings: new URLSearchParams(location.search).has('anomalies') ? [
+          { line: 9, severity: 'error', code: 'VALEUR_INVALIDE', message: "'risk' vaut 'hight' ; valeurs admises : low | medium | high." },
+          { line: 47, severity: 'warning', code: 'MARQUEUR_INCONNU', message: "Marqueur '[REBBOT]' inconnu — vouliez-vous dire '[REBOOT]' ?" },
+        ] : [],
+      }),
     ],
     health: [
       script('sfc', 'Vérifier les fichiers système', 'Contrôle et répare Windows', 'health', 'activity', { duration: 'slow', interruptible: false }),

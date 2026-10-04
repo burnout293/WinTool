@@ -204,7 +204,9 @@ svg { display: block; }
 .i14 { width: 14px; height: 14px; }
 .i17 { width: 17px; height: 17px; }
 
-.app { height: 100vh; display: flex; flex-direction: column; }
+/* Divise par --echelle : sous zoom, les unites de fenetre ne sont pas
+   compensees (voir appliquerEchelle). */
+.app { height: calc(100vh / var(--echelle, 1)); display: flex; flex-direction: column; }
 
 /* --- Barre de titre personnalisee ---------------------------------------- */
 .titlebar {
@@ -605,7 +607,7 @@ button.chip[aria-pressed="true"] {
   background: linear-gradient(135deg, var(--acc), var(--acc-2)); color: var(--ink);
 }
 
-body[data-console="etendu"] #term { max-height: 46vh; }
+body[data-console="etendu"] #term { max-height: calc(46vh / var(--echelle, 1)); }
 
 body[data-console="complet"] #term {
   position: fixed; inset: 0; z-index: 55; max-height: none;
@@ -1090,7 +1092,7 @@ body.inactive .rise-crest { animation-play-state: paused; }
 .grp .seg { flex-shrink: 0; }
 
 .set-card {
-  width: 100%; max-width: 700px; max-height: 82vh; margin: 0 20px; background: var(--surface);
+  width: 100%; max-width: 700px; max-height: calc(82vh / var(--echelle, 1)); margin: 0 20px; background: var(--surface);
   border-radius: 20px; box-shadow: var(--sh-2); display: flex; flex-direction: column; overflow: hidden;
 }
 .set-head {
@@ -1150,7 +1152,7 @@ body.sans-numeros .num { display: none; }
 body[data-mode="simple"] .only-expert { display: none; }
 
 .trust-card {
-  width: 100%; max-width: 640px; max-height: 84vh; margin: 0 20px; background: var(--surface);
+  width: 100%; max-width: 640px; max-height: calc(84vh / var(--echelle, 1)); margin: 0 20px; background: var(--surface);
   border-radius: 20px; box-shadow: var(--sh-2); display: flex; flex-direction: column;
   overflow: hidden; padding: 22px 24px;
 }
@@ -1406,7 +1408,7 @@ body.mode-test .btn.primary.big.lancer { animation: none; box-shadow: var(--sh);
 
 /* --- Fenetre de choix d'icone ---------------------------------------------- */
 .ic-card {
-  width: min(860px, 92vw); max-height: 84vh; display: flex; flex-direction: column;
+  width: min(860px, calc(92vw / var(--echelle, 1))); max-height: calc(84vh / var(--echelle, 1)); display: flex; flex-direction: column;
   background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
   box-shadow: var(--sh-2); padding: 20px 22px 16px;
 }

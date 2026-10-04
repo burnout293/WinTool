@@ -1043,6 +1043,9 @@ function messageErreurMaj(e) {
   if (texte.includes('MAJ_PENDANT_EXECUTION')) return t('maj.pendant_execution');
   if (/signature|minisign|signed for version/i.test(texte)) return t('maj.signature');
   if (/error sending request|dns|connect|timed out|network/i.test(texte)) return t('maj.hors_ligne');
+  // Serveur joint, mais aucun manifeste lisible : aucune version publiee, ou
+  // une release sans latest.json. Ce n'est pas une panne de l'utilisateur.
+  if (/release JSON/i.test(texte)) return t('maj.introuvable');
   return t('maj.echec', { e: texte });
 }
 
@@ -1210,7 +1213,14 @@ function ouvrirFenetreDroits() {
  */
 function appliquerEchelle(valeur) {
   const n = Number(valeur);
-  document.documentElement.style.zoom = Number.isFinite(n) && n > 0 ? String(n) : '1';
+  const echelle = Number.isFinite(n) && n > 0 ? n : 1;
+  // `zoom` agrandit tout, y compris ce qui se mesure en unites de fenetre : sous
+  // un zoom de 1,5, 100vh vaut 150 % de la hauteur reelle. L'application
+  // debordait alors sous l'ecran, emportant le bouton « Continuer », et les
+  // fenetres plafonnees en vh debordaient par le haut, croix de fermeture
+  // comprise. --echelle permet a ces regles de se compenser (styles.css).
+  document.documentElement.style.zoom = String(echelle);
+  document.documentElement.style.setProperty('--echelle', String(echelle));
 }
 
 /**
@@ -2935,11 +2945,17 @@ function rendreRapportConformite() {
     zone.innerHTML = '';
     return;
   }
-  const tous = [...etatGroupes.categories.flatMap((g) => g.scripts), ...etatGroupes.unclassified];
+  // Un script figure dans chacun de ses lots, et « Entretien complet » les
+  // contient tous : sans dedoublonnage, chaque script en anomalie etait liste
+  // au moins deux fois.
+  const vus = new Set();
+  const tous = [...etatGroupes.categories.flatMap((g) => g.scripts), ...etatGroupes.unclassified]
+    .filter((s) => !vus.has(s.id) && vus.add(s.id));
   const avecAnomalies = tous.filter((s) => s.meta.findings?.length);
+  const explication = `<p class="muted conformite-expl">${esc(t('reglages.conformite_explication'))}</p>`;
 
   if (!avecAnomalies.length) {
-    zone.innerHTML = `<div class="box-b"><p class="muted">${esc(t('reglages.conformite_aucune'))}</p></div>`;
+    zone.innerHTML = `<div class="box-b">${explication}<p class="muted">${esc(t('reglages.conformite_aucune', { n: tous.length }))}</p></div>`;
     return;
   }
 
@@ -2948,7 +2964,9 @@ function rendreRapportConformite() {
     const titre = tr?.title || s.meta.title || s.path;
     return `<div class="box-b"><div class="rrow"><div class="rt">${esc(titre)}</div></div>${rendreAnomalies(s.meta)}</div>`;
   });
-  zone.innerHTML = `<div class="box-h">${esc(t('reglages.conformite_titre'))}</div>${sections.join('')}`;
+  zone.innerHTML = `<div class="box-h">${esc(t('reglages.conformite_titre'))}</div>`
+    + `<div class="box-b">${explication}<p class="muted">${esc(t('reglages.conformite_bilan', { n: tous.length, k: avecAnomalies.length }))}</p></div>`
+    + sections.join('');
 }
 
 /**
