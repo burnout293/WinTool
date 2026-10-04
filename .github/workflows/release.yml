@@ -35,6 +35,18 @@ jobs:
       - run: npm ci
       - run: npm run icons:sync
 
+      # Avant de construire : les secrets de signature sont-ils la, bien formes,
+      # et conformes a la cle publique compilee dans l'application ? Sinon la
+      # construction echouerait au bout de dix minutes sur « exit code 1 » — ou
+      # pire, signerait avec une cle que chaque installation refuserait. Chaque
+      # echec sort en annotation, lisible sans fouiller le journal.
+      - name: Verifier la cle de signature
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: ./tools/verifier-cle-signature.ps1
+
       # On ne publie pas ce qui n'a pas passe les tests, meme si la CI est
       # deja verte sur la branche : le tag peut pointer ailleurs.
       - name: Tests
