@@ -57,13 +57,12 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Signature de la mise a jour automatique (§11). La cle privee ne vit
-          # que dans les secrets du depot : c'est elle qui fait qu'une
-          # installation de WinTool n'acceptera que des installeurs produits
-          # ici. Sans ces deux secrets, la construction echoue — volontairement :
-          # une release non signee casserait la mise a jour de tout le monde.
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Signature de la mise a jour automatique (§11). La cle et son mot de
+          # passe arrivent par GITHUB_ENV, ecrits par l'etape « Verifier la cle
+          # de signature » apres nettoyage : un copier-coller y laisse souvent un
+          # saut de ligne que tauri refuse. NE PAS remettre ici les secrets
+          # bruts — ils ecraseraient les valeurs nettoyees, et la release 1.1.0
+          # a deja echoue exactement ainsi.
         with:
           # La signature n'est activee que pour la release : en local et en CI
           # ordinaire, `npm run build` n'a pas a connaitre la cle privee.
