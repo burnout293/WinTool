@@ -34,7 +34,7 @@ Si vous préférez vérifier avant, chaque Release publie l'empreinte SHA-256 de
 Comparez-la avec :
 
 ```powershell
-Get-FileHash .\WinTool_1.0.0_x64-setup.exe -Algorithm SHA256
+Get-FileHash .\WinTool_*_x64-setup.exe -Algorithm SHA256
 ```
 
 ### Droits administrateur
@@ -46,6 +46,20 @@ tous les scripts en héritent ensuite.
 La plupart des scripts d'entretien en ont besoin : Windows réserve aux administrateurs le
 droit d'effacer des fichiers système, de changer une configuration réseau ou de désinstaller
 une application.
+
+### Mises à jour
+
+Depuis la **1.1**, WinTool vérifie à son ouverture si une version plus récente est publiée,
+et **vous la propose** dans un bandeau. Il ne télécharge et n'installe rien sans votre clic.
+Vous pouvez désactiver cette vérification dans les réglages ; « Vérifier maintenant » reste
+alors disponible.
+
+- **Rien n'identifie votre PC** dans cette vérification, pas même la version installée :
+  WinTool demande simplement un fichier public à GitHub.
+- **Chaque mise à jour est signée.** WinTool vérifie la signature avant d'installer quoi que
+  ce soit, et refuse un installeur qui ne viendrait pas de ce dépôt.
+- **Si vous avez la 1.0.0**, installez la 1.1 à la main une dernière fois : la 1.0.0 ne
+  savait pas encore se mettre à jour. Toutes les versions suivantes arriveront seules.
 
 ---
 

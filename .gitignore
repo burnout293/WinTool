@@ -18,3 +18,8 @@ dist/
 
 # Raccourcis crees localement pour tester le binaire construit.
 *.lnk
+
+# Cle privee de signature des mises a jour : elle vit hors du depot
+# (%USERPROFILE%\.tauri) et dans les secrets GitHub, jamais ici. La cle
+# publique, elle, est dans tauri.conf.json.
+*.key

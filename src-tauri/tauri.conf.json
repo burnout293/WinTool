@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "WinTool",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "identifier": "com.wintool.app",
   "build": {
     "frontendDist": "../src"
@@ -49,5 +49,17 @@
       "icons/icon.ico"
     ],
     "licenseFile": "../LICENSE"
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIwQUM5OTlFOUZGMDhGRkUKUldUK2ovQ2ZucG1zc00yT05aejNLZG9RZy9aTFcxc29LbkdLSjVsUEQ1WStjamNRdkdYR2dwMHcK",
+      "endpoints": [
+        "https://github.com/burnout293/WinTool/releases/latest/download/latest.json"
+      ],
+      "requireSignedVersion": true,
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

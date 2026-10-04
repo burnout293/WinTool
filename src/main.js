@@ -1020,6 +1020,127 @@ function basculerConsole(mode) {
  * croire qu'on simule alors qu'on modifie vraiment est le pire resultat
  * possible, et une seule pastille se perd dans une barre chargee.
  */
+// --- Mise a jour de WinTool (specification §11) ------------------------------
+// Detecter et proposer, rien d'installe sans un clic. La verification de la
+// signature, le telechargement et l'installation sont faits cote Rust par le
+// greffon officiel (voir src-tauri/src/update.rs) ; ici on ne fait qu'afficher.
+
+/** { version, actuelle, notes, date } si une version plus recente existe. */
+let majDisponible = null;
+/** L'utilisateur a clique « Plus tard » : on ne redemande pas de la session. */
+let majRepoussee = false;
+/** Telechargement lance : le bandeau n'accepte plus d'autre geste. */
+let majInstallation = false;
+
+function executionEnCours() {
+  return course !== null || entretienActif;
+}
+
+/** Traduit un echec du greffon. Une signature refusee n'est pas un incident
+ *  reseau : c'est un evenement de securite, et il doit se lire comme tel. */
+function messageErreurMaj(e) {
+  const texte = String(e).replace(/^Error:\s*/, '');
+  if (texte.includes('MAJ_PENDANT_EXECUTION')) return t('maj.pendant_execution');
+  if (/signature|minisign|signed for version/i.test(texte)) return t('maj.signature');
+  if (/error sending request|dns|connect|timed out|network/i.test(texte)) return t('maj.hors_ligne');
+  return t('maj.echec', { e: texte });
+}
+
+function rendreBandeauMaj(erreur) {
+  const bandeau = document.getElementById('majBanner');
+  if (!bandeau) return;
+  const visible = !!erreur || (!!majDisponible && !majRepoussee);
+  bandeau.hidden = !visible;
+  bandeau.classList.toggle('erreur', !!erreur);
+  if (!visible) return;
+
+  const texte = document.getElementById('majTexte');
+  const installer = document.getElementById('majInstaller');
+  const plusTard = document.getElementById('majPlusTard');
+
+  if (erreur) {
+    texte.textContent = erreur;
+    installer.hidden = true;
+    plusTard.hidden = false;
+    plusTard.textContent = t('maj.fermer');
+    return;
+  }
+  if (majInstallation) return;
+
+  texte.textContent = t('maj.disponible', { v: majDisponible.version });
+  installer.hidden = false;
+  plusTard.hidden = false;
+  installer.textContent = t('maj.installer');
+  plusTard.textContent = t('maj.plus_tard');
+  // L'installeur ferme WinTool : pendant un entretien, il couperait le script
+  // en cours au milieu de ce qu'il fait. Le moteur refuse aussi de son cote.
+  installer.disabled = executionEnCours();
+  installer.dataset.tip = executionEnCours() ? t('maj.pendant_execution') : '';
+}
+
+/** Interroge la derniere release publiee. Silencieux au demarrage : une machine
+ *  hors ligne est un cas normal, pas une erreur a afficher. */
+async function verifierMaj({ silencieux = false } = {}) {
+  const etat = document.getElementById('majEtat');
+  if (!silencieux && etat) etat.textContent = t('maj.verification');
+  try {
+    majDisponible = await invoke('check_update');
+    if (majDisponible) majRepoussee = false;
+    rendreBandeauMaj();
+    if (etat) {
+      etat.textContent = majDisponible
+        ? t('maj.disponible', { v: majDisponible.version })
+        : t('maj.a_jour', { v: document.getElementById('version')?.textContent || '' });
+    }
+  } catch (e) {
+    console.error('Verification de mise a jour :', e);
+    if (!silencieux && etat) etat.textContent = messageErreurMaj(e);
+  }
+}
+
+async function installerMaj() {
+  if (majInstallation || executionEnCours()) return;
+  majInstallation = true;
+  const texte = document.getElementById('majTexte');
+  document.getElementById('majInstaller').hidden = true;
+  document.getElementById('majPlusTard').hidden = true;
+  texte.textContent = t('maj.telechargement_debut');
+
+  // Une fois tout recu, le texte annonce la suite plutot que de rester sur
+  // « 100 % » : la verification de signature puis l'installeur prennent encore
+  // quelques secondes, et c'est la que WinTool va se fermer.
+  const arreterEcoute = await ecouter('update:progress', (ev) => {
+    const { recu, total } = ev.payload;
+    if (total && recu >= total) texte.textContent = t('maj.lancement');
+    else if (total) texte.textContent = t('maj.telechargement', { p: Math.round((recu / total) * 100) });
+    else texte.textContent = t('maj.telechargement_debut');
+  });
+
+  try {
+    // Sous Windows, le greffon lance l'installeur puis ferme WinTool : on ne
+    // revient ici qu'en cas d'echec.
+    await invoke('install_update');
+  } catch (e) {
+    console.error('Installation de mise a jour :', e);
+    majInstallation = false;
+    rendreBandeauMaj(messageErreurMaj(e));
+  } finally {
+    arreterEcoute();
+  }
+}
+
+function cablerMaj() {
+  document.getElementById('majInstaller').addEventListener('click', installerMaj);
+  // « Plus tard » comme « Fermer » apres un echec : on ne repropose pas de la
+  // session. Apres une signature refusee surtout, l'installeur est suspect —
+  // seule une verification demandee a la main peut le remettre sur la table.
+  document.getElementById('majPlusTard').addEventListener('click', () => {
+    majRepoussee = true;
+    document.getElementById('majBanner').hidden = true;
+  });
+  document.getElementById('btnVerifierMaj').addEventListener('click', () => verifierMaj());
+}
+
 function appliquerModeTest(actif) {
   modeTest = !!actif;
   document.body.classList.toggle('mode-test', modeTest);
@@ -1917,6 +2038,11 @@ let modeCourant = 'simple';
 let fileEntretien = [];
 /** { categorieId, total, resultats: [{id, success}] }, ou null hors entretien. */
 let entretienEnCours = null;
+/** Vrai du lancement d'un entretien a son bilan, enchainements compris. Ni
+ *  `course`, nul le temps de lancer le script suivant, ni `entretienEnCours`,
+ *  garde pour le bilan et jamais remis a nul, ne le disent. La mise a jour
+ *  s'en sert : son installeur ferme l'application. */
+let entretienActif = false;
 /** Categorie actuellement selectionnee a l'etape 1 — un clic choisit, il ne
  *  fait pas avancer tout seul (le mockup de reference confirme ce modele :
  *  choisir puis Continuer, pas un saut immediat). */
@@ -2250,6 +2376,8 @@ async function lancerEntretien() {
   document.getElementById('riseFill')?.classList.remove('termine');
   const groupe = etatGroupes?.categories.find((g) => g.category.id === entretienEnCours?.categorieId);
   if (!groupe) return;
+  entretienActif = true;
+  rendreBandeauMaj();
 
   afficherEtapeSimple(3);
   document.getElementById('s3Titre').textContent = t('s3.titre');
@@ -2337,6 +2465,8 @@ async function arreterEntretien() {
 }
 
 function terminerEntretien() {
+  entretienActif = false;
+  rendreBandeauMaj();
   // L'eau redescend : elle disait « en cours » alors que tout etait fini, et
   // restait a mi-hauteur sur l'ecran de bilan.
   document.getElementById('riseFill')?.classList.add('termine');
@@ -2567,6 +2697,9 @@ function appliquerTraductionsReglages() {
   document.getElementById('setMajLabel').textContent = t('reglages.maj_comportement');
   document.querySelector('#setMajSelect [value="propose"]').textContent = t('reglages.maj_proposer');
   document.querySelector('#setMajSelect [value="never"]').textContent = t('reglages.maj_jamais');
+  document.getElementById('setMajVerifLabel').textContent = t('reglages.maj_verifier');
+  document.getElementById('btnVerifierMaj').textContent = t('reglages.maj_verifier_btn');
+  rendreBandeauMaj();
 
   document.getElementById('setSectionExpert').textContent = t('reglages.section_expert');
   document.getElementById('setEchecLabel').textContent = t('reglages.echec_comportement');
@@ -2958,6 +3091,7 @@ async function demarrer() {
   });
   await cablerPauseAnimation();
   await cablerMoteur();
+  cablerMaj();
 
   try {
     const infos = await invoke('app_info');
@@ -2988,6 +3122,10 @@ async function demarrer() {
 
   // La fenetre est creee invisible pour eviter un flash blanc avant la peinture.
   await laFenetre.show();
+
+  // Apres l'affichage, et sans l'attendre : une verification lente ou une
+  // machine hors ligne ne doit jamais retarder l'ouverture de la fenetre.
+  if (reglages.update_policy !== 'never') verifierMaj({ silencieux: true });
 }
 
 demarrer();

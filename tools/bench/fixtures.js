@@ -259,7 +259,28 @@
   }
 
   const REPONSES = {
-    app_info: () => ({ version: '1.0.0', elevated: !new URLSearchParams(location.search).has('sansadmin') }),
+    app_info: () => ({ version: '1.1.0', elevated: !new URLSearchParams(location.search).has('sansadmin') }),
+    // Mise a jour. ?maj=1.1.1 annonce une version ; ?maj=signature la fait
+    // refuser a l'installation ; ?maj=horsligne fait echouer la verification.
+    // Sans parametre, WinTool est a jour.
+    check_update: async () => {
+      const maj = new URLSearchParams(location.search).get('maj');
+      if (maj === 'horsligne') throw new Error('error sending request for url (https://github.com/...)');
+      if (!maj) return null;
+      const version = maj === 'signature' ? '1.1.1' : maj;
+      return { version, actuelle: '1.1.0', notes: 'Notes de version', date: '2026-10-01 10:00:00 +00:00:00' };
+    },
+    install_update: async () => {
+      const maj = new URLSearchParams(location.search).get('maj');
+      const total = 2_300_000;
+      for (let recu = 0; recu <= total; recu += 460_000) {
+        emettre('update:progress', { recu, total });
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      if (maj === 'signature') throw new Error('Signature verification failed');
+      // Le vrai greffon fermerait l'application ici ; le banc ne peut pas.
+      throw new Error('banc : l’installeur aurait ete lance et WinTool ferme');
+    },
     engines: () => ({ winps: 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', pwsh: null }),
     scripts_root: () => 'C:\\Users\\Buly\\AppData\\Local\\WinTool\\scripts',
     get_settings: () => JSON.parse(JSON.stringify(reglages)),

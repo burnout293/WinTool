@@ -675,8 +675,35 @@ fn set_lang(app: tauri::AppHandle, lang: String) -> Result<Settings, String> {
     })
 }
 
+/// Code d'erreur traduit par l'interface : installer pendant une execution.
+const MAJ_PENDANT_EXECUTION: &str = "MAJ_PENDANT_EXECUTION";
+
+/// Interroge la derniere release publiee. `None` : a jour.
+#[tauri::command]
+async fn check_update(app: tauri::AppHandle) -> Result<Option<update::Disponible>, String> {
+    update::verifier(&app).await
+}
+
+/// Telecharge, verifie la signature, installe. Refuse pendant une execution :
+/// sous Windows l'installeur ferme l'application, et avec elle le script en
+/// cours, au milieu de ce qu'il faisait. Un lot qui enchaine ses scripts est
+/// garde cote interface, qui voit l'enchainement ; ici on garde le script.
+#[tauri::command]
+async fn install_update(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<runner::Runner>>,
+) -> Result<(), String> {
+    if state.snapshot().is_some() {
+        return Err(MAJ_PENDANT_EXECUTION.to_string());
+    }
+    update::installer(&app).await
+}
+
 #[tauri::command]
 fn set_update_policy(app: tauri::AppHandle, policy: String) -> Result<Settings, String> {
+    if !update::politique_valide(&policy) {
+        return Err(format!("politique de mise a jour inconnue : {policy}"));
+    }
     with_settings(&app, |s| {
         s.update_policy = policy;
         Ok(())
@@ -835,6 +862,7 @@ fn reorder_category_scripts(
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             app.manage(Arc::new(runner::Runner::default()));
             app.manage(Arc::new(ModeTest::default()));
@@ -878,6 +906,8 @@ pub fn run() {
             set_theme,
             set_lang,
             set_update_policy,
+            check_update,
+            install_update,
             set_failure_policy,
             set_show_setting_numbers,
             set_ui_scale,

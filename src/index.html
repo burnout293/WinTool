@@ -98,6 +98,14 @@
       <!-- Rappel permanent tant que le mode test est actif. -->
       <div id="testBanner" class="test-banner" hidden></div>
 
+      <div id="majBanner" class="maj-banner" role="status" hidden>
+        <span id="majTexte"></span>
+        <span class="maj-actions">
+          <button class="btn primary" type="button" id="majInstaller"></button>
+          <button class="btn" type="button" id="majPlusTard"></button>
+        </span>
+      </div>
+
       <div id="problems" class="problems-bar" hidden></div>
 
       <!-- Mode Simple (specification §2/§3/§15) : assistant en trois etapes,
@@ -309,7 +317,7 @@
               </div>
             </div>
             <div class="setrow">
-              <span class="setrow-txt"><span class="num">1.4</span><span id="setEchelleLabel"></span></span>
+              <span class="setrow-txt"><span class="num">1.3</span><span id="setEchelleLabel"></span></span>
               <select class="cat-select" id="setEchelleSelect">
                 <option value="1">100 %</option>
                 <option value="1.15">115 %</option>
@@ -319,12 +327,17 @@
               </select>
             </div>
             <div class="setrow">
-              <span class="setrow-txt"><span class="num">1.3</span><span id="setMajLabel"></span></span>
+              <span class="setrow-txt"><span class="num">1.4</span><span id="setMajLabel"></span></span>
               <select class="cat-select" id="setMajSelect">
                 <option value="propose"></option>
                 <option value="never"></option>
               </select>
             </div>
+            <div class="setrow">
+              <span class="setrow-txt"><span class="num">1.5</span><span id="setMajVerifLabel"></span></span>
+              <button class="btn compact" type="button" id="btnVerifierMaj"></button>
+            </div>
+            <p class="maj-etat" id="majEtat" aria-live="polite"></p>
           </section>
 
           <section class="set-group only-expert" id="sec-expert">

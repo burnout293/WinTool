@@ -8,7 +8,7 @@ d'un cran (1.1, 1.2…), une version de corrections seules prend un troisième c
 | Version | Contenu | État |
 |---|---|---|
 | **1.0.0** | Première version publiée | Publiée le 27/09/2026 |
-| **1.1** | Mise à jour automatique de WinTool | En cours |
+| **1.1** | Mise à jour automatique de WinTool | Prête à publier |
 | **1.2** | Analyser → cocher → nettoyer (§17) | Contrat script prêt, interface à faire |
 | **1.3** | Catégories distinctes des lots, onglets Scripts / Lots en Expert | À faire |
 | **1.4** | Sources de scripts, index signé Ed25519 (§16) | Spécifié |

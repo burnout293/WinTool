@@ -12,7 +12,7 @@ Version du document : 0.1 — 22/09/2026
 > | Axe | Où | État |
 > |---|---|---|
 > | Génération de l'application | « v0.3 », « v0.4 » dans ce document | Quatre réécritures internes, **aucune publiée** |
-> | Version publiée | `tauri.conf.json`, `Cargo.toml`, les tags git | **1.0.0** sera la première mise à disposition du public |
+> | Version publiée | `tauri.conf.json`, `Cargo.toml`, les tags git | **1.0.0**, publiée le 27/09/2026, a été la première mise à disposition du public |
 > | Contrat de script | « contrat v2 », `docs/FORMAT_SCRIPT.md` | Format des `.ps1`, indépendant des deux autres |
 >
 > Les générations antérieures sont donc numérotées en `v0.x` : rien n'a jamais
@@ -563,18 +563,82 @@ Aucune chaîne de caractères en dur dans le code de l'interface.
 
 ## 11. Mises à jour
 
-**Par défaut : détecter et proposer. Rien n'est téléchargé ni installé sans accord
-explicite.** Cohérent avec un outil élevé en administrateur qui se présente comme
-respectueux de la vie privée. D'autres comportements sont proposés dans les réglages.
+**Par défaut : détecter et proposer. Rien n'est téléchargé ni installé sans un clic.**
+Cohérent avec un outil élevé en administrateur qui se présente comme respectueux de la vie
+privée.
 
-À documenter dans le README : l'exécutable n'étant pas signé, **SmartScreen affichera un
-avertissement** au téléchargement.
+Implémenté en 1.1 par le greffon officiel `tauri-plugin-updater`, dont le code a été lu
+avant d'être retenu. Le détail des choix est en tête de `src-tauri/src/update.rs`.
 
-**Intégrité du téléchargement** : l'exécutable n'étant pas signé (Authenticode), l'appli
-vérifie le **checksum** du binaire téléchargé contre celui publié avec la release GitHub
-(fichier `.sha256` généré en CI, à côté de l'exe) avant de proposer l'installation. Ça ne
-remplace pas une signature, mais ça détecte une altération en transit ou un CDN compromis
-sans dépendre d'un certificat payant.
+### 11.1 Comportement
+
+- **Au démarrage**, si le réglage vaut « Proposer », WinTool interroge la dernière release
+  publiée — **après** l'affichage de la fenêtre et sans l'attendre. Une machine hors ligne
+  est un cas normal : la vérification échoue alors en silence.
+- **Une version plus récente** fait apparaître un bandeau : « Installer » ou « Plus tard ».
+  « Plus tard » vaut pour la session : WinTool ne redemande pas avant le prochain lancement.
+- **« Ne jamais vérifier »** supprime toute requête automatique. « Vérifier maintenant »
+  reste disponible dans les réglages : c'est alors une action explicite, pas un contact
+  silencieux.
+- **L'installation est refusée pendant un entretien**, par l'interface et par le moteur.
+  Sous Windows, l'installeur ferme WinTool : il couperait le script en cours au milieu de
+  ce qu'il fait. Entre deux scripts d'un lot, un drapeau dédié tient ce refus — ni l'état
+  d'exécution, nul le temps de lancer le script suivant, ni l'état du bilan ne le disent.
+- **L'installeur ferme WinTool puis le rouvre.** Il demande l'élévation, l'installation
+  étant `perMachine` (§4.3).
+
+### 11.2 Intégrité : une signature, pas une empreinte
+
+La première version de ce paragraphe prévoyait de vérifier une empreinte SHA-256 publiée à
+côté de l'installeur. Elle a été abandonnée : une empreinte hébergée sur la même release que
+l'exécutable protège d'une corruption en transit, pas de quelqu'un capable de remplacer les
+fichiers de la release — il remplacerait l'empreinte avec.
+
+À la place, **une signature**, faite avec une clé privée qui n'est jamais publiée :
+
+1. l'installeur est téléchargé **en mémoire** ;
+2. sa signature est vérifiée avec la **clé publique compilée dans l'application** ;
+3. **seulement ensuite** il est écrit et exécuté. Une signature invalide arrête tout, et
+   l'interface le présente comme ce que c'est — un refus de sécurité, en rouge, « rien n'a
+   été installé » —, pas comme un incident réseau. La mise à jour refusée n'est plus
+   reproposée de la session.
+
+**Protection contre le retour en arrière.** Le manifeste `latest.json`, qui annonce la
+version disponible, n'est **pas** signé : seul l'installeur l'est. Sans précaution, une
+réponse falsifiée pourrait annoncer « 9.9.9 » en l'associant à un ancien installeur,
+authentiquement signé mais vulnérable. L'option `requireSignedVersion` est donc activée :
+la version annoncée doit égaler celle inscrite dans la partie signée de la signature.
+Vérifié empiriquement avant de l'activer — la CLI 2.11.5 inscrit bien `version:` dans le
+commentaire signé ; sans cela, l'option aurait bloqué toutes les mises à jour.
+
+**Ce que la signature ne couvre pas.** La clé privée vit dans les secrets du dépôt GitHub.
+Qui compromet le compte peut modifier le workflow et faire signer ce qu'il veut. La clé
+publique étant compilée dans l'application, la remplacer exige de publier une version qui
+porte la nouvelle — la même contrainte que pour les sources de scripts (§16.9).
+
+**Perdre la clé privée, c'est perdre la mise à jour.** Toutes les installations
+existantes refuseraient un installeur signé par une autre clé : chaque utilisateur devrait
+réinstaller à la main. Elle doit être sauvegardée hors du dépôt, avec son mot de passe.
+
+### 11.3 Vie privée
+
+La requête ne porte que `User-Agent: tauri-plugin-updater/<version du greffon>` et
+`Accept: application/json`. L'adresse interrogée est fixe : le greffon n'y substitue
+`{{current_version}}`, `{{arch}}` ou `{{target}}` que si elles y figurent, et elles n'y
+figurent pas. **Rien n'identifie la machine, pas même la version installée.** GitHub voit
+une adresse IP qui demande un fichier public. Vérifié dans le source de la version 2.12.0.
+
+### 11.4 Publier, c'est livrer
+
+La construction de la release produit `latest.json` à côté de l'installeur, mais GitHub ne
+le sert qu'une fois la release **publiée**. Tant qu'elle reste en brouillon, aucune
+installation ne reçoit rien. Publier le brouillon est donc l'acte qui livre la mise à jour
+à tout le monde : il se fait après l'avoir relue, jamais par réflexe.
+
+À documenter dans le README : l'exécutable n'étant pas signé Authenticode, **SmartScreen
+affichera un avertissement** au premier téléchargement. La signature de mise à jour est
+d'une autre nature : elle ne rassure pas Windows, elle garantit à WinTool que ce qu'il
+installe vient bien de ce dépôt.
 
 ---
 
@@ -594,16 +658,16 @@ et la visibilité au bon moment**, pas une prétendue détection de malware.
 
 Tout script est identifié par un **hash de son contenu**, calculé à l'analyse (§5.5).
 
-- Un script **dont l'empreinte correspond à celle déclarée dans l'index signé de la source
-  officielle** est **implicitement approuvé**. Depuis le §16, l'installeur ne livre plus
-  aucun script : la signature Ed25519 de l'index a remplacé le bundle comme ancrage de
-  confiance. Le détail des provenances et de ce qu'elles accordent est au §16.4.
-- **Tout le reste** — script déposé à la main, script de source tierce, ou script dont
-  l'empreinte a changé depuis son installation (modification locale, potentiellement
-  malveillante) — doit être
-  **explicitement approuvé avant sa toute première exécution** : un écran affiche le
-  contenu du script (accessible même en mode Simple via un lien, sans jamais l'imposer en
-  lecture) et demande une confirmation nommée, jamais une case cochée par réflexe.
+- Un script de `Default\` **dont l'empreinte correspond à ce que l'installeur a posé** est
+  **implicitement approuvé** — déjà vérifié en CI (§5.4).
+  *Quand les sources de scripts seront implémentées (§16), l'installeur ne livrera plus
+  aucun script : cet ancrage passera à la signature Ed25519 de l'index officiel (§16.4).*
+- **Tout le reste** — script déposé à la main, script dont l'empreinte a changé depuis son
+  installation (modification locale, potentiellement malveillante) et, avec le §16, tout
+  script de source tierce — doit être **explicitement approuvé avant sa toute première
+  exécution** : un écran affiche le contenu du script (accessible même en mode Simple via un
+  lien, sans jamais l'imposer en lecture) et demande une confirmation nommée, jamais une
+  case cochée par réflexe.
 - **Toute modification ultérieure du fichier invalide l'approbation** (nouveau hash → le
   script redevient « non approuvé », re-demande à la prochaine exécution). Une approbation
   ne porte que sur le contenu exact qui a été montré.
@@ -810,7 +874,7 @@ par npm (`lucide-static`) côté frontend — ils ne sont pas versionnés dans l
 > encore cette section. Elle est écrite avant l'implémentation, pas après, pour que le
 > modèle de sécurité soit arrêté avant qu'un raccourci ne le décide à notre place.
 >
-> **La 1.0.0 livre donc le catalogue dans l'installeur**, comme aujourd'hui, et les
+> **Tant qu'elle ne l'est pas, l'installeur livre le catalogue**, comme en 1.0.0, et les
 > scripts de `Default\` y restent implicitement approuvés par comparaison d'empreinte
 > avec ce que l'installeur a posé (§12.1, première règle). Le basculement vers les
 > sources — installeur vide, confiance ancrée sur la signature Ed25519 — vaut à partir

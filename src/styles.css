@@ -1131,6 +1131,8 @@ body.inactive .rise-crest { animation-play-state: paused; }
    toute la largeur de la ligne. Seuls les boutons d'action s'etendent. */
 .setrow > button:not(.switch) { flex: 1; justify-content: center; }
 .setrow > .switch { flex: 0 0 auto; }
+/* Un bouton d'action a cote d'un libelle garde sa taille, comme un menu. */
+.setrow > .btn.compact { flex: 0 0 auto; }
 
 /* Numero discret de chaque option (ex. 2.3) : reference stable pour en
    parler sans ambiguite, jamais une hierarchie a memoriser. */
@@ -1361,6 +1363,28 @@ body.inactive .btn.primary.big.lancer { animation-play-state: paused; }
   color: var(--warn); background: var(--warn-s);
   border-bottom: 1px solid color-mix(in srgb, var(--warn) 32%, transparent);
 }
+
+/* --- Bandeau de mise a jour -------------------------------------------------
+   Meme place et meme gabarit que le bandeau du mode test, mais aux couleurs de
+   l'accent : une nouvelle version est une bonne nouvelle, pas un avertissement.
+   Il ne passe au rouge que pour un echec — et une signature refusee en est un. */
+.maj-banner {
+  position: relative; z-index: 3; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; gap: 8px 14px; flex-wrap: wrap;
+  padding: 6px 18px;
+  font-size: 12.5px; font-weight: 650;
+  color: var(--text); background: var(--acc-soft);
+  border-bottom: 1px solid color-mix(in srgb, var(--acc) 32%, transparent);
+}
+/* display:flex l'emporterait sur l'attribut hidden. */
+.maj-banner[hidden] { display: none; }
+.maj-banner.erreur {
+  color: var(--err); background: var(--err-s);
+  border-bottom-color: color-mix(in srgb, var(--err) 32%, transparent);
+}
+.maj-actions { display: inline-flex; gap: 8px; }
+.maj-banner .btn { height: 30px; }
+.maj-etat { margin: 2px 0 0; font-size: 12px; color: var(--text-3); min-height: 1em; }
 
 /* Le bouton qui engage une execution rappelle lui aussi l'etat : en mode test
    il cesse de respirer et perd son insistance visuelle — ce n'est plus le

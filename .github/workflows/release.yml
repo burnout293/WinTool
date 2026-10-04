@@ -45,20 +45,25 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Pas de secret de signature ici, et c'est delibere : la mise a jour
-          # automatique n'est pas branchee. tauri-plugin-updater n'est pas une
-          # dependance et src-tauri/src/update.rs dit pourquoi (il ne contient
-          # que la comparaison de version et la verification de checksum,
-          # testables sans reseau). Passer TAURI_SIGNING_PRIVATE_KEY
-          # maintenant donnerait a croire que la chaine existe.
-          #
-          # Quand elle existera : `npx tauri signer generate`, deposer la cle
-          # privee et son mot de passe en secrets du depot, les remettre ici,
-          # et ajouter `createUpdaterArtifacts` au bundle.
+          # Signature de la mise a jour automatique (§11). La cle privee ne vit
+          # que dans les secrets du depot : c'est elle qui fait qu'une
+          # installation de WinTool n'acceptera que des installeurs produits
+          # ici. Sans ces deux secrets, la construction echoue — volontairement :
+          # une release non signee casserait la mise a jour de tout le monde.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          # La signature n'est activee que pour la release : en local et en CI
+          # ordinaire, `npm run build` n'a pas a connaitre la cle privee.
+          args: --config src-tauri/tauri.release.json
           tagName: ${{ github.ref_name }}
           releaseName: 'WinTool ${{ github.ref_name }}'
           releaseDraft: true
+          # latest.json, le manifeste que chaque installation interroge. Il
+          # n'est servi qu'une fois la release PUBLIEE : tant qu'elle reste en
+          # brouillon, personne ne recoit la mise a jour. Publier le brouillon,
+          # c'est la livrer.
+          includeUpdaterJson: true
           prerelease: false
           releaseBody: |
             ## Installation
