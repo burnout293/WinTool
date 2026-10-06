@@ -161,16 +161,47 @@ pub fn emplacements() -> &'static Emplacements {
 ///   designent un autre moteur, un autre canal (Canary s'installe dans le
 ///   profil, donc dans un dossier inscriptible), un port de debogage ou des
 ///   arguments de lancement.
+// Inutilisees en version de developpement, qui garde ces variables (lib.rs).
+#[cfg_attr(debug_assertions, allow(dead_code))]
 const PREFIXES_RETIRES: [&str; 5] = ["COR_", "CORECLR_", "COMPLUS_", "DOTNET_", "WEBVIEW2_"];
 
+// Inutilisees en version de developpement, qui garde ces variables (lib.rs).
+#[cfg_attr(debug_assertions, allow(dead_code))]
 pub fn a_retirer(nom: &str) -> bool {
     let n = nom.to_ascii_uppercase();
     PREFIXES_RETIRES.iter().any(|p| n.starts_with(p))
 }
 
+/// Parmi elles, celles qui font **charger du code** : un profileur, un
+/// assembly de demarrage, un autre moteur d'interface. Les autres sont des
+/// reglages courants sur un PC de developpeur (`DOTNET_CLI_TELEMETRY_OPTOUT`,
+/// `DOTNET_ROOT`...) : on ne les transmet pas, mais leur presence ne merite pas
+/// d'alerte.
+// Inutilisees en version de developpement, qui garde ces variables (lib.rs).
+#[cfg_attr(debug_assertions, allow(dead_code))]
+pub fn charge_du_code(nom: &str) -> bool {
+    let n = nom.to_ascii_uppercase();
+    n.starts_with("COR_ENABLE_PROFILING")
+        || n.starts_with("COR_PROFILER")
+        || n.starts_with("CORECLR_ENABLE_PROFILING")
+        || n.starts_with("CORECLR_PROFILER")
+        || matches!(
+            n.as_str(),
+            "DOTNET_STARTUP_HOOKS"
+                | "DOTNET_ADDITIONAL_DEPS"
+                | "WEBVIEW2_BROWSER_EXECUTABLE_FOLDER"
+                | "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"
+                | "WEBVIEW2_RELEASE_CHANNEL_PREFERENCE"
+                | "WEBVIEW2_PIPE_FOR_SCRIPT_DEBUGGER"
+                | "WEBVIEW2_USER_DATA_FOLDER"
+        )
+}
+
 /// Retire de l'environnement du processus les variables d'injection. A appeler
 /// **en tout premier**, avant que le moindre fil ou la moindre vue n'existe :
 /// WebView2 les lit en creant son moteur, et chaque processus lance en herite.
+// Inutilisees en version de developpement, qui garde ces variables (lib.rs).
+#[cfg_attr(debug_assertions, allow(dead_code))]
 pub fn retirer_variables_dangereuses() -> Vec<String> {
     let noms: Vec<String> = std::env::vars_os()
         .filter_map(|(k, _)| k.into_string().ok())
@@ -320,6 +351,27 @@ mod tests {
             "PSModulePath",
         ] {
             assert!(!a_retirer(n), "{n}");
+        }
+    }
+
+    #[test]
+    fn seules_les_variables_qui_chargent_du_code_alertent() {
+        for n in [
+            "COR_PROFILER_PATH",
+            "cor_enable_profiling",
+            "CORECLR_PROFILER_PATH_64",
+            "DOTNET_STARTUP_HOOKS",
+            "WEBVIEW2_BROWSER_EXECUTABLE_FOLDER",
+        ] {
+            assert!(charge_du_code(n), "{n}");
+        }
+        // Courantes chez un developpeur : retirees, mais sans alarme.
+        for n in [
+            "DOTNET_CLI_TELEMETRY_OPTOUT",
+            "DOTNET_ROOT",
+            "COMPlus_TieredCompilation",
+        ] {
+            assert!(a_retirer(n) && !charge_du_code(n), "{n}");
         }
     }
 

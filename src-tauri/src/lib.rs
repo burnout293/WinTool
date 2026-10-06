@@ -1036,14 +1036,27 @@ fn reorder_category_scripts(
 pub fn run() {
     // En tout premier, avant le moindre fil et la moindre vue : WebView2 lit
     // ces variables en creant son moteur, et chaque processus lance en herite.
-    let retirees = systeme::retirer_variables_dangereuses();
-    if !retirees.is_empty() {
-        systeme::signaler(format!(
-            "Variables d'environnement retirees au demarrage : {}. Elles font charger du code \
-             dans PowerShell ou dans l'interface ; aucun logiciel courant ne les pose sur un \
-             PC de particulier. Une analyse antivirus est conseillee.",
-            retirees.join(", ")
-        ));
+    //
+    // Seulement dans la version publiee : une version de developpement
+    // (`npm run dev`) les garde, pour qui debogue l'interface avec
+    // WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS par exemple. Dans les deux cas,
+    // l'environnement de l'utilisateur n'est pas touche : seul ce processus,
+    // et ce qu'il lance, ne les recoit pas.
+    #[cfg(not(debug_assertions))]
+    {
+        let suspectes: Vec<String> = systeme::retirer_variables_dangereuses()
+            .into_iter()
+            .filter(|n| systeme::charge_du_code(n))
+            .collect();
+        if !suspectes.is_empty() {
+            systeme::signaler(format!(
+                "Variables d'environnement qui font charger du code dans PowerShell ou dans \
+                 l'interface : {}. WinTool ne les transmet pas. Elles servent aux outils de \
+                 developpement et de diagnostic ; si vous n'en utilisez pas, une analyse \
+                 antivirus est conseillee.",
+                suspectes.join(", ")
+            ));
+        }
     }
 
     tauri::Builder::default()
