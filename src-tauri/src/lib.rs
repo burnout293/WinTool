@@ -251,7 +251,7 @@ fn run_script(
     // aucun texte libre ne doit viser un emplacement protege. C'est un refus,
     // pas un constat : il s'agit d'execution avec les droits administrateur.
     let reglages = settings::load(&app)?;
-    let zones = zones_protegees(&app, &reglages)?;
+    let zones = zones_protegees(&app)?;
     let e = systeme::emplacements();
     req.config = garde::verifier_config(&entree.meta, &req.config, &zones, e, &e.system32())
         .map_err(|r| r.message())?;
@@ -356,12 +356,9 @@ fn approve_script(hash: String) -> Result<(), String> {
     approval::enregistrer(&hash)
 }
 
-/// Les emplacements proteges : ceux du systeme, plus ceux que l'utilisateur
-/// ajoute (`garde`).
-fn zones_protegees<R: tauri::Runtime>(
-    app: &tauri::AppHandle<R>,
-    reglages: &Settings,
-) -> Result<garde::Zones, String> {
+/// Les emplacements proteges : la liste integree, moins ce que l'utilisateur
+/// en a retire, plus ce qu'il y a ajoute (`garde`, lue dans HKLM).
+fn zones_protegees<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<garde::Zones, String> {
     let profil = app
         .path()
         .home_dir()
@@ -373,53 +370,68 @@ fn zones_protegees<R: tauri::Runtime>(
         systeme::emplacements(),
         &profil,
         installation.as_deref(),
-        &reglages.protected_paths,
+        &garde::charger(),
     ))
 }
 
 #[derive(Serialize)]
 struct EmplacementsProteges {
-    integres: Vec<String>,
-    /// Dossier des profils : protege, sauf le profil de l'utilisateur et le
-    /// profil public.
-    profils: String,
+    integres: Vec<garde::Integre>,
+    retires: Vec<String>,
     ajouts: Vec<String>,
+    /// Faux sans droits administrateur : la liste se lit, elle ne se modifie
+    /// pas (elle vit dans HKLM).
+    modifiable: bool,
 }
 
-/// Les emplacements proteges, pour les Reglages : ceux du systeme (non
-/// modifiables) et ceux que l'utilisateur a ajoutes.
+/// Les emplacements proteges, pour les Reglages.
 #[tauri::command]
-fn protected_paths(app: tauri::AppHandle) -> Result<EmplacementsProteges, String> {
+fn protected_paths() -> EmplacementsProteges {
     let installation = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_path_buf()));
-    Ok(EmplacementsProteges {
-        integres: garde::Zones::integres(systeme::emplacements(), installation.as_deref()),
-        profils: systeme::emplacements().profils.display().to_string(),
-        ajouts: settings::load(&app)?.protected_paths,
-    })
+    let config = garde::charger();
+    EmplacementsProteges {
+        integres: garde::integres(systeme::emplacements(), installation.as_deref()),
+        retires: config.retires,
+        ajouts: config.ajouts,
+        modifiable: is_elevated(),
+    }
 }
 
-/// Remplace la liste des emplacements ajoutes par l'utilisateur. Seuls des
-/// chemins absolus sont admis : un chemin relatif ne designerait rien de sur.
+/// Sentinelle : modifier la liste demande les droits administrateur.
+const GARDE_SANS_DROITS: &str = "GARDE_SANS_DROITS";
+
+/// Remplace les changements de l'utilisateur a la liste : emplacements integres
+/// retires, emplacements ajoutes. En administrateur seulement, comme toute
+/// ecriture dans HKLM — et c'est le but : un programme sans droits ne doit pas
+/// pouvoir retirer un emplacement a la place de l'utilisateur.
 #[tauri::command]
-fn set_protected_paths(app: tauri::AppHandle, paths: Vec<String>) -> Result<Settings, String> {
-    let mut propres = Vec::new();
-    for p in paths.iter().map(|p| p.trim().trim_matches('"').trim()) {
+fn set_protected_paths(retires: Vec<String>, ajouts: Vec<String>) -> Result<(), String> {
+    if !is_elevated() {
+        return Err(GARDE_SANS_DROITS.to_string());
+    }
+    let mut config = garde::ConfigGarde::default();
+    for r in retires {
+        if !garde::IDS_INTEGRES.contains(&r.as_str()) {
+            return Err(format!("emplacement integre inconnu : {r}"));
+        }
+        if !config.retires.contains(&r) {
+            config.retires.push(r);
+        }
+    }
+    for p in ajouts.iter().map(|p| p.trim().trim_matches('"').trim()) {
         if p.is_empty() {
             continue;
         }
         if !garde::absolu(p) {
             return Err(format!("CHEMIN_NON_ABSOLU:{p}"));
         }
-        if !propres.iter().any(|x: &String| x.eq_ignore_ascii_case(p)) {
-            propres.push(p.to_string());
+        if !config.ajouts.iter().any(|x| x.eq_ignore_ascii_case(p)) {
+            config.ajouts.push(p.to_string());
         }
     }
-    with_settings(&app, |s| {
-        s.protected_paths = propres;
-        Ok(())
-    })
+    garde::enregistrer(&config)
 }
 
 /// Sentinelle : approbation impossible faute de droits administrateur.
@@ -1069,11 +1081,7 @@ pub fn run() {
             // depuis HKLM, dossiers de l'utilisateur ramenes dans son profil
             // s'ils visent un emplacement protege.
             let handle = app.handle();
-            let reglages =
-                settings::load(handle).unwrap_or_else(|_| settings::default_settings(Vec::new()));
-            if let (Ok(profil), Ok(zones)) =
-                (handle.path().home_dir(), zones_protegees(handle, &reglages))
-            {
+            if let (Ok(profil), Ok(zones)) = (handle.path().home_dir(), zones_protegees(handle)) {
                 let corrigees =
                     systeme::preparer_environnement_enfants(&profil, |p| zones.protege(p));
                 if !corrigees.is_empty() {

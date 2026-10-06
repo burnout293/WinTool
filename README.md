@@ -66,6 +66,13 @@ alors disponible.
 - **Si vous avez la 1.0.0**, installez la 1.1 à la main une dernière fois : la 1.0.0 ne
   savait pas encore se mettre à jour. Toutes les versions suivantes arriveront seules.
 
+### Désinstaller
+
+Depuis les **Paramètres de Windows → Applications**. Cochez **« Supprimer les données de
+l'application »** pour effacer toutes les traces de WinTool : réglages, historique,
+journaux, catalogue installé, et ce qu'il range dans la base de registre. **Vos scripts
+personnels sont conservés** : ce sont les vôtres, pas des traces de WinTool.
+
 ---
 
 ## La simulation

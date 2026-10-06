@@ -54,3 +54,24 @@ PowerShell téléchargé auprès de n'importe qui, exécuté en administrateur.
   lots d'usine, sera scindé en deux.
 - **Sources tierces** — l'emplacement de leur liste (réservé à l'administrateur, §16.2)
   impose une élévation pour en ajouter une : à confirmer le moment venu.
+
+## Idées pour plus tard
+
+- **Exceptions par script aux emplacements protégés.** La liste reste la même pour tous,
+  mais tel script — « vérifier les fichiers de Windows » — a le droit de recevoir
+  `C:\Windows`, sans ouvrir la porte aux autres. Même rangement que la liste (`HKLM`,
+  administrateur), rattaché à l'identifiant du script.
+- **Témoin des changements sensibles.** Aucun bac à sable n'est possible pour un script
+  administrateur (§12) : WinTool ne peut pas l'*empêcher* de toucher aux tâches planifiées
+  ou aux variables d'environnement. Il peut en revanche **relever, avant et après chaque
+  script**, ce qu'un logiciel malveillant modifie pour s'installer durablement — tâches
+  planifiées, services, clés de démarrage automatique, variables d'environnement du
+  système, exclusions de l'antivirus, fichier `hosts`, certificats racine, règles du
+  pare-feu — et **le dire dans le bilan** : « ce script a créé la tâche planifiée X ».
+  Presque tout se lit dans `HKLM` ou sur le disque, sans PowerShell, donc vite. En
+  simulation, tout changement relevé trahirait un script qui ne simule pas vraiment. Les
+  points d'attention de l'écran d'approbation (§12.2) s'étendraient aux mêmes gestes
+  (`Register-ScheduledTask`, `Add-MpPreference -ExclusionPath`…).
+- **Faux positifs des antivirus.** Signer l'exécutable (certificat payant) ; soumettre
+  chaque version à l'analyse de Microsoft ; envisager `RemoteSigned` comme politique par
+  défaut, `Bypass` étant un signal que les antivirus d'entreprise surveillent.

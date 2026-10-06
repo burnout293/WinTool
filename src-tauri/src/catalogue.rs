@@ -1210,6 +1210,50 @@ mod tests {
         assert!(i.scripts.iter().all(|e| !e.title.is_empty()));
     }
 
+    /// Le catalogue officiel publie, par le vrai code reseau (TLS, redirections
+    /// de GitHub, plafonds) et la vraie cle compilee, installe dans un dossier
+    /// jetable. A lancer a la main avant chaque release de WinTool :
+    ///
+    /// ```text
+    /// cargo test --lib -- --ignored catalogue_publie
+    /// ```
+    #[test]
+    #[ignore]
+    fn catalogue_publie_se_telecharge_et_s_installe() {
+        let bac = Bac::neuf("publie");
+        tauri::async_runtime::block_on(async {
+            let client = client().expect("client HTTPS");
+            let distant = consulter(&client).await.expect("index officiel");
+            let presents = HashMap::new();
+            let mut recus = Vec::new();
+            for e in a_telecharger(&distant.index, &presents) {
+                let url = format!("{DEPOT}/releases/download/{}/{}", distant.index.tag, e.file);
+                let octets = telecharger(&client, &url, e.size)
+                    .await
+                    .unwrap_or_else(|err| panic!("{} : {err}", e.file));
+                recus.push((e, octets));
+            }
+            let r = appliquer(
+                &bac.0,
+                None,
+                &presents,
+                &recus,
+                &distant.brut,
+                &distant.signature,
+                "t",
+            )
+            .expect("installation");
+            assert_eq!(r.ecrits, distant.index.scripts.len());
+            let relu = index_local(&bac.0)
+                .expect("index installe")
+                .expect("present");
+            println!(
+                "catalogue {} : {} scripts installes et verifies",
+                relu.version, r.ecrits
+            );
+        });
+    }
+
     #[test]
     fn la_cle_officielle_si_presente_est_lisible() {
         // Garde-fou : une cle compilee mais illisible rendrait le catalogue

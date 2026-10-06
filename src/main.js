@@ -3352,6 +3352,8 @@ function appliquerTraductionsReglages() {
   document.getElementById('protegesIntegresTitre').textContent = t('reglages.proteges_integres');
   document.getElementById('protegesAjoutsLabel').textContent = t('reglages.proteges_ajouts');
   document.getElementById('btnProtegesEnregistrer').textContent = t('reglages.proteges_enregistrer');
+  document.getElementById('protegesDroitsTexte').textContent = t('reglages.proteges_droits');
+  document.getElementById('btnProtegesDroits').textContent = t('reglages.proteges_relancer');
   document.getElementById('setEchelleLabel').textContent = t('reglages.echelle');
   document.getElementById('btnOuvrirDossierReglages').textContent = t('reglages.dossier_scripts');
   document.getElementById('btnReanalyserReglages').textContent = t('reglages.reanalyser');
@@ -3390,23 +3392,64 @@ function appliquerNumerosReglages(actif) {
   if (bouton) bouton.setAttribute('aria-checked', String(!!actif));
 }
 
-/** Emplacements proteges (§12.4) : ceux du systeme, en lecture seule, et les
- *  ajouts de l'utilisateur. */
+/** `lib::EmplacementsProteges`, tel que lu a l'ouverture des Reglages. */
+let gardeActuelle = null;
+
+/** Emplacements proteges (§12.4) : la liste integree, un interrupteur par
+ *  emplacement, et les ajouts de l'utilisateur. Elle vit dans HKLM : sans droits
+ *  administrateur, elle se lit mais ne se modifie pas. */
 async function rendreEmplacementsProteges() {
   const liste = document.getElementById('protegesIntegres');
   const zone = document.getElementById('protegesAjouts');
   if (!liste || !zone) return;
   try {
     const p = await invoke('protected_paths');
-    liste.innerHTML = [
-      ...p.integres.map((c) => `<li>${esc(c)}</li>`),
-      `<li>${esc(p.profils)} <span class="muted">${esc(t('reglages.proteges_sauf_profil'))}</span></li>`,
-      `<li><span class="muted">${esc(t('reglages.proteges_racines'))}</span></li>`,
-    ].join('');
+    gardeActuelle = p;
+    liste.innerHTML = p.integres
+      .map((i) => {
+        const badge = i.tres_sensible ? ` <span class="badge med">${esc(t('garde.tres_sensible'))}</span>` : '';
+        const chemins = i.chemins.length ? `<span class="mono muted">${esc(i.chemins.join(' · '))}</span>` : '';
+        return `<li class="protege-ligne">
+          <button class="switch" type="button" role="switch" data-protege="${esc(i.id)}"
+            aria-checked="${!p.retires.includes(i.id)}"${p.modifiable ? '' : ' disabled'}></button>
+          <span class="protege-texte"><span><b>${esc(t(`garde.id.${i.id}`))}</b>${badge}</span>${chemins}</span>
+        </li>`;
+      })
+      .join('');
     zone.value = p.ajouts.join('\n');
+    zone.disabled = !p.modifiable;
+    document.getElementById('btnProtegesEnregistrer').hidden = !p.modifiable;
+    document.getElementById('protegesDroits').hidden = p.modifiable;
     document.getElementById('protegesEtat').textContent = '';
   } catch (e) {
     console.error('Emplacements proteges :', e);
+  }
+}
+
+/** Identifiants des emplacements integres actuellement desactives. */
+function protegesRetires() {
+  return [...document.querySelectorAll('#protegesIntegres [data-protege]')]
+    .filter((b) => b.getAttribute('aria-checked') !== 'true')
+    .map((b) => b.dataset.protege);
+}
+
+async function enregistrerGarde(retires, ajouts) {
+  const etat = document.getElementById('protegesEtat');
+  try {
+    await invoke('set_protected_paths', { retires, ajouts });
+    await rendreEmplacementsProteges();
+    etat.textContent = t('reglages.proteges_enregistre');
+  } catch (e) {
+    const texte = String(e).replace(/^Error:\s*/, '');
+    if (texte.startsWith('CHEMIN_NON_ABSOLU:')) {
+      etat.textContent = t('reglages.proteges_non_absolu', { p: texte.slice('CHEMIN_NON_ABSOLU:'.length) });
+    } else if (texte === 'GARDE_SANS_DROITS') {
+      etat.textContent = t('reglages.proteges_droits');
+    } else {
+      etat.textContent = texte;
+    }
+    // L'affichage revient a ce qui est reellement enregistre.
+    await rendreEmplacementsProteges();
   }
 }
 
@@ -3503,19 +3546,25 @@ function cablerReglages() {
   document.getElementById('setPolitiqueSelect').onchange = async (ev) => {
     reglagesActuels = await invoke('set_exec_policy', { policy: ev.target.value });
   };
-  document.getElementById('btnProtegesEnregistrer').onclick = async () => {
-    const etat = document.getElementById('protegesEtat');
-    const paths = document.getElementById('protegesAjouts').value.split(/\r?\n/);
-    try {
-      reglagesActuels = await invoke('set_protected_paths', { paths });
-      await rendreEmplacementsProteges();
-      etat.textContent = t('reglages.proteges_enregistre');
-    } catch (e) {
-      const texte = String(e).replace(/^Error:\s*/, '');
-      etat.textContent = texte.startsWith('CHEMIN_NON_ABSOLU:')
-        ? t('reglages.proteges_non_absolu', { p: texte.slice('CHEMIN_NON_ABSOLU:'.length) })
-        : texte;
+  document.getElementById('btnProtegesEnregistrer').onclick = () =>
+    enregistrerGarde(protegesRetires(), document.getElementById('protegesAjouts').value.split(/\r?\n/));
+  // Un interrupteur s'enregistre aussitot, comme les autres reglages. Retirer un
+  // emplacement tres sensible se confirme : c'est le seul geste de cette liste
+  // qui affaiblit la protection.
+  document.getElementById('protegesIntegres').addEventListener('click', async (ev) => {
+    const b = ev.target.closest('[data-protege]');
+    if (!b || b.disabled) return;
+    const protege = b.getAttribute('aria-checked') === 'true';
+    const integre = gardeActuelle?.integres.find((i) => i.id === b.dataset.protege);
+    if (protege && integre?.tres_sensible) {
+      if (!confirm(t('reglages.proteges_confirmer', { nom: t(`garde.id.${integre.id}`) }))) return;
     }
+    b.setAttribute('aria-checked', String(!protege));
+    await enregistrerGarde(protegesRetires(), gardeActuelle?.ajouts || []);
+  });
+  document.getElementById('btnProtegesDroits').onclick = () => {
+    document.getElementById('settingsOverlay').hidden = true;
+    ouvrirFenetreDroits();
   };
   document.getElementById('setNumerosToggle').onclick = async (ev) => {
     const actif = ev.currentTarget.getAttribute('aria-checked') !== 'true';

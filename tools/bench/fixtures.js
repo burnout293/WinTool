@@ -233,6 +233,8 @@
   // Le banc rejoue une sortie plausible pour que la progression, les couleurs
   // de marqueur et le bilan soient reellement observables.
   const auditeurs = { 'script:line': [], 'script:end': [], 'catalogue:progress': [] };
+  /** `garde::ConfigGarde` — dans HKLM cote Rust. */
+  const garde = { retires: [], ajouts: [] };
   const emettre = (nom, payload) => auditeurs[nom]?.forEach((f) => f({ payload }));
 
   const LIGNES = [
@@ -383,17 +385,27 @@
     },
     // Emplacements proteges (§12.4). `lib::EmplacementsProteges`.
     protected_paths: () => ({
-      integres: ['C:\\Windows', 'C:\\Program Files', 'C:\\Program Files (x86)', 'C:\\ProgramData',
-        'C:\\System Volume Information', 'C:\\$Recycle.Bin', 'C:\\Program Files\\WinTool'],
-      profils: 'C:\\Users',
-      ajouts: reglages.protected_paths || [],
+      integres: [
+        { id: 'windows', chemins: ['C:\\Windows'], tres_sensible: true },
+        { id: 'program_files', chemins: ['C:\\Program Files', 'C:\\Program Files (x86)'], tres_sensible: true },
+        { id: 'installation', chemins: ['C:\\Program Files\\WinTool'], tres_sensible: true },
+        { id: 'racines_lecteurs', chemins: [], tres_sensible: true },
+        { id: 'program_data', chemins: ['C:\\ProgramData'], tres_sensible: false },
+        { id: 'profils', chemins: ['C:\\Users'], tres_sensible: false },
+        { id: 'racine_systeme', chemins: ['C:\\System Volume Information', 'C:\\$Recycle.Bin', 'C:\\Recovery'], tres_sensible: false },
+      ],
+      retires: garde.retires,
+      ajouts: garde.ajouts,
+      modifiable: !new URLSearchParams(location.search).has('sansadmin'),
     }),
     set_protected_paths: (a) => {
-      const propres = (a.paths || []).map((p) => p.trim()).filter(Boolean);
+      if (new URLSearchParams(location.search).has('sansadmin')) throw new Error('GARDE_SANS_DROITS');
+      const propres = (a.ajouts || []).map((p) => p.trim()).filter(Boolean);
       const mauvais = propres.find((p) => !/^[A-Za-z]:[\\/]/.test(p));
       if (mauvais) throw new Error(`CHEMIN_NON_ABSOLU:${mauvais}`);
-      reglages.protected_paths = propres;
-      return JSON.parse(JSON.stringify(reglages));
+      garde.retires = [...(a.retires || [])];
+      garde.ajouts = propres;
+      return null;
     },
     set_catalogue_source: (a) => { reglages.catalogue_source = a.source; return JSON.parse(JSON.stringify(reglages)); },
     set_catalogue_check: (a) => { reglages.catalogue_check = a.policy; return JSON.parse(JSON.stringify(reglages)); },

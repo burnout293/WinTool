@@ -18,13 +18,17 @@
 //!    lui-meme. Chaque chemin est d'abord resolu (jonctions, liens, noms courts,
 //!    `..`), puisqu'une liste noire comparee a la lettre se contourne.
 //!
-//! La liste integree ne se retire pas depuis l'interface : tout ce que
-//! l'interface pourrait retirer, un programme malveillant pourrait le retirer
-//! aussi, en reecrivant le meme fichier. Les ajouts de l'utilisateur, eux,
-//! ne font que restreindre davantage.
+//! **La liste est a l'utilisateur.** Il peut en retirer un emplacement — pour un
+//! script qui doit verifier les fichiers de Windows, par exemple — et en
+//! ajouter. Mais ses changements vivent dans `HKLM\SOFTWARE\WinTool\Garde`, et
+//! ne s'ecrivent qu'en administrateur : la liberte de retirer un emplacement ne
+//! vaut que si un programme sans droits ne peut pas l'exercer a sa place. Dans
+//! `settings.json`, il lui aurait suffi de reecrire le fichier. Retirer un
+//! emplacement tres sensible fait l'objet d'un avertissement (interface).
 
 use crate::contract::{DefaultValue, Opt, Script};
 use crate::systeme::Emplacements;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
@@ -88,17 +92,6 @@ fn est_racine(p: &Path) -> bool {
         && c.next().is_none()
 }
 
-/// Les emplacements proteges, resolus une fois.
-#[derive(Debug, Clone)]
-pub struct Zones {
-    proteges: Vec<PathBuf>,
-    /// Le dossier des profils, protege sauf dans les exceptions ci-dessous.
-    profils: PathBuf,
-    /// Le profil de l'utilisateur et le profil public : il peut deja y ecrire
-    /// lui-meme, les designer n'apporte rien a un programme malveillant.
-    exceptions: Vec<PathBuf>,
-}
-
 /// Dossiers caches a la racine du lecteur systeme, reserves au systeme.
 /// (Pas `Documents and Settings` : c'est une jonction vers le dossier des
 /// profils, qui une fois resolue protegerait aussi le profil de l'utilisateur.
@@ -112,24 +105,187 @@ const RACINE_SYSTEME: [&str; 6] = [
     "PerfLogs",
 ];
 
+/// Un emplacement de la liste integree, tel que les Reglages le montrent.
+#[derive(Debug, Clone, Serialize)]
+pub struct Integre {
+    pub id: &'static str,
+    pub chemins: Vec<String>,
+    /// Le retirer demande une confirmation explicite (interface).
+    pub tres_sensible: bool,
+}
+
+/// Identifiants des emplacements integres : ce sont eux que `ConfigGarde`
+/// retire, pas des chemins, qui changent d'un PC a l'autre.
+pub const IDS_INTEGRES: [&str; 7] = [
+    "windows",
+    "program_files",
+    "installation",
+    "racines_lecteurs",
+    "program_data",
+    "profils",
+    "racine_systeme",
+];
+
+pub fn integres(e: &Emplacements, installation: Option<&Path>) -> Vec<Integre> {
+    let texte = |p: &Path| p.display().to_string();
+    let mut pf = vec![texte(&e.program_files)];
+    pf.extend(e.program_files_x86.as_deref().map(texte));
+    vec![
+        Integre {
+            id: "windows",
+            chemins: vec![texte(&e.windows)],
+            tres_sensible: true,
+        },
+        Integre {
+            id: "program_files",
+            chemins: pf,
+            tres_sensible: true,
+        },
+        Integre {
+            id: "installation",
+            chemins: installation.map(texte).into_iter().collect(),
+            tres_sensible: true,
+        },
+        Integre {
+            id: "racines_lecteurs",
+            chemins: Vec::new(),
+            tres_sensible: true,
+        },
+        Integre {
+            id: "program_data",
+            chemins: vec![texte(&e.program_data)],
+            tres_sensible: false,
+        },
+        Integre {
+            id: "profils",
+            chemins: vec![texte(&e.profils)],
+            tres_sensible: false,
+        },
+        Integre {
+            id: "racine_systeme",
+            chemins: RACINE_SYSTEME
+                .iter()
+                .map(|d| format!(r"{}\{d}", e.lecteur))
+                .collect(),
+            tres_sensible: false,
+        },
+    ]
+}
+
+/// Ce que l'utilisateur a change a la liste : des emplacements integres retires
+/// (par identifiant), des emplacements ajoutes.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ConfigGarde {
+    pub retires: Vec<String>,
+    pub ajouts: Vec<String>,
+}
+
+/// Emplacement de `ConfigGarde`, sous `HKEY_LOCAL_MACHINE` : rien ne s'y ecrit
+/// sans elevation (meme raisonnement que le magasin d'approbations).
+pub const CLE_GARDE: &str = r"SOFTWARE\WinTool\Garde";
+
+#[cfg(windows)]
+pub fn charger_depuis(racine: &windows_registry::Key, chemin: &str) -> ConfigGarde {
+    let Ok(cle) = racine.open(chemin) else {
+        return ConfigGarde::default();
+    };
+    let liste = |nom: &str| -> Vec<String> {
+        cle.get_multi_string(nom)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    };
+    ConfigGarde {
+        retires: liste("Retires"),
+        ajouts: liste("Ajouts"),
+    }
+}
+
+#[cfg(windows)]
+pub fn enregistrer_dans(
+    racine: &windows_registry::Key,
+    chemin: &str,
+    c: &ConfigGarde,
+) -> Result<(), String> {
+    let cle = racine
+        .create(chemin)
+        .map_err(|e| format!("ouverture de la liste des emplacements proteges : {e}"))?;
+    for (nom, valeurs) in [("Retires", &c.retires), ("Ajouts", &c.ajouts)] {
+        if valeurs.is_empty() {
+            let _ = cle.remove_value(nom);
+        } else {
+            cle.set_multi_string(nom.to_string(), valeurs.as_slice())
+                .map_err(|e| format!("ecriture de la liste des emplacements proteges : {e}"))?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+pub fn charger() -> ConfigGarde {
+    charger_depuis(windows_registry::LOCAL_MACHINE, CLE_GARDE)
+}
+
+#[cfg(windows)]
+pub fn enregistrer(c: &ConfigGarde) -> Result<(), String> {
+    enregistrer_dans(windows_registry::LOCAL_MACHINE, CLE_GARDE, c)
+}
+
+#[cfg(not(windows))]
+pub fn charger() -> ConfigGarde {
+    ConfigGarde::default()
+}
+
+#[cfg(not(windows))]
+pub fn enregistrer(_c: &ConfigGarde) -> Result<(), String> {
+    Err("disponible sous Windows seulement".into())
+}
+
+/// Les emplacements proteges, resolus une fois.
+#[derive(Debug, Clone)]
+pub struct Zones {
+    proteges: Vec<PathBuf>,
+    /// Le dossier des profils, protege sauf dans les exceptions ci-dessous ;
+    /// `None` si l'utilisateur l'a retire de la liste.
+    profils: Option<PathBuf>,
+    /// Le profil de l'utilisateur et le profil public : il peut deja y ecrire
+    /// lui-meme, les designer n'apporte rien a un programme malveillant.
+    exceptions: Vec<PathBuf>,
+    /// La racine de chaque lecteur (`C:\`, `D:\`).
+    racines: bool,
+}
+
 impl Zones {
     pub fn nouvelles(
         e: &Emplacements,
         profil: &Path,
         installation: Option<&Path>,
-        ajouts: &[String],
+        config: &ConfigGarde,
     ) -> Zones {
-        let mut proteges = vec![
-            e.windows.clone(),
-            e.program_files.clone(),
-            e.program_data.clone(),
-        ];
-        proteges.extend(e.program_files_x86.clone());
-        let racine = PathBuf::from(format!(r"{}\", e.lecteur));
-        proteges.extend(RACINE_SYSTEME.iter().map(|d| racine.join(d)));
-        proteges.extend(installation.map(Path::to_path_buf));
+        let actif = |id: &str| !config.retires.iter().any(|r| r == id);
+        let mut proteges = Vec::new();
+        if actif("windows") {
+            proteges.push(e.windows.clone());
+        }
+        if actif("program_files") {
+            proteges.push(e.program_files.clone());
+            proteges.extend(e.program_files_x86.clone());
+        }
+        if actif("program_data") {
+            proteges.push(e.program_data.clone());
+        }
+        if actif("racine_systeme") {
+            let racine = PathBuf::from(format!(r"{}\", e.lecteur));
+            proteges.extend(RACINE_SYSTEME.iter().map(|d| racine.join(d)));
+        }
+        if actif("installation") {
+            proteges.extend(installation.map(Path::to_path_buf));
+        }
         proteges.extend(
-            ajouts
+            config
+                .ajouts
                 .iter()
                 .map(|a| a.trim())
                 .filter(|a| absolu(a))
@@ -137,40 +293,24 @@ impl Zones {
         );
         Zones {
             proteges: proteges.iter().map(|p| normaliser(p)).collect(),
-            profils: normaliser(&e.profils),
+            profils: actif("profils").then(|| normaliser(&e.profils)),
             exceptions: vec![normaliser(profil), normaliser(&e.public)],
+            racines: actif("racines_lecteurs"),
         }
     }
 
     /// Vrai si ce chemin designe un emplacement protege, ou se trouve dedans.
     pub fn protege(&self, chemin: &Path) -> bool {
         let n = normaliser(chemin);
-        if est_racine(&n) {
+        if self.racines && est_racine(&n) {
             return true;
         }
         if self.proteges.iter().any(|r| n.starts_with(r)) {
             return true;
         }
-        n.starts_with(&self.profils) && !self.exceptions.iter().any(|x| n.starts_with(x))
-    }
-
-    /// Les emplacements integres, pour les montrer dans les Reglages. Le dossier
-    /// des profils et les racines de lecteur sont decrits par l'interface, dans
-    /// sa langue : ils ne figurent pas dans cette liste.
-    pub fn integres(e: &Emplacements, installation: Option<&Path>) -> Vec<String> {
-        let mut v = vec![
-            e.windows.display().to_string(),
-            e.program_files.display().to_string(),
-        ];
-        v.extend(
-            e.program_files_x86
-                .as_ref()
-                .map(|p| p.display().to_string()),
-        );
-        v.push(e.program_data.display().to_string());
-        v.extend(RACINE_SYSTEME.iter().map(|d| format!(r"{}\{d}", e.lecteur)));
-        v.extend(installation.map(|p| p.display().to_string()));
-        v
+        self.profils
+            .as_ref()
+            .is_some_and(|p| n.starts_with(p) && !self.exceptions.iter().any(|x| n.starts_with(x)))
     }
 }
 
@@ -403,7 +543,19 @@ mod tests {
     }
 
     fn zones(ajouts: &[String]) -> Zones {
-        Zones::nouvelles(systeme::emplacements(), &profil(), None, ajouts)
+        let config = ConfigGarde {
+            retires: Vec::new(),
+            ajouts: ajouts.to_vec(),
+        };
+        Zones::nouvelles(systeme::emplacements(), &profil(), None, &config)
+    }
+
+    fn zones_sans(retires: &[&str]) -> Zones {
+        let config = ConfigGarde {
+            retires: retires.iter().map(|r| r.to_string()).collect(),
+            ajouts: Vec::new(),
+        };
+        Zones::nouvelles(systeme::emplacements(), &profil(), None, &config)
     }
 
     fn opt(key: &str, kind: &str, choix: &[&str], defaut: Option<DefaultValue>) -> Opt {
@@ -501,6 +653,48 @@ mod tests {
         assert!(z.protege(&lien), "la jonction n'a pas ete suivie");
         assert!(z.protege(&lien.join("System32")));
         let _ = std::fs::remove_dir(&lien);
+    }
+
+    #[test]
+    fn un_emplacement_retire_n_est_plus_protege_et_seulement_lui() {
+        let e = systeme::emplacements();
+        let z = zones_sans(&["windows", "racines_lecteurs"]);
+        assert!(!z.protege(&e.windows.join("System32")));
+        assert!(!z.protege(Path::new(r"D:\")));
+        // Le reste de la liste tient toujours.
+        assert!(z.protege(&e.program_files));
+        assert!(z.protege(&e.program_data));
+        let z = zones_sans(&["profils"]);
+        assert!(!z.protege(&e.profils.join("Default")));
+    }
+
+    #[test]
+    fn chaque_identifiant_retirable_existe_dans_la_liste() {
+        let ids: Vec<&str> = integres(systeme::emplacements(), None)
+            .iter()
+            .map(|i| i.id)
+            .collect();
+        assert_eq!(ids, IDS_INTEGRES);
+    }
+
+    #[test]
+    fn la_liste_modifiee_se_relit_depuis_le_registre() {
+        use windows_registry::CURRENT_USER;
+        let chemin = format!(r"SOFTWARE\WinTool-tests-{}-garde", std::process::id());
+        let _ = CURRENT_USER.remove_tree(&chemin);
+        let c = ConfigGarde {
+            retires: vec!["windows".into()],
+            ajouts: vec![r"D:\Archives".into()],
+        };
+        enregistrer_dans(CURRENT_USER, &chemin, &c).unwrap();
+        assert_eq!(charger_depuis(CURRENT_USER, &chemin), c);
+        // Vider une liste efface la valeur, et se relit comme une liste vide.
+        enregistrer_dans(CURRENT_USER, &chemin, &ConfigGarde::default()).unwrap();
+        assert_eq!(
+            charger_depuis(CURRENT_USER, &chemin),
+            ConfigGarde::default()
+        );
+        let _ = CURRENT_USER.remove_tree(&chemin);
     }
 
     #[test]

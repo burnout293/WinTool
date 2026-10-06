@@ -568,7 +568,7 @@ réellement.
 | Rapport de conformité | Expert |
 | Ré-analyser tous les scripts (§5.5) | Expert |
 | Politique d'exécution : Bypass / RemoteSigned / Unrestricted (§6.7) | Expert |
-| Emplacements protégés : la liste du système (en lecture seule) et vos ajouts (§12.4) | Expert |
+| Emplacements protégés : en retirer, en ajouter — en administrateur (§12.4) | Expert |
 
 Une personne à qui l'on a installé l'outil peut éclaircir ou agrandir son interface sans
 jamais croiser un réglage qu'elle pourrait casser.
@@ -778,7 +778,8 @@ chemin identifié.
 | Lancement | L'interpréteur résolu par le `PATH`, ou cherché dans le profil (`%LOCALAPPDATA%\PowerShell`) | **Chemin lu dans `HKLM`** : System32 et Program Files seulement ; ni `PATH`, ni profil, ni variable d'environnement (§6.7, corrigé en 1.2) |
 | Lancement | Dossier courant = dossier du script, inscriptible : `cmd /c outil` et `Process.Start("outil.exe")` y cherchent l'exécutable avant le système | Dossier courant **System32**, et `NoDefaultCurrentDirectoryInExePath` (1.2) |
 | Environnement | Les variables de l'utilisateur (`HKCU\Environment`) sont héritées par le processus élevé : `COR_PROFILER_PATH` et `DOTNET_STARTUP_HOOKS` font charger du code dans PowerShell, `WEBVIEW2_BROWSER_EXECUTABLE_FOLDER` lance un autre moteur d'interface, `windir`, `SystemRoot` ou `TEMP` redéfinis font viser un autre dossier aux scripts | Familles `COR_`, `CORECLR_`, `COMPLUS_`, `DOTNET_`, `WEBVIEW2_` **retirées au démarrage** du processus de WinTool — l'environnement de l'utilisateur n'est pas modifié, et une version de développement les garde —, avec une alerte pour celles qui chargent du code ; variables du système **rétablies depuis `HKLM`** pour chaque script ; `TEMP`, `TMP`, `LOCALAPPDATA`, `APPDATA`, `USERPROFILE` ramenées dans le profil s'ils visent un emplacement protégé (1.2) |
-| Réglages | `settings.json` est inscriptible, et ses valeurs partent à un script élevé : écrire `C:\Windows` dans les dossiers à vider du nettoyage suffit | **Garde** : chaque valeur doit avoir le type et faire partie des choix déclarés ; un texte libre ne peut pas viser un **emplacement protégé** — liste intégrée non retirable, ajouts de l'utilisateur, chemins résolus avant comparaison (1.2) |
+| Réglages | `settings.json` est inscriptible, et ses valeurs partent à un script élevé : écrire `C:\Windows` dans les dossiers à vider du nettoyage suffit | **Garde** : chaque valeur doit avoir le type et faire partie des choix déclarés ; un texte libre ne peut pas viser un **emplacement protégé** — chemins résolus avant comparaison ; liste modifiable par l'utilisateur, mais rangée dans `HKLM` et modifiable **en administrateur seulement** (1.2) |
+| Désinstallation | Le désinstalleur, administrateur, efface dans des dossiers inscriptibles par l'utilisateur : une jonction glissée à la place de `logs` lui ferait effacer le dossier visé | **Aucune suppression récursive** : fichiers nommés, puis dossiers seulement s'ils sont vides ; **rien du tout** si un dossier visé est une jonction ou un lien — éprouvé sur une vraie jonction (1.2) |
 | Journal | Une valeur secrète (mot de passe de sauvegarde) écrite en clair dans le journal technique | Valeurs des clés `Password`, `Secret`, `Token` **masquées** (1.2) |
 | Bouton Arrêter | `taskkill` résolu par le `PATH`, exécuté en administrateur | **Chemin absolu**, lu dans `HKLM` |
 
@@ -813,9 +814,25 @@ public, les dossiers réservés à la racine du lecteur système, le dossier d'i
 racine de chaque lecteur. Sont refusés aussi les chemins de fournisseur PowerShell
 (`HKLM:`, `Registry::`…), les chemins de périphérique (`\\?\`), les partages
 d'administration (`\\machine\C$`) et un chemin relatif qui désigne quelque chose dans
-System32, d'où partent les scripts. La liste intégrée ne se retire pas depuis l'interface :
-tout ce que l'interface pourrait retirer, un programme malveillant le retirerait en
-réécrivant le même fichier. L'utilisateur peut seulement ajouter des emplacements.
+System32, d'où partent les scripts.
+
+**La liste appartient à l'utilisateur.** Il peut en retirer un emplacement — un script qui
+vérifie les fichiers de Windows doit pouvoir recevoir `C:\Windows` — et en ajouter. Retirer
+un emplacement marqué « très sensible » (Windows, Program Files, le dossier de WinTool, la
+racine des lecteurs) se confirme explicitement. Mais ses changements vivent dans
+`HKLM\SOFTWARE\WinTool\Garde`, et ne s'écrivent **qu'en administrateur** : la liberté de
+retirer un emplacement ne vaut que si un programme sans droits ne peut pas l'exercer à sa
+place. Rangée dans `settings.json`, il lui aurait suffi de réécrire le fichier. Sans droits,
+la liste s'affiche, mais ne se modifie pas.
+
+**Désinstallation.** La case « Supprimer les données de l'application » du désinstalleur
+efface toutes les traces de WinTool : ses données dans le profil (réglages, historique,
+journaux, catalogue installé), celles de l'interface, le magasin d'approbations et la liste
+des emplacements protégés dans `HKLM`, l'ancien magasin de `ProgramData`. **Les scripts
+personnels de l'utilisateur sont conservés** : ce sont ses créations, pas des traces de
+WinTool ; leur dossier ne disparaît que s'il est vide. Une mise à jour n'efface jamais rien.
+Le crochet vit dans `src-tauri/installeur/crochets.nsh`. Il n'atteint que le profil du
+compte qui désinstalle : un autre compte du même PC garde ses propres réglages.
 
 **Résidus assumés.**
 
