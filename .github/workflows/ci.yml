@@ -52,19 +52,10 @@ jobs:
           for f in src/main.js src/i18n.js tools/bench/fixtures.js tools/sync-icons.mjs; do
             node --check "$f"
           done
+          node tools/verifier-traductions.mjs
 
-      - name: Valider les scripts livres
-        shell: pwsh
-        run: |
-          $dossier = 'scripts/Default'
-          $scripts = @(Get-ChildItem -Path $dossier -Filter *.ps1 -ErrorAction SilentlyContinue)
-          if ($scripts.Count -eq 0) {
-            # Catalogue en cours de reecriture : rien a valider n'est pas un
-            # echec, mais doit se voir dans le journal.
-            Write-Host "::notice::aucun script dans $dossier, validation ignoree"
-            exit 0
-          }
-          ./tools/lint-scripts.ps1 -Path $dossier -Strict
+      # Les scripts officiels ne vivent plus ici : le depot WinTool-Catalogue les
+      # valide a chaque poussee, avec ce meme validateur.
 
       # Les scripts complets de FORMAT_SCRIPT.md sont les modeles que l'agent
       # catalogue recopie. Un exemple que le validateur refuserait apprendrait a
@@ -86,6 +77,9 @@ jobs:
           Write-Host "$n exemple(s) complet(s) extrait(s)"
           if ($n -lt 2) { Write-Host '::error::moins de deux exemples complets dans FORMAT_SCRIPT.md'; exit 1 }
           ./tools/lint-scripts.ps1 -Path $dir -Strict
+          # Le depot du catalogue emprunte l'outil d'index a ce depot-ci : il
+          # s'eprouve donc ici, sur les memes exemples.
+          ./tools/construire-index-catalogue.ps1 -Scripts $dir -Version 0.0.0 -Sortie (Join-Path $env:RUNNER_TEMP 'index-exemples.json')
 
       - name: Clippy
         working-directory: src-tauri

@@ -1378,7 +1378,7 @@ absente.
    sont précisément ce que l'OFL impose de conserver, et qui diffèrent entre les deux.
 
    Puis inclure le dossier dans l'installeur NSIS via `bundle.resources` de
-   `tauri.conf.json`, comme c'est déjà fait pour `scripts/Default` et `categories.json`.
+   `tauri.conf.json`, comme c'est déjà fait pour `categories.json`.
 
 2. **Les polices sont embarquées sans leur licence.** Vérifié : `src/fonts/` ne contient
    que trois `.woff2`, et aucun des trois ne porte d'enregistrement `name` 13 (voir 8.1).
@@ -1451,8 +1451,9 @@ absente.
 
 ### Hors périmètre
 
-11. **Les scripts PowerShell de `scripts/Default` ne sont pas des composants tiers.** Ils
-    sont l'œuvre de l'auteur de WinTool et relèvent de ses propres conditions. Les scripts
+11. **Les scripts PowerShell du catalogue officiel ne sont pas des composants tiers**, et
+    ne font plus partie de ce dépôt ni de l'installeur depuis la 1.2. Ils sont l'œuvre de
+    l'auteur de WinTool et publiés sous licence MIT dans [WinTool-Catalogue](https://github.com/burnout293/WinTool-Catalogue). Les scripts
     provenant de sources tierces relèvent de la licence choisie par leur auteur et
     n'entrent jamais dans ce document — conformément à la séparation posée par la licence
     WinTool et par `docs/FORMAT_SCRIPT.md`. Un script conforme au contrat v2 conserve sa

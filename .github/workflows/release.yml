@@ -35,6 +35,18 @@ jobs:
       - run: npm ci
       - run: npm run icons:sync
 
+      # Sans elle, build.rs compile une cle vide : l'application refuserait tout
+      # catalogue, et une installation neuve ne saurait rien faire. On ne publie
+      # pas une telle version.
+      - name: Verifier la cle publique du catalogue
+        shell: pwsh
+        run: |
+          $f = 'src-tauri/catalogue.pub'
+          if (-not (Test-Path $f) -or -not (Get-Content $f -Raw).Trim()) {
+            Write-Host "::error title=Cle du catalogue absente::$f manque : cette version ne saurait verifier aucun catalogue. La generer avec tools/generer-cle-signature.ps1 -Cible catalogue."
+            exit 1
+          }
+
       # Avant de construire : les secrets de signature sont-ils la, bien formes,
       # et conformes a la cle publique compilee dans l'application ? Sinon la
       # construction echouerait au bout de dix minutes sur « exit code 1 » — ou

@@ -11,6 +11,11 @@ vous pouvez lire, modifier et ajouter vous-même.
 L'application ne fait rien d'autre que lancer des scripts. Ce qu'ils font est écrit dans
 leur fichier, en clair, et vous pouvez le lire avant de cliquer.
 
+**WinTool est livré sans aucun script.** Au premier lancement, il propose d'installer le
+[catalogue officiel](https://github.com/burnout293/WinTool-Catalogue) — publié à part, sous licence MIT, et signé : chaque script est
+vérifié contre un index signé avant d'être écrit sur le disque. Vous pouvez aussi continuer
+sans, et n'utiliser que vos propres scripts.
+
 ---
 
 ## Installation
@@ -109,7 +114,7 @@ Vérifiez-le avant de le lancer :
 npm install
 npm run dev            # lance l'application
 npm run build          # produit l'installeur NSIS
-npm run lint:scripts   # valide les scripts livrés
+npm run lint:scripts   # valide le catalogue, extrait à côté (../WinTool-Catalogue)
 npm run icons:sync     # régénère les icônes depuis lucide-static
 ```
 
@@ -140,7 +145,7 @@ Ce banc ne part jamais dans le binaire : les fixtures vivent dans `tools/bench/`
 |---|---|
 | [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md) | Ce que l'application doit faire, et pourquoi. Fait autorité en cas de doute. |
 | [`docs/FORMAT_SCRIPT.md`](docs/FORMAT_SCRIPT.md) | Écrire un script : squelette, règles, codes du validateur. |
-| [`docs/SCRIPTS_CATALOGUE.md`](docs/SCRIPTS_CATALOGUE.md) | Le catalogue des scripts officiels prévus. |
+| [WinTool-Catalogue](https://github.com/burnout293/WinTool-Catalogue) | Les scripts officiels, leur licence (MIT) et la liste des scripts prévus. |
 
 Une règle du projet : **toute convention décrite dans la documentation est vérifiée par un
 outil**. `tools/lint-scripts.ps1` valide les scripts, et la suite de tests Rust lit le
@@ -179,7 +184,9 @@ assumé et écrit en tête du fichier plutôt que laissé à découvrir.
 
 **Les scripts ne font pas partie de WinTool** et ne sont pas soumis à cette licence. Leurs
 auteurs choisissent librement leurs conditions, y compris commerciales — un script
-conforme au contrat v2 reste exécutable sans WinTool, il ne lui doit donc rien.
+conforme au contrat v2 reste exécutable sans WinTool, il ne lui doit donc rien. Ceux du
+catalogue officiel sont sous licence MIT et distribués à part, dans
+[leur propre dépôt](https://github.com/burnout293/WinTool-Catalogue) : l'installeur de WinTool n'en contient aucun.
 
 Les composants tiers conservent leurs propres licences, énumérées dans
 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).

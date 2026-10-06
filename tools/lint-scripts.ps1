@@ -15,20 +15,21 @@
     dans les deux sens. C'est ce croisement qui rend la dérive impossible.
 
     Deux usages, deux exigences :
-      · En intégration continue sur scripts/Default/ — tolérance zéro, code de sortie 1
-        à la moindre erreur. Ces scripts-là, on les maîtrise.
+      · En intégration continue sur le catalogue officiel (dépôt WinTool-Catalogue) —
+        tolérance zéro, code de sortie 1 à la moindre erreur. Ces scripts-là, on les
+        maîtrise.
       · En local sur un script personnel — informatif. L'application, elle, n'empêche
         jamais un script non conforme de s'exécuter (§5.4 « constater, jamais bloquer »).
 
 .PARAMETER Path
-    Dossier à analyser. Par défaut scripts/ à la racine du dépôt.
+    Dossier à analyser. Par défaut vos scripts : %LOCALAPPDATA%\WinTool\scripts.
 
 .PARAMETER Strict
-    Traite les avertissements comme des erreurs. À utiliser en CI sur Default/.
+    Traite les avertissements comme des erreurs. Exigé du catalogue officiel.
 
 .EXAMPLE
     .\tools\lint-scripts.ps1
-    .\tools\lint-scripts.ps1 -Path .\scripts\Default -Strict
+    .\tools\lint-scripts.ps1 -Path ..\WinTool-Catalogue\scripts -Strict
 #>
 [CmdletBinding()]
 param(
@@ -38,7 +39,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-if (-not $Path) { $Path = Join-Path (Split-Path $PSScriptRoot -Parent) 'scripts' }
+# Par defaut, le dossier ou l'utilisateur depose ses propres scripts : depuis
+# la 1.2, le depot ne contient plus aucun script.
+if (-not $Path) { $Path = Join-Path $env:LOCALAPPDATA 'WinTool\scripts' }
 
 # ==============================================================================
 # Référentiel — la seule source de vérité sur les valeurs admises

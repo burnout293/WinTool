@@ -1405,8 +1405,14 @@ async function rendreOffreCatalogue() {
 
   const avecCle = !!etatCatalogue?.cle;
   const sans = reglagesActuels?.catalogue_source === 'none' || !avecCle;
-  document.getElementById('s1Titre').textContent = t('offre.titre');
-  document.getElementById('s1Sous').textContent = t(sans ? 'offre.sous_sans' : 'offre.sous');
+  // Un historique ou des reglages de scripts : cet utilisateur vient d'une
+  // version qui livrait les scripts dans l'installeur. Ses lots et ses reglages
+  // sont intacts (ils portent sur les id, que le catalogue conserve) ; il doit
+  // l'apprendre, plutot que de se croire face a une installation neuve.
+  const retour =
+    (historiqueActuel?.scripts?.length || 0) > 0 || Object.keys(reglagesActuels?.overrides || {}).length > 0;
+  document.getElementById('s1Titre').textContent = t(retour && !sans ? 'offre.titre_retour' : 'offre.titre');
+  document.getElementById('s1Sous').textContent = t(sans ? 'offre.sous_sans' : retour ? 'offre.sous_retour' : 'offre.sous');
 
   const carte = avecCle
     ? `<div class="offre-source">

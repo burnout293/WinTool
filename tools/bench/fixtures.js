@@ -16,7 +16,9 @@
   /**
    * Scenario du catalogue (§16), par `?catalogue=` :
    *   (absent)   catalogue 1.0.0 installe, a jour
-   *   vide       aucun script, rien d'installe : l'accueil propose le catalogue
+   *   vide       aucun script, rien d'installe, un historique : l'utilisateur
+   *              qui arrive d'une version qui livrait les scripts
+   *   neuf       aucun script, rien d'installe, aucun historique : premier lancement
    *   perso      des scripts a soi, aucun catalogue : le rappel s'affiche
    *   maj        installe, une version 1.1.0 attend
    *   modifie    installe, un script officiel modifie sur le PC
@@ -24,7 +26,7 @@
    *   horsligne  la verification echoue faute de reseau
    */
   const SCENARIO = new URLSearchParams(location.search).get('catalogue') || '';
-  let catalogueInstalle = !['vide', 'perso', 'signature'].includes(SCENARIO);
+  let catalogueInstalle = !['vide', 'neuf', 'perso', 'signature'].includes(SCENARIO);
   const CATALOGUE_ROOT = 'C:\\Users\\Buly\\AppData\\Local\\WinTool\\sources\\officiel';
 
   const CATS = [
@@ -221,7 +223,7 @@
     categories: [
       { category_id: 'cleaning', category_name: 'Faire le ménage', at: '2026-09-18T10:12:00Z', script_ids: ['clean-temp'] },
     ],
-    scripts: [
+    scripts: SCENARIO === 'neuf' ? [] : [
       { script_id: 'clean-temp', title: 'Nettoyer les fichiers temporaires', at: '2026-09-18T10:12:00Z', success: true, killed: false, duration_ms: 4200 },
       { script_id: 'set-dns', title: 'Configurer DNS', at: '2026-09-12T19:03:00Z', success: false, killed: false, duration_ms: 2400 },
     ],

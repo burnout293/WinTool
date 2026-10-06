@@ -48,7 +48,8 @@ traduction qui ne correspond à rien — tout est signalé, avec le numéro de l
 
 ## Nommer le fichier
 
-**Cette norme ne s'applique qu'aux scripts officiels**, ceux livrés dans `Default\`.
+**Cette norme ne s'applique qu'aux scripts officiels**, ceux du catalogue
+([WinTool-Catalogue](https://github.com/burnout293/WinTool-Catalogue)).
 Vos scripts personnels se nomment comme vous voulez : l'application ne regarde jamais le
 nom de fichier, elle ne connaît que le champ `id`.
 
@@ -75,7 +76,8 @@ Format : `NNN_NOM_EN_ANGLAIS.ps1` — trois chiffres, tiret bas, nom en majuscul
 c'est le classement manuel du mode Expert qui décide — ni l'identité du script, qui vient
 de son `id`. Ne renumérotez donc jamais un fichier pour réorganiser un affichage.
 
-Tous les scripts officiels vivent à plat dans `Default\`, sans sous-dossiers.
+Tous les scripts officiels vivent à plat dans `scripts/` du dépôt du catalogue, sans
+sous-dossiers : son index signé est une liste plate.
 
 ---
 
@@ -713,11 +715,11 @@ Dans VS Code : *Sélectionner l'encodage → Enregistrer avec l'encodage → UTF
 ## Valider
 
 ```powershell
-.\tools\lint-scripts.ps1                                   # tout le dossier scripts/
-.\tools\lint-scripts.ps1 -Path .\scripts\Default -Strict   # exigence CI
+.\tools\lint-scripts.ps1                                               # vos scripts
+.\tools\lint-scripts.ps1 -Path ..\WinTool-Catalogue\scripts -Strict   # catalogue officiel
 ```
 
-`-Strict` traite les avertissements comme des erreurs. Les scripts destinés à `Default\`
+`-Strict` traite les avertissements comme des erreurs. Les scripts du catalogue officiel
 doivent passer en `-Strict`.
 
 ### Les contrôles, un par un
@@ -779,7 +781,7 @@ Sans cette restriction, les transtypages PowerShell deviennent des faux positifs
 
 ## Votre modèle : le squelette de ce document
 
-`scripts/Default/` contient le catalogue officiel, et chacun de ses scripts passe le
+Le dépôt [WinTool-Catalogue](https://github.com/burnout293/WinTool-Catalogue) contient le catalogue officiel, et chacun de ses scripts passe le
 validateur en `-Strict`. Ils sont de bons exemples de ce qu'on peut faire — mais ils
 évoluent, et aucun n'est garanti représentatif de toutes les règles.
 
@@ -869,9 +871,9 @@ faire refuser le lancement :
 
 ### 1. Le script n'est pas approuvé
 
-Tout script qui ne vient pas de `Default\` doit être approuvé une fois, par son
-empreinte exacte. Toute modification du fichier invalide l'approbation. Voir §12.1
-de la spécification.
+Tout script qui ne vient pas du catalogue officiel — ou qui en vient mais a été modifié
+depuis — doit être approuvé une fois, par son empreinte exacte. Toute modification du
+fichier invalide l'approbation. Voir §12.1 et §16.4 de la spécification.
 
 ### 2. La ligne d'override lit un fichier
 

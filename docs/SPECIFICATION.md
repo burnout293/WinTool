@@ -138,41 +138,49 @@ script ne réécrit plus jamais automatiquement.
 
 ### 4.3 Emplacement des scripts
 
-**Deux racines, et c'est une décision de sécurité autant que de rangement.**
+**Deux racines, que distingue ce qui fonde la confiance en elles.**
 
 ```
-<dossier d'installation>\scripts\Default\   ← scripts livrés, lecture seule
-│   ├─ 200_DISABLE_SLEEP.ps1
+%LOCALAPPDATA%\WinTool\sources\officiel\   ← catalogue officiel (§16), index signé
+│   ├─ index.json, index.json.sig
+│   ├─ 100_CLEAN_TEMP_FILES.ps1
 │   └─ …
-%LOCALAPPDATA%\WinTool\scripts\             ← scripts de l'utilisateur
-├─ MesScripts\                              ← il organise comme il veut
+%LOCALAPPDATA%\WinTool\scripts\            ← scripts de l'utilisateur
+├─ MesScripts\                             ← il organise comme il veut
 └─ Essais\
 ```
 
-**Les scripts livrés restent dans le dossier d'installation** et ne sont recopiés nulle
-part. `Program Files` n'est pas inscriptible sans élévation : du code lancé sous le compte
-de l'utilisateur ne peut donc pas les remplacer — alors que ce sont précisément ceux qu'un
-débutant lancera en mode Simple sans les lire. La protection vient des **droits du
-système**, pas d'un mécanisme qu'il faudrait écrire et maintenir.
+**Depuis la 1.2, l'installeur ne contient plus aucun script** (§16.1). Jusqu'à la 1.1.1, les
+scripts livrés restaient dans le dossier d'installation, et c'étaient les droits du système
+qui les protégeaient : `Program Files` n'est pas inscriptible sans élévation.
+Une installation mise à jour depuis une de ces versions peut conserver l'ancien dossier
+`scripts\Default\` sous `Program Files` : plus rien ne le lit.
 
-Corollaire à assumer : l'installation doit être **par machine** (`perMachine`), jamais
-« pour moi seul ». Une installation dans un dossier inscriptible sans élévation rendrait
-tout le reste sans objet — on y remplacerait aussi bien l'exécutable lui-même.
+Les deux racines sont désormais inscriptibles sans élévation. Ce qui distingue un script de
+confiance n'est donc plus son emplacement mais la **signature** de l'index du catalogue,
+re-vérifiée à chaque découverte : un script officiel n'est approuvé d'office que si son
+empreinte est exactement celle que l'index signé déclare (§16.4). Modifié, il redevient un
+script ordinaire.
 
-Le dossier de l'utilisateur, lui, **reste inscriptible** : c'est le principe du projet, on
-dépose un `.ps1` et il apparaît. C'est aussi la raison pour laquelle tout ce qui s'y trouve
-passe par l'approbation avant première exécution (§12.1). **Les sous-dossiers sont
-autorisés et la découverte est récursive.**
+Corollaire qui demeure : l'installation est **par machine** (`perMachine`), jamais « pour
+moi seul ». Une installation dans un dossier inscriptible sans élévation permettrait de
+remplacer l'exécutable lui-même — et avec lui la clé publique qu'il contient.
 
-**Règle de mise à jour** : `Default\` est remplacé avec l'application, puisqu'il en fait
-partie. Les scripts de l'utilisateur vivent ailleurs et ne sont jamais touchés — il n'y a
-plus de fusion à opérer, ni de modification locale à sauvegarder.
+Le dossier de l'utilisateur est le principe même du projet : on dépose un `.ps1` et il
+apparaît. Tout ce qui s'y trouve passe par l'approbation avant première exécution (§12.1).
+**Les sous-dossiers sont autorisés et la découverte est récursive.** Le dossier d'une
+source, lui, est plat — son index est une liste plate.
+
+**Règle de mise à jour** : WinTool ne touche jamais aux scripts de l'utilisateur. Ceux du
+catalogue sont remplacés à la demande, et une version modifiée localement est gardée à côté
+avant remplacement (§16.5).
 
 **Identifiant d'un script — le champ `id` de l'entête (§5.1), pas le chemin.** Un chemin
 change au moindre renommage ou déplacement ; l'`id` survit, ce qui préserve la
 configuration, le classement dans les catégories et l'historique.
 
-- **Scripts de `Default\`** : `id` obligatoire, vérifié en CI (§5.4).
+- **Scripts du catalogue officiel** : `id` obligatoire, vérifié par sa CI (§5.4) et par
+  l'outil qui construit son index.
 - **Scripts utilisateur sans `id`** : tolérés (« constater, jamais bloquer ») — WinTool
   retombe alors sur le **chemin relatif** à `scripts\` comme identifiant provisoire, et le
   lint signale l'anomalie « pas d'id déclaré : un renommage ou déplacement fera perdre la
@@ -184,9 +192,11 @@ configuration, le classement dans les catégories et l'historique.
   fichier découvert** (ordre alphabétique du chemin) garde l'`id` ; les suivants portant le
   même `id` sont traités comme des doublons, signalés par le lint avec leur chemin, et
   identifiés provisoirement par leur chemin en attendant qu'un nouvel `id` soit généré.
-  **Les scripts livrés sont parcourus en premier**, et ce n'est pas un détail d'ordre : un
-  script déposé dans le dossier utilisateur ne peut donc pas s'approprier l'`id` d'un
-  script livré pour hériter de sa configuration ou de son approbation.
+  **Les scripts que l'index signé nomme sont parcourus en premier**, et ce n'est pas un
+  détail d'ordre : un script déposé à la main — dans le dossier utilisateur, ou glissé dans
+  celui du catalogue sous un nom trié avant les autres — ne peut donc pas s'approprier l'`id`
+  d'un script officiel pour hériter de sa configuration et de sa place dans les lots. Un
+  script sans `id`, identifié par son chemin, réserve ce chemin comme un `id` déclaré.
 
 Un script référencé par une catégorie mais introuvable (par `id` ou, à défaut, par chemin)
 est affiché comme **manquant** et ignoré à l'exécution — jamais une erreur bloquante.
@@ -350,8 +360,9 @@ C'est ce qui corrige la v0.3 : elle acceptait en silence, d'où **zéro script c
 treize** alors que la convention était documentée. Ici la non-conformité est visible sans
 que le script cesse de fonctionner.
 
-`tools/lint-scripts.ps1` reste utilisé **en intégration continue sur les scripts livrés** :
-ceux-là, qu'on maîtrise, doivent être conformes à 100 %.
+`tools/lint-scripts.ps1` reste utilisé **en intégration continue sur le catalogue
+officiel**, dans son propre dépôt : ces scripts-là, qu'on maîtrise, doivent être conformes
+à 100 %.
 
 ### 5.5 Analyse et ré-analyse
 
@@ -540,6 +551,7 @@ réellement.
 | Thème (clair / sombre / Windows) | **partout**, icône engrenage |
 | Langue | **partout** |
 | Comportement des mises à jour | **partout** |
+| Catalogue d'entretiens : installer, vérifier, moment de la vérification (§16) | **partout** |
 | Comportement en cas d'échec | Expert |
 | Taille maximale des journaux | Expert |
 | Réinitialisation aux réglages d'usine | Expert |
@@ -691,13 +703,13 @@ et la visibilité au bon moment**, pas une prétendue détection de malware.
 
 Tout script est identifié par un **hash de son contenu**, calculé à l'analyse (§5.5).
 
-- Un script de `Default\` **dont l'empreinte correspond à ce que l'installeur a posé** est
-  **implicitement approuvé** — déjà vérifié en CI (§5.4).
-  *Quand les sources de scripts seront implémentées (§16), l'installeur ne livrera plus
-  aucun script : cet ancrage passera à la signature Ed25519 de l'index officiel (§16.4).*
-- **Tout le reste** — script déposé à la main, script dont l'empreinte a changé depuis son
-  installation (modification locale, potentiellement malveillante) et, avec le §16, tout
-  script de source tierce — doit être **explicitement approuvé avant sa toute première
+- Un script du catalogue officiel **dont l'empreinte est exactement celle que déclare
+  l'index signé** est **implicitement approuvé** (§16.4). Jusqu'à la 1.1.1, cet ancrage
+  était l'installeur : un script de `Default\` dont l'empreinte correspondait à ce qu'il
+  avait posé.
+- **Tout le reste** — script déposé à la main, script officiel dont l'empreinte a changé
+  depuis son installation (modification locale, potentiellement malveillante) et, quand
+  elles existeront, tout script de source tierce — doit être **explicitement approuvé avant sa toute première
   exécution** : un écran affiche le contenu du script (accessible même en mode Simple via un
   lien, sans jamais l'imposer en lecture) et demande une confirmation nommée, jamais une
   case cochée par réflexe.
@@ -750,6 +762,8 @@ chemin identifié.
 | Approbation | Voir la règle de lecture unique ci-dessous | §12.1 |
 | Configuration | Un fichier JSON dans un dossier inscriptible, relu par PowerShell | Le JSON passe **dans la variable**, il n'y a plus de fichier (§5.2) |
 | Lancement | Le script peut être remplacé entre sa vérification et son ouverture | Fichier **ouvert en interdisant le partage en écriture**, empreinte calculée depuis ce handle, handle gardé ouvert pendant toute l'exécution |
+| Lancement | Approbation et exécution décidées sur **deux découvertes distinctes** : deux substitutions rapides font exécuter un contenu non approuvé | **Une seule découverte** : l'entrée approuvée part au moteur avec son empreinte, imposée au fichier verrouillé (corrigé en 1.2) |
+| Catalogue | Son dossier est inscriptible : on y remplace un script officiel, ou on retouche l'index installé | Approbation implicite seulement si l'empreinte égale celle de l'**index signé**, signature **re-vérifiée à chaque découverte** avec la clé compilée (§16.4) |
 | Lancement | Le profil PowerShell vit sous `Documents`, inscriptible | `-NoProfile` |
 | Lancement | `Import-Module` cherche d'abord sous `Documents`, inscriptible | `PSModulePath` réduit aux **chemins système** |
 | Lancement | L'interpréteur résolu par le `PATH` | **Chemin absolu** (§6.7) |
@@ -924,16 +938,18 @@ par npm (`lucide-static`) côté frontend — ils ne sont pas versionnés dans l
 
 ## 16. Sources de scripts
 
-> **État : spécifié, non implémenté au 27/09/2026.** Aucune ligne de code ne réalise
-> encore cette section. Elle est écrite avant l'implémentation, pas après, pour que le
-> modèle de sécurité soit arrêté avant qu'un raccourci ne le décide à notre place.
+> **État : implémenté en 1.2 pour la source officielle** (`src-tauri/src/catalogue.rs`).
+> L'installeur ne contient plus aucun script ; le catalogue vit dans le dépôt
+> [WinTool-Catalogue](https://github.com/burnout293/WinTool-Catalogue), sous licence MIT.
 >
-> **Tant qu'elle ne l'est pas, l'installeur livre le catalogue**, comme en 1.0.0, et les
-> scripts de `Default\` y restent implicitement approuvés par comparaison d'empreinte
-> avec ce que l'installeur a posé (§12.1, première règle). Le basculement vers les
-> sources — installeur vide, confiance ancrée sur la signature Ed25519 — vaut à partir
-> de la version qui implémentera cette section. Tant qu'elle n'est pas écrite, c'est la
-> règle du §12.1 qui s'applique, pas celle du §16.4.
+> **Les sources tierces restent spécifiées, non implémentées** : en 1.2, WinTool ne connaît
+> que la source officielle. Ce qui les concerne — leur liste dans l'emplacement réservé à
+> l'administrateur, l'ajout et le retrait (§16.2), la mention « ni contrôlé ni approuvé »
+> (§16.6), le §16.8 — vaut pour la version qui les introduira.
+>
+> Cette section a été écrite avant le code, pour que le modèle de sécurité soit arrêté avant
+> qu'un raccourci ne le décide à notre place. Le code l'a suivie ; les écarts sont notés là
+> où ils se trouvent.
 
 ### 16.1 Pourquoi WinTool ne livre plus de scripts
 
@@ -973,7 +989,10 @@ Une source est un catalogue de scripts publié à une adresse, signé par son é
 | `enabled` | une source peut être conservée sans être interrogée |
 
 **La clé publique de la source officielle est compilée dans le binaire.** Elle ne vit ni
-dans les réglages ni dans un fichier de configuration. Le raisonnement est celui du §12.4 :
+dans les réglages ni dans un fichier de configuration : `build.rs` lit
+`src-tauri/catalogue.pub` à la compilation. Absent, la clé est vide et le catalogue refuse
+tout ; la release de WinTool refuse de se construire sans. **Ce n'est pas la clé des mises à
+jour** (§11.2) : si l'une fuitait, elle ne signerait que son propre domaine. Le raisonnement est celui du §12.4 :
 tout ce qui est inscriptible sans élévation est remplaçable par un logiciel malveillant, et
 une clé publique remplacée transforme le bandeau « source officielle » en décor.
 
@@ -996,9 +1015,27 @@ L'ordre des opérations n'est pas négociable :
    afficher du contenu de l'index. Un index non vérifié est une donnée hostile.
 4. Analyser l'index vérifié.
 
-Un index est refusé s'il déclare un chemin de fichier contenant un séparateur de dossier,
-un `..`, un caractère interdit par Windows ou un nom de périphérique réservé (`CON`, `PRN`,
-`AUX`, `NUL`, `COM1`…). Sans ce filtre, une source pourrait écrire hors de son dossier.
+Un index est refusé s'il déclare un nom de fichier hors d'une **liste blanche** — lettres
+et chiffres ASCII, point, tiret, souligné, et `.ps1` pour finir —, contenant `..`, ou
+portant un nom de périphérique réservé (`CON`, `PRN`, `AUX`, `NUL`, `COM0`…`LPT9`). Une
+liste blanche plutôt qu'une liste noire : elle exclut d'office séparateurs, deux-points
+(flux NTFS alternatifs), caractères interdits et homoglyphes. Sans ce filtre, une source
+pourrait écrire hors de son dossier. Deux noms qui ne diffèrent que par la casse sont
+refusés : Windows y verrait le même fichier.
+
+L'index déclare aussi `format` (version du format : un format inconnu demande une mise à
+jour de WinTool plutôt qu'il ne se lit de travers), `source` (un index signé pour une autre
+source est refusé), `version` (`X.Y.Z`) et `tag`, la release où vivent les scripts. Les
+scripts se téléchargent depuis **cette** release, jamais depuis « la dernière » : entre la
+lecture de l'index et celle des scripts, une autre a pu paraître.
+
+**Un index plus ancien que celui installé est refusé.** Sans ce contrôle, qui intercepte la
+connexion pourrait servir un ancien index, authentique et correctement signé, pour ramener
+un script dont un défaut a été corrigé depuis.
+
+Le format est documenté dans le README du dépôt du catalogue ; l'index est construit par
+`tools/construire-index-catalogue.ps1`, qui vit dans ce dépôt-ci, à côté du code qui le
+lit.
 
 ### 16.4 Où la confiance est ancrée
 
@@ -1026,14 +1063,29 @@ fasse **contre l'index signé** et non contre une empreinte recalculée localeme
 ### 16.5 Installer et mettre à jour un script
 
 Un script téléchargé est d'abord reçu en mémoire, son empreinte calculée, puis comparée à
-celle de l'index signé. **Il n'est écrit sur le disque qu'après cette comparaison**, dans
-`%LOCALAPPDATA%\WinTool\scripts\<id-source>\`. Un dossier par source : deux sources ne
-peuvent pas se marcher dessus, et la provenance d'un script se lit dans son chemin.
+celle de l'index signé. **Rien n'est écrit sur le disque tant que tous les scripts reçus ne
+correspondent pas**, dans `%LOCALAPPDATA%\WinTool\sources\<id-source>\`. Un dossier par
+source, à part des scripts de l'utilisateur : deux sources ne peuvent pas se marcher dessus,
+et la provenance d'un script se lit dans son chemin.
 
-La mise à jour suit le §11 — **détecter et proposer, jamais installer sans accord**. Trois
-comportements au choix dans les réglages : vérifier au démarrage, vérifier à la demande,
-ne jamais vérifier. Par défaut, vérification au démarrage et **proposition** ; rien n'est
-téléchargé tant que l'utilisateur n'a pas dit oui.
+L'écriture se fait fichier par fichier, chacun dans un fichier voisin renommé par-dessus la
+cible, et **l'index et sa signature en dernier**. Interrompue en route, l'installation laisse
+des scripts neufs sous l'ancien index : leurs empreintes ne correspondent plus, ils
+demandent l'accord de l'utilisateur jusqu'à la prochaine installation complète. L'échec
+penche toujours du côté de la prudence.
+
+Un script **modifié localement** est mis de côté (`<nom>.ps1.<horodatage>.bak`, que la
+découverte ignore) avant d'être remplacé : WinTool ne détruit pas le travail de
+l'utilisateur. Un script **retiré du catalogue** reste sur le disque — WinTool ne supprime
+jamais un script — mais n'étant plus nommé par l'index, il redevient un script ordinaire,
+soumis à l'approbation ; l'interface le dit au moment de l'installation.
+
+La mise à jour suit le §11 — **détecter et proposer, jamais installer sans accord**. Deux
+comportements au choix dans les réglages : vérifier au démarrage (par défaut) ou seulement
+à la demande. Dans les deux cas, la vérification ne télécharge que l'index ; aucun script
+n'est téléchargé tant que l'utilisateur n'a pas dit oui. (La spécification en prévoyait un
+troisième, « ne jamais vérifier » : il ne différait du second que par l'absence d'un bouton,
+et n'a pas été retenu.)
 
 Une mise à jour change l'empreinte. Elle repasse donc par la règle du §16.4 : automatique
 pour la source officielle, écran d'approbation pour les autres. Un script mis à jour n'est
@@ -1046,16 +1098,22 @@ officielle en tête et identifiée comme telle. Un bouton permet de **continuer 
 source** : l'utilisateur qui veut seulement déposer ses propres scripts ne doit pas avoir à
 refuser un catalogue pour arriver à l'application.
 
-**Des scripts, mais aucune source.** Un rappel discret, une fois, expliquant que ces
-scripts ne recevront aucune mise à jour. Il porte une case **« ne plus afficher »** qui est
+**Des scripts, mais aucune source.** Un rappel discret, une fois par session, expliquant
+que ces scripts ne recevront aucune mise à jour. Il porte une case **« ne plus afficher »** qui est
 respectée définitivement.
 
 **Sur chaque script**, sa provenance est visible sans avoir à la chercher : source
 officielle, nom de la source tierce, ou script local. Un script de source tierce porte la
 mention qu'il **n'est ni contrôlé ni approuvé par le projet WinTool**.
 
-**Dans les réglages**, la gestion des sources : ajouter, retirer, activer, vérifier
-maintenant, et le choix du comportement de mise à jour.
+**Dans les réglages**, une section Catalogue, visible dans les deux modes : l'état de la
+version installée, installer ou vérifier maintenant, et le moment de la vérification.
+Ajouter, retirer ou activer une source tierce viendront avec elles.
+
+La formulation n'atteste que la **provenance** : « publiés et signés par le projet
+WinTool », jamais « vérifiés ». La licence (conditions additionnelles, §5) précise que le
+concédant n'examine ni ne garantit les scripts, y compris ceux de la source officielle ;
+l'interface ne doit pas promettre davantage.
 
 Le mode Simple suit les règles de langage du §3. « Source » n'y apparaît pas : on y parle
 de **« catalogue d'entretiens »**, et une source tierce devient **« ajouté par vous, pas
