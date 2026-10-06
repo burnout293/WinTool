@@ -16,17 +16,36 @@
 
   Usage, depuis la racine du dépôt :
     powershell -NoProfile -File tools\generer-cle-signature.ps1
+    powershell -NoProfile -File tools\generer-cle-signature.ps1 -Cible catalogue
+
+  Deux clés distinctes, jamais la même :
+    mises-a-jour  signe les installeurs de WinTool. Clé publique dans
+                  src-tauri/tauri.conf.json (plugins.updater.pubkey).
+    catalogue     signe l'index du catalogue officiel de scripts. Clé publique
+                  dans src-tauri/catalogue.pub, compilée dans l'application.
+  Si l'une fuitait, elle ne signerait que son propre domaine : une clé de
+  catalogue compromise ne fabrique pas de fausse mise à jour, et inversement.
 
   ATTENTION : écrase la clé existante. Une clé déjà utilisée pour publier ne doit
   être remplacée qu'en connaissance de cause : chaque installation existante
   refuserait les versions signées par la nouvelle (§11.2 de la spécification).
 #>
 param(
-    [string] $Fichier = (Join-Path $env:USERPROFILE '.tauri\wintool.key'),
+    [ValidateSet('mises-a-jour', 'catalogue')]
+    [string] $Cible = 'mises-a-jour',
+    [string] $Fichier,
     [string] $Config = 'src-tauri/tauri.conf.json',
+    [string] $ClePublique = 'src-tauri/catalogue.pub',
     # Pour les essais seulement : ne touche pas au presse-papiers.
     [switch] $SansPressePapiers
 )
+
+$catalogue = $Cible -eq 'catalogue'
+if (-not $Fichier) {
+    $nom = if ($catalogue) { 'wintool-catalogue.key' } else { 'wintool.key' }
+    $Fichier = Join-Path (Join-Path $env:USERPROFILE '.tauri') $nom
+}
+$depot = if ($catalogue) { 'WinTool-Catalogue' } else { 'WinTool' }
 
 function Arret([string] $Message) {
     Write-Host ''
@@ -67,26 +86,40 @@ if ($code -ne 0 -or -not (Test-Path -LiteralPath "$Fichier.pub")) {
 # Remplacement textuel de l'ancienne valeur : ConvertTo-Json reformaterait tout le
 # fichier. Écrit en UTF-8 sans BOM, comme le reste du dépôt.
 $pub = (Get-Content -LiteralPath "$Fichier.pub" -Raw).Trim()
-$texte = [IO.File]::ReadAllText((Resolve-Path $Config).Path)
-$avant = ($texte | ConvertFrom-Json).plugins.updater.pubkey
-if ([string]::IsNullOrWhiteSpace($avant)) {
-    Arret "$Config ne déclare pas plugins.updater.pubkey."
+if ($catalogue) {
+    # Un fichier a lui seul : la cle publique, rien d'autre.
+    $dossierPub = Split-Path -Parent ([IO.Path]::GetFullPath($ClePublique))
+    New-Item -ItemType Directory -Force -Path $dossierPub | Out-Null
+    [IO.File]::WriteAllText([IO.Path]::GetFullPath($ClePublique), "$pub`n", (New-Object Text.UTF8Encoding $false))
+    $destination = $ClePublique
+} else {
+    $texte = [IO.File]::ReadAllText((Resolve-Path $Config).Path)
+    $avant = ($texte | ConvertFrom-Json).plugins.updater.pubkey
+    if ([string]::IsNullOrWhiteSpace($avant)) {
+        Arret "$Config ne déclare pas plugins.updater.pubkey."
+    }
+    $texte = $texte.Replace($avant, $pub)
+    [IO.File]::WriteAllText((Resolve-Path $Config).Path, $texte, (New-Object Text.UTF8Encoding $false))
+    $destination = $Config
 }
-$texte = $texte.Replace($avant, $pub)
-[IO.File]::WriteAllText((Resolve-Path $Config).Path, $texte, (New-Object Text.UTF8Encoding $false))
 
 # --- 4. Vérification complète, avant que rien ne quitte la machine ----------------
 Write-Host 'Vérification de la paire clé / mot de passe…'
 $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -LiteralPath $Fichier -Raw
 $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = $mdp
-$verdict = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'verifier-cle-signature.ps1') -Config $Config 2>&1 | Out-String
+$verificateur = Join-Path $PSScriptRoot 'verifier-cle-signature.ps1'
+$verdict = if ($catalogue) {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $verificateur -ClePublique $ClePublique 2>&1 | Out-String
+} else {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $verificateur -Config $Config 2>&1 | Out-String
+}
 $codeVerif = $LASTEXITCODE
 Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY, Env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD -ErrorAction SilentlyContinue
 if ($codeVerif -ne 0) {
     Arret "la vérification a échoué :`n$($verdict.Trim())"
 }
 $identifiant = if ($verdict -match 'cle ([0-9A-F]{16})') { $Matches[1] } else { '?' }
-Write-Host "Clé $identifiant générée et vérifiée. $Config est à jour." -ForegroundColor Green
+Write-Host "Clé $identifiant générée et vérifiée. $destination est à jour." -ForegroundColor Green
 
 # --- 5. Remise par le presse-papiers ---------------------------------------------
 if ($SansPressePapiers) {
@@ -94,7 +127,7 @@ if ($SansPressePapiers) {
     exit 0
 }
 
-$secrets = 'https://github.com/burnout293/WinTool/settings/secrets/actions'
+$secrets = "https://github.com/burnout293/$depot/settings/secrets/actions"
 Write-Host ''
 Write-Host "Ouvrez la page des secrets : $secrets"
 Write-Host ''

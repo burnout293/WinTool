@@ -26,6 +26,11 @@
 #>
 param(
     [string] $Config = 'src-tauri/tauri.conf.json',
+    # Cle publique a laquelle comparer, sous forme de fichier .pub (format tauri,
+    # base64). Remplace la lecture de plugins.updater.pubkey dans $Config : c'est
+    # ainsi que se verifie la cle du CATALOGUE (src-tauri/catalogue.pub), qui
+    # n'est pas celle des mises a jour.
+    [string] $ClePublique,
     # Usage local : le fichier de cle privee, plutot que la variable.
     [string] $FichierCle
 )
@@ -154,9 +159,17 @@ if ($code -ne 0 -or -not (Test-Path -LiteralPath "$essai.sig")) {
 $idPrivee = Get-IdentifiantCle (Get-Content -LiteralPath "$essai.sig" -Raw)
 Remove-Item -LiteralPath $essai, "$essai.sig" -ErrorAction SilentlyContinue
 
-$pub = (Get-Content -LiteralPath $Config -Raw | ConvertFrom-Json).plugins.updater.pubkey
+if ($ClePublique) {
+    if (-not (Test-Path -LiteralPath $ClePublique)) {
+        Echec 'Cle publique absente' "$ClePublique n'existe pas."
+    }
+    $pub = (Get-Content -LiteralPath $ClePublique -Raw).Trim()
+    $Config = $ClePublique
+} else {
+    $pub = (Get-Content -LiteralPath $Config -Raw | ConvertFrom-Json).plugins.updater.pubkey
+}
 if ([string]::IsNullOrWhiteSpace($pub)) {
-    Echec 'Cle publique absente' "$Config ne declare pas plugins.updater.pubkey : l'application ne saurait verifier aucune mise a jour."
+    Echec 'Cle publique absente' "$Config ne declare aucune cle publique : l'application ne saurait rien verifier."
 }
 $idPublique = Get-IdentifiantCle $pub
 
