@@ -1,4 +1,5 @@
 mod approval;
+mod catalogue;
 mod contract;
 mod discovery;
 mod history;
@@ -73,7 +74,7 @@ fn list_scripts_grouped(app: tauri::AppHandle) -> Result<GroupedResult, String> 
     let groupes = settings::group_scripts(&reglages, decouverte.scripts);
     Ok(GroupedResult {
         root: decouverte.root,
-        shipped_root: decouverte.shipped_root,
+        catalogue_root: decouverte.catalogue_root,
         problems: decouverte.problems,
         categories: groupes.categories,
         unclassified: groupes.unclassified,
@@ -84,7 +85,7 @@ fn list_scripts_grouped(app: tauri::AppHandle) -> Result<GroupedResult, String> 
 #[derive(Serialize)]
 struct GroupedResult {
     root: String,
-    shipped_root: String,
+    catalogue_root: String,
     problems: Vec<String>,
     categories: Vec<settings::CategoryGroup>,
     unclassified: Vec<discovery::ScriptEntry>,
@@ -116,16 +117,17 @@ fn engines() -> runner::Engines {
 const NON_APPROUVE: &str = "NON_APPROUVE";
 
 /// Vrai si ce script peut s'executer sans passer par l'ecran de confiance.
-/// Un script livre (`Default\`, verifie en CI, §5.4) l'est implicitement — sa
-/// protection vient des droits du systeme (§4.3), pas de ce magasin. Tout le
-/// reste doit figurer dans le magasin par son hash exact (§12.1) : toute
-/// modification du fichier change le hash et invalide l'approbation.
-fn script_approuve(origin: &str, hash: &str) -> Result<bool, String> {
-    if origin == "shipped" {
+/// Un script du catalogue officiel l'est implicitement **si son empreinte est
+/// celle que declare l'index signe** (§16.4) : c'est la signature qui fonde la
+/// confiance, pas le dossier, inscriptible. Tout le reste doit figurer dans le
+/// magasin par son hash exact (§12.1) : toute modification du fichier change
+/// le hash et invalide l'approbation.
+fn script_approuve(entree: &discovery::ScriptEntry) -> Result<bool, String> {
+    if entree.origin == "official" && entree.verified {
         return Ok(true);
     }
     let store = approval::load()?;
-    Ok(approval::is_approved(&store, hash))
+    Ok(approval::is_approved(&store, &entree.hash))
 }
 
 /// Relance WinTool avec les droits administrateur, puis ferme l'instance
@@ -220,40 +222,51 @@ fn run_script(
     // de faire porter ce champ par `RunRequest`, pour ne pas avoir a faire
     // confiance a ce que le frontend affirme sur un script qu'il ne controle
     // pas.
+    //
+    // Une seule decouverte, et c'est l'entree qu'elle a approuvee qui part au
+    // moteur, avec son empreinte : le moteur verrouille le fichier et refuse
+    // tout contenu different. Avant la 1.2, le moteur refaisait sa propre
+    // decouverte : deux substitutions rapides du fichier, l'une avant
+    // l'approbation, l'autre avant la seconde decouverte, faisaient executer
+    // un contenu que personne n'avait approuve.
     let decouverte = discovery::discover(&app)?;
+    let entree = decouverte
+        .scripts
+        .iter()
+        .find(|s| s.id == req.script_id)
+        .cloned()
+        .ok_or_else(|| format!("Script introuvable : {}", req.script_id))?;
     let mut simule = false;
-    if let Some(entree) = decouverte.scripts.iter().find(|s| s.id == req.script_id) {
-        if !script_approuve(entree.origin, &entree.hash)? {
-            return Err(NON_APPROUVE.to_string());
-        }
+    if !script_approuve(&entree)? {
+        return Err(NON_APPROUVE.to_string());
+    }
 
-        // Simulation (§6.9). Ce sont les reglages enregistres qui decident, pas
-        // la configuration envoyee par l'interface : la valeur de `SafeTest`
-        // est imposee ici, si bien que ce qui s'execute est toujours ce que les
-        // reglages annoncent.
-        //
-        // **Simulation activee, script sans `SafeTest` : refus.** Lui injecter
-        // une cle qu'il n'utilise pas ajouterait une entree inerte a sa table,
-        // et il modifierait la machine pendant que l'interface annonce une
-        // simulation. Un refus visible vaut mieux qu'une garantie fausse
-        // (§12.2 : ne jamais laisser croire a une protection absente).
-        let reglages = settings::load(&app)?;
-        let general = simulation::bilan(
-            &reglages,
-            decouverte.scripts.iter().map(|s| (s.id.as_str(), &s.meta)),
-        );
-        match simulation::decision(&reglages, &entree.id, &entree.meta, &general) {
-            simulation::Decision::Refuser => return Err(SANS_SIMULATION.to_string()),
-            simulation::Decision::Simuler => {
+    // Simulation (§6.9). Ce sont les reglages enregistres qui decident, pas
+    // la configuration envoyee par l'interface : la valeur de `SafeTest`
+    // est imposee ici, si bien que ce qui s'execute est toujours ce que les
+    // reglages annoncent.
+    //
+    // **Simulation activee, script sans `SafeTest` : refus.** Lui injecter
+    // une cle qu'il n'utilise pas ajouterait une entree inerte a sa table,
+    // et il modifierait la machine pendant que l'interface annonce une
+    // simulation. Un refus visible vaut mieux qu'une garantie fausse
+    // (§12.2 : ne jamais laisser croire a une protection absente).
+    let reglages = settings::load(&app)?;
+    let general = simulation::bilan(
+        &reglages,
+        decouverte.scripts.iter().map(|s| (s.id.as_str(), &s.meta)),
+    );
+    match simulation::decision(&reglages, &entree.id, &entree.meta, &general) {
+        simulation::Decision::Refuser => return Err(SANS_SIMULATION.to_string()),
+        simulation::Decision::Simuler => {
+            req.config
+                .insert(simulation::CLE.to_string(), serde_json::Value::Bool(true));
+            simule = true;
+        }
+        simulation::Decision::Reel => {
+            if simulation::simulable(&entree.meta) {
                 req.config
-                    .insert(simulation::CLE.to_string(), serde_json::Value::Bool(true));
-                simule = true;
-            }
-            simulation::Decision::Reel => {
-                if simulation::simulable(&entree.meta) {
-                    req.config
-                        .insert(simulation::CLE.to_string(), serde_json::Value::Bool(false));
-                }
+                    .insert(simulation::CLE.to_string(), serde_json::Value::Bool(false));
             }
         }
     }
@@ -261,7 +274,7 @@ fn run_script(
     // Un `Arc` plutot qu'un etat emprunte : le fil qui attend la fin du
     // processus doit pouvoir liberer l'emplacement bien apres le retour de
     // cette commande.
-    let mut demarre = runner::run_script(&app, state.inner().clone(), req)?;
+    let mut demarre = runner::run_script(&app, state.inner().clone(), req, entree)?;
     demarre.simulated = simule;
     Ok(demarre)
 }
@@ -288,7 +301,7 @@ fn preparer_approbation(
     let Some(entree) = decouverte.scripts.iter().find(|s| s.id == script_id) else {
         return Ok(None);
     };
-    if script_approuve(entree.origin, &entree.hash)? {
+    if script_approuve(entree)? {
         return Ok(None);
     }
 
@@ -726,6 +739,73 @@ fn set_update_policy(app: tauri::AppHandle, policy: String) -> Result<Settings, 
     })
 }
 
+/// Code d'erreur traduit par l'interface : toucher au catalogue pendant une
+/// execution. Le script en cours est verrouille en ecriture (§12.4), son
+/// remplacement echouerait de toute facon — on le dit avant d'essayer.
+const CATALOGUE_PENDANT_EXECUTION: &str = "CATALOGUE_PENDANT_EXECUTION";
+
+/// Etat du catalogue officiel installe (§16) : version, nombre de scripts, et
+/// ce qui ne va pas s'il y a lieu.
+#[tauri::command]
+fn catalogue_state(app: tauri::AppHandle) -> Result<catalogue::Etat, String> {
+    catalogue::etat(&app)
+}
+
+/// Interroge le catalogue officiel et dit ce qu'une installation changerait.
+/// Ne telecharge que l'index signe ; aucun script, rien d'ecrit.
+#[tauri::command]
+async fn check_catalogue(app: tauri::AppHandle) -> Result<catalogue::Bilan, String> {
+    catalogue::examiner(&app).await
+}
+
+/// Installe ou met a jour le catalogue officiel. Installer, c'est aussi
+/// choisir cette source : le reglage suit.
+#[tauri::command]
+async fn install_catalogue(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<runner::Runner>>,
+) -> Result<catalogue::Installation, String> {
+    if state.snapshot().is_some() {
+        return Err(CATALOGUE_PENDANT_EXECUTION.to_string());
+    }
+    let fait = catalogue::installer(&app).await?;
+    with_settings(&app, |s| {
+        s.catalogue_source = "official".to_string();
+        Ok(())
+    })?;
+    Ok(fait)
+}
+
+#[tauri::command]
+fn set_catalogue_source(app: tauri::AppHandle, source: String) -> Result<Settings, String> {
+    if !settings::SOURCES_CATALOGUE.contains(&source.as_str()) {
+        return Err(format!("source de catalogue inconnue : {source}"));
+    }
+    with_settings(&app, |s| {
+        s.catalogue_source = source;
+        Ok(())
+    })
+}
+
+#[tauri::command]
+fn set_catalogue_check(app: tauri::AppHandle, policy: String) -> Result<Settings, String> {
+    if !settings::VERIFICATIONS_CATALOGUE.contains(&policy.as_str()) {
+        return Err(format!("verification de catalogue inconnue : {policy}"));
+    }
+    with_settings(&app, |s| {
+        s.catalogue_check = policy;
+        Ok(())
+    })
+}
+
+#[tauri::command]
+fn hide_catalogue_reminder(app: tauri::AppHandle) -> Result<Settings, String> {
+    with_settings(&app, |s| {
+        s.catalogue_reminder_hidden = true;
+        Ok(())
+    })
+}
+
 #[tauri::command]
 fn set_failure_policy(app: tauri::AppHandle, policy: String) -> Result<Settings, String> {
     with_settings(&app, |s| {
@@ -923,6 +1003,12 @@ pub fn run() {
             set_update_policy,
             check_update,
             install_update,
+            catalogue_state,
+            check_catalogue,
+            install_catalogue,
+            set_catalogue_source,
+            set_catalogue_check,
+            hide_catalogue_reminder,
             set_failure_policy,
             set_show_setting_numbers,
             set_ui_scale,

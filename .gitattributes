@@ -2,3 +2,6 @@
 *.md   text eol=lf
 *.html text eol=lf
 
+# Fixtures signees : la signature porte sur les octets exacts. Une conversion
+# des fins de ligne a l'extraction les invaliderait, et les tests avec.
+src-tauri/fixtures/** binary

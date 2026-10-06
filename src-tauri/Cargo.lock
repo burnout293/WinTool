@@ -5195,7 +5195,11 @@ dependencies = [
 name = "wintool"
 version = "1.1.1"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
+ "minisign-verify",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "sha2",

@@ -13,6 +13,20 @@
  */
 
 (() => {
+  /**
+   * Scenario du catalogue (§16), par `?catalogue=` :
+   *   (absent)   catalogue 1.0.0 installe, a jour
+   *   vide       aucun script, rien d'installe : l'accueil propose le catalogue
+   *   perso      des scripts a soi, aucun catalogue : le rappel s'affiche
+   *   maj        installe, une version 1.1.0 attend
+   *   modifie    installe, un script officiel modifie sur le PC
+   *   signature  l'installation echoue sur une signature refusee
+   *   horsligne  la verification echoue faute de reseau
+   */
+  const SCENARIO = new URLSearchParams(location.search).get('catalogue') || '';
+  let catalogueInstalle = !['vide', 'perso', 'signature'].includes(SCENARIO);
+  const CATALOGUE_ROOT = 'C:\\Users\\Buly\\AppData\\Local\\WinTool\\sources\\officiel';
+
   const CATS = [
     { id: 'entretien', fr: 'Entretien complet', en: 'Full maintenance', icon: 'sparkles', pinned: true, aggregate: true },
     { id: 'cleaning', fr: 'Faire le ménage', en: 'Cleaning', icon: 'broom', pinned: false, aggregate: false },
@@ -46,9 +60,11 @@
     n += 1;
     return {
       id,
-      path: `Default/${String(100 + n)}_${id.toUpperCase()}.ps1`,
-      abs_path: `C:\\Program Files\\WinTool\\scripts\\Default\\${String(100 + n)}_${id.toUpperCase()}.ps1`,
-      origin: 'shipped',
+      path: `${String(100 + n)}_${id.toUpperCase()}.ps1`,
+      abs_path: `${CATALOGUE_ROOT}\\${String(100 + n)}_${id.toUpperCase()}.ps1`,
+      // Struct `discovery::ScriptEntry` : `official` + `verified` depuis la 1.2.
+      origin: SCENARIO === 'perso' ? 'user' : 'official',
+      verified: SCENARIO !== 'perso' && !(SCENARIO === 'modifie' && id === 'set-dns'),
       hash: (id + 'abcdef0123456789').repeat(4).slice(0, 64),
       declared_id: true,
       meta: {
@@ -137,7 +153,16 @@
     ],
   };
 
-  const TOUS = Object.values(SCRIPTS).flat();
+  const TOUT = Object.values(SCRIPTS).flat();
+  /** Les scripts presents sur le disque : aucun tant que le catalogue n'est
+   *  pas installe, dans le scenario `vide` et ses voisins. */
+  const presents = () => (catalogueInstalle || SCENARIO === 'perso' ? TOUT : []);
+  // `has` autant que `get` : filter, map et forEach testent la presence de
+  // chaque indice avant de le lire — sans lui, la liste paraitrait vide.
+  const TOUS = new Proxy([], {
+    get: (_, k) => Reflect.get(presents(), k),
+    has: (_, k) => Reflect.has(presents(), k),
+  });
 
   /**
    * Struct `lib::GroupedResult` — PAS `settings::GroupedScripts`.
@@ -159,7 +184,7 @@
 
   const groupes = () => ({
     root: 'C:\\Users\\Buly\\AppData\\Local\\WinTool\\scripts',
-    shipped_root: 'C:\\Program Files\\WinTool\\scripts\\Default',
+    catalogue_root: CATALOGUE_ROOT,
     problems: [],
     categories: CATS.map((c) => ({
       category: categorie(c),
@@ -184,6 +209,9 @@
     overrides: {},
     show_setting_numbers: false,
     ui_scale: 1,
+    catalogue_source: catalogueInstalle ? 'official' : '',
+    catalogue_check: 'startup',
+    catalogue_reminder_hidden: false,
     // Le banc saute l'accueil par defaut ; `?onboarding=1` le rejoue.
     onboarded: !new URLSearchParams(location.search).has('onboarding'),
   };
@@ -202,7 +230,7 @@
   // --- Execution simulee ---------------------------------------------------
   // Le banc rejoue une sortie plausible pour que la progression, les couleurs
   // de marqueur et le bilan soient reellement observables.
-  const auditeurs = { 'script:line': [], 'script:end': [] };
+  const auditeurs = { 'script:line': [], 'script:end': [], 'catalogue:progress': [] };
   const emettre = (nom, payload) => auditeurs[nom]?.forEach((f) => f({ payload }));
 
   const LIGNES = [
@@ -305,6 +333,51 @@
       // Le vrai greffon fermerait l'application ici ; le banc ne peut pas.
       throw new Error('banc : l’installeur aurait ete lance et WinTool ferme');
     },
+    // Structs `catalogue::Etat`, `Bilan`, `Installation`.
+    catalogue_state: () => ({
+      cle: true,
+      depot: 'https://github.com/burnout293/WinTool-Catalogue',
+      dossier: CATALOGUE_ROOT,
+      installe: catalogueInstalle ? { version: '1.0.0', published: '2026-10-06', scripts: TOUT.length } : null,
+      probleme: null,
+    }),
+    check_catalogue: async () => {
+      await new Promise((r) => setTimeout(r, 400));
+      if (SCENARIO === 'horsligne') throw new Error('CATALOGUE_HORS_LIGNE: error sending request');
+      const el = (id, file, fr) => ({ id, file, title: { fr, en: fr } });
+      if (SCENARIO === 'maj') {
+        return {
+          version: '1.1.0', published: '2026-10-20', installee: '1.0.0',
+          nouveaux: [el('n1', '120_NEW.ps1', 'Nettoyer Teams'), el('n2', '121_NEW.ps1', 'Vider la corbeille')],
+          mis_a_jour: [el('set-dns', '102_SET-DNS.ps1', 'Configurer DNS')],
+          remplaces: [], retires: [el('smart', '110_SMART.ps1', 'Vérifier la santé du disque')],
+          a_jour: false,
+        };
+      }
+      return {
+        version: '1.0.0', published: '2026-10-06', installee: catalogueInstalle ? '1.0.0' : null,
+        nouveaux: catalogueInstalle ? [] : TOUT.map((x) => el(x.id, x.path, x.meta.title)),
+        mis_a_jour: [], remplaces: [], retires: [], a_jour: catalogueInstalle,
+      };
+    },
+    install_catalogue: async () => {
+      const total = SCENARIO === 'maj' ? 3 : TOUT.length;
+      for (let fait = 0; fait <= total; fait += 1) {
+        emettre('catalogue:progress', { fait, total });
+        await new Promise((r) => setTimeout(r, 120));
+      }
+      if (SCENARIO === 'signature') {
+        throw new Error("CATALOGUE_SIGNATURE: l'index ne porte pas la signature du catalogue officiel");
+      }
+      catalogueInstalle = true;
+      reglages.catalogue_source = 'official';
+      return SCENARIO === 'maj'
+        ? { version: '1.1.0', ecrits: 3, copies: [], retires: [{ id: 'smart', file: '110_SMART.ps1', title: { fr: 'Vérifier la santé du disque', en: 'Check disk health' } }] }
+        : { version: '1.0.0', ecrits: TOUT.length, copies: [], retires: [] };
+    },
+    set_catalogue_source: (a) => { reglages.catalogue_source = a.source; return JSON.parse(JSON.stringify(reglages)); },
+    set_catalogue_check: (a) => { reglages.catalogue_check = a.policy; return JSON.parse(JSON.stringify(reglages)); },
+    hide_catalogue_reminder: () => { reglages.catalogue_reminder_hidden = true; return JSON.parse(JSON.stringify(reglages)); },
     engines: () => ({ winps: 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe', pwsh: null }),
     scripts_root: () => 'C:\\Users\\Buly\\AppData\\Local\\WinTool\\scripts',
     get_settings: () => JSON.parse(JSON.stringify(reglages)),

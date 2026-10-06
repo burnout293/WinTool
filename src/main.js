@@ -482,11 +482,14 @@ function rendreEtiquettes(entree) {
       : etiquette(t('badge.non_interruptible'), 'med', true, t('badge.non_interruptible_tip')),
     etiquette(t('badge.redemarrage'), 'med', !!m.reboot),
     etiquette(t('badge.admin_requis'), 'neutre', !!m.admin),
-    // L'origine n'est pas decorative : un script livre vit dans le dossier
-    // d'installation, que du code non eleve ne peut pas modifier. Un script
-    // perso vit dans un dossier inscriptible, d'ou l'approbation.
-    etiquette(t('badge.livre'), 'acc', entree.origin === 'shipped'),
-    etiquette(t('badge.perso'), 'neutre', entree.origin !== 'shipped'),
+    // La provenance n'est pas decorative (§16.4/16.6) : un script officiel
+    // conforme a l'index signe s'execute sans approbation ; modifie, ou depose
+    // a la main, il la demande.
+    entree.origin === 'official'
+      ? entree.verified
+        ? etiquette(t('badge.officiel'), 'acc', true, t('badge.officiel_tip'))
+        : etiquette(t('badge.modifie'), 'med', true, t('badge.modifie_tip'))
+      : etiquette(t('badge.perso'), 'neutre', true),
     etiquette(libelleFait(derniereExecution(entree.id)), 'neutre', !!derniereExecution(entree.id)),
     entree.declared_id ? '' : etiquette(t('badge.sans_id'), 'med', true),
   ]
@@ -890,8 +893,8 @@ async function chargerLots() {
     // Libelle en gras, chemin a la ligne : deux racines lisibles d'un coup
     // d'oeil, au lieu d'un pave ou le nom et le chemin se confondaient.
     document.getElementById('cheminsScripts').innerHTML =
-      `<b>${esc(t('chrome.livres_titre'))}</b> <span class="muted">${esc(t('chrome.lecture_seule'))}</span><br />` +
-      `${esc(etatGroupes.shipped_root)}<br /><br />` +
+      `<b>${esc(t('chrome.catalogue_titre'))}</b><br />` +
+      `${esc(etatGroupes.catalogue_root)}<br /><br />` +
       `<b>${esc(t('chrome.perso_titre'))}</b><br />${esc(etatGroupes.root)}`;
 
     if (etatGroupes.problems?.length) {
@@ -1165,6 +1168,322 @@ function cablerMaj() {
     document.getElementById('majBanner').hidden = true;
   });
   document.getElementById('btnVerifierMaj').addEventListener('click', () => verifierMaj());
+}
+
+/* -------------------------------------------------------------------------
+   Catalogue d'entretiens (specification §16)
+
+   WinTool ne livre plus de scripts : ils viennent du catalogue officiel, dont
+   l'index est signe. Tout le travail de confiance se fait cote Rust
+   (catalogue.rs) — verification de signature, empreintes, ecriture. L'interface
+   propose et rapporte ; elle n'installe jamais rien sans un clic (§16.5).
+   ------------------------------------------------------------------------- */
+
+/** `catalogue::Etat` — null tant qu'inconnu. */
+let etatCatalogue = null;
+/** `catalogue::Bilan` de la derniere verification, s'il propose quelque chose. */
+let bilanCatalogue = null;
+/** « Plus tard » : on ne repropose pas de la session. */
+let catalogueRepousse = false;
+/** Telechargement en cours : un seul a la fois. */
+let catalogueInstallation = false;
+/** Le rappel « des scripts mais aucun catalogue » ne se montre qu'une fois. */
+let rappelCatalogueMontre = false;
+
+const ERREURS_CATALOGUE = {
+  CATALOGUE_PENDANT_EXECUTION: 'cat.pendant_execution',
+  CATALOGUE_SANS_CLE: 'cat.sans_cle',
+  CATALOGUE_HORS_LIGNE: 'cat.hors_ligne',
+  CATALOGUE_INTROUVABLE: 'cat.introuvable',
+  CATALOGUE_SIGNATURE: 'cat.signature',
+  CATALOGUE_ANCIEN: 'cat.ancien',
+  CATALOGUE_FORMAT: 'cat.format',
+  CATALOGUE_EMPREINTE: 'cat.empreinte',
+  CATALOGUE_INVALIDE: 'cat.invalide',
+};
+
+/** Les erreurs arrivent sous la forme `CODE: detail` (catalogue.rs). Une
+ *  signature refusee se dit comme un evenement de securite, pas comme une
+ *  panne. */
+function messageErreurCatalogue(e) {
+  const texte = String(e).replace(/^Error:\s*/, '');
+  const separateur = texte.indexOf(': ');
+  const code = separateur < 0 ? texte : texte.slice(0, separateur);
+  const detail = separateur < 0 ? '' : texte.slice(separateur + 2);
+  if (code === 'CATALOGUE_ECRITURE') return t('cat.ecriture', { e: detail });
+  if (ERREURS_CATALOGUE[code]) return t(ERREURS_CATALOGUE[code]);
+  return t('cat.echec', { e: texte });
+}
+
+/** Titre d'un script de l'index, dans la langue de l'interface si possible. */
+function titreElement(el) {
+  const titres = el.title || {};
+  return titres[currentLang()] || titres.en || Object.values(titres)[0] || el.file;
+}
+
+function dateCourte(iso) {
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? new Date(`${iso}T00:00:00`) : new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso || '';
+  return d.toLocaleDateString(currentLang(), { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/** « 2 ajouts, 3 mises à jour » : ce que changerait une installation. */
+function resumeBilan(b) {
+  const morceaux = [
+    b.nouveaux.length && PLURIEL('cat.nouveaux', b.nouveaux.length),
+    b.mis_a_jour.length && PLURIEL('cat.mis_a_jour', b.mis_a_jour.length),
+    b.remplaces.length && PLURIEL('cat.remplaces', b.remplaces.length),
+    b.retires.length && PLURIEL('cat.retires', b.retires.length),
+  ].filter(Boolean);
+  return morceaux.length ? morceaux.join(', ') : t('cat.nouvelle_version');
+}
+
+/** Bandeau du haut. Sans message : la proposition de mise a jour, s'il y en a
+ *  une. Avec un message : un compte rendu (succes ou echec), a fermer. */
+function rendreBandeauCatalogue(message, { erreur = false } = {}) {
+  const bandeau = document.getElementById('catBanner');
+  if (!bandeau || catalogueInstallation) return;
+  const texte = document.getElementById('catTexte');
+  const agir = document.getElementById('catInstaller');
+  const plusTard = document.getElementById('catPlusTard');
+
+  if (message) {
+    bandeau.hidden = false;
+    bandeau.classList.toggle('erreur', erreur);
+    texte.textContent = message;
+    agir.hidden = true;
+    plusTard.hidden = false;
+    plusTard.textContent = t('maj.fermer');
+    return;
+  }
+
+  const visible = !!bilanCatalogue && !catalogueRepousse;
+  bandeau.hidden = !visible;
+  bandeau.classList.remove('erreur');
+  if (!visible) return;
+  texte.textContent = t('cat.banniere', { detail: resumeBilan(bilanCatalogue) });
+  agir.hidden = false;
+  agir.textContent = t('cat.btn_maj');
+  plusTard.hidden = false;
+  plusTard.textContent = t('maj.plus_tard');
+  // Le script en cours est verrouille en ecriture : le remplacer echouerait.
+  agir.disabled = executionEnCours();
+  agir.dataset.tip = executionEnCours() ? t('cat.pendant_execution') : '';
+}
+
+/** Ligne d'etat et bouton de la section Catalogue des Reglages. */
+function rendreReglagesCatalogue(message) {
+  const etat = document.getElementById('catalogueEtat');
+  const bouton = document.getElementById('btnCatalogue');
+  if (!etat || !bouton) return;
+  const e = etatCatalogue;
+  bouton.hidden = !e?.cle;
+  bouton.disabled = catalogueInstallation;
+  if (!e) {
+    etat.textContent = message || '';
+    return;
+  }
+  if (!e.cle) {
+    etat.textContent = t('cat.sans_cle');
+    return;
+  }
+  if (!e.installe) bouton.textContent = t(e.probleme ? 'cat.btn_reinstaller' : 'cat.btn_installer');
+  else bouton.textContent = t(bilanCatalogue ? 'cat.btn_maj' : 'cat.btn_verifier');
+
+  if (message) {
+    etat.textContent = message;
+    return;
+  }
+  if (e.probleme) etat.textContent = t('cat.etat_probleme');
+  else if (e.installe) {
+    const n = e.installe.scripts;
+    const installe = t('cat.etat_installe', {
+      v: e.installe.version,
+      d: dateCourte(e.installe.published),
+      n,
+      s: n > 1 ? 's' : '',
+    });
+    // Une nouveaute deja detectee se dit ici aussi : rouvrir les Reglages ne
+    // doit pas la faire oublier.
+    etat.textContent = bilanCatalogue
+      ? `${installe} ${t('cat.disponible', { v: bilanCatalogue.version, detail: resumeBilan(bilanCatalogue) })}`
+      : installe;
+  } else etat.textContent = t('cat.etat_absent');
+}
+
+/** Ne telecharge que l'index signe : aucun script, rien d'ecrit. Silencieux
+ *  au demarrage — une machine hors ligne est un cas normal. */
+async function verifierCatalogue({ silencieux = false } = {}) {
+  if (!etatCatalogue?.cle || catalogueInstallation) return;
+  if (!silencieux) rendreReglagesCatalogue(t('cat.verification'));
+  try {
+    const b = await invoke('check_catalogue');
+    bilanCatalogue = b.a_jour ? null : b;
+    if (bilanCatalogue) catalogueRepousse = false;
+    rendreBandeauCatalogue();
+    if (bilanCatalogue) rendreReglagesCatalogue(t('cat.disponible', { v: b.version, detail: resumeBilan(b) }));
+    else rendreReglagesCatalogue(silencieux ? undefined : t('cat.a_jour', { v: b.version }));
+  } catch (e) {
+    console.error('Verification du catalogue :', e);
+    if (!silencieux) rendreReglagesCatalogue(messageErreurCatalogue(e));
+  }
+}
+
+/** Le meme texte partout ou l'utilisateur peut regarder : bandeau, Reglages,
+ *  et l'accueil s'il l'y a lance. */
+function afficherProgressionCatalogue(texte) {
+  const bandeau = document.getElementById('catBanner');
+  bandeau.hidden = false;
+  bandeau.classList.remove('erreur');
+  document.getElementById('catTexte').textContent = texte;
+  document.getElementById('catInstaller').hidden = true;
+  document.getElementById('catPlusTard').hidden = true;
+  const offre = document.getElementById('offreEtat');
+  if (offre) offre.textContent = texte;
+  const etat = document.getElementById('catalogueEtat');
+  if (etat) etat.textContent = texte;
+}
+
+async function installerCatalogue() {
+  if (catalogueInstallation || executionEnCours() || !etatCatalogue?.cle) return;
+  catalogueInstallation = true;
+  document.querySelectorAll('[data-offre="installer"], #btnCatalogue').forEach((b) => { b.disabled = true; });
+  afficherProgressionCatalogue(t('cat.telechargement_debut'));
+
+  const arreterEcoute = await ecouter('catalogue:progress', (ev) => {
+    const { fait, total } = ev.payload;
+    afficherProgressionCatalogue(total ? t('cat.telechargement', { f: fait, n: total }) : t('cat.telechargement_debut'));
+  });
+
+  let message = '';
+  let erreur = false;
+  try {
+    const r = await invoke('install_catalogue');
+    const morceaux = [t('cat.installe', { v: r.version })];
+    if (r.copies.length) morceaux.push(t('cat.copies', { f: r.copies.join(', ') }));
+    if (r.retires.length) morceaux.push(t('cat.retires_info', { f: r.retires.map(titreElement).join(', ') }));
+    message = morceaux.join(' ');
+    bilanCatalogue = null;
+  } catch (e) {
+    console.error('Installation du catalogue :', e);
+    message = messageErreurCatalogue(e);
+    erreur = true;
+  } finally {
+    arreterEcoute();
+    catalogueInstallation = false;
+  }
+
+  // Installer, c'est aussi choisir cette source : les reglages ont bouge.
+  try {
+    reglagesActuels = await invoke('get_settings');
+    etatCatalogue = await invoke('catalogue_state');
+  } catch (e) {
+    console.error('Etat du catalogue :', e);
+  }
+  if (!erreur) {
+    await chargerLots();
+    await rafraichirSimulation();
+    const etapeVisible = document.querySelector('.s-step:not([hidden])')?.dataset.s;
+    if (modeCourant === 'simple' && etapeVisible === '1') await rendreEtapeChoisir();
+  }
+  rendreReglagesCatalogue(message);
+  rendreBandeauCatalogue(message, { erreur });
+  const offre = document.getElementById('offreEtat');
+  if (offre) offre.textContent = erreur ? message : '';
+  document.querySelectorAll('[data-offre="installer"]').forEach((b) => { b.disabled = false; });
+}
+
+/** Accueil sans aucun script (§16.6) : la liste des catalogues proposes, la
+ *  source officielle en tete, et un moyen de continuer sans — l'utilisateur
+ *  qui veut deposer ses propres scripts n'a pas a refuser quoi que ce soit
+ *  pour arriver a l'application. */
+async function rendreOffreCatalogue() {
+  document.getElementById('buoysZone').innerHTML = '';
+  retirerVaguesArriere();
+  document.getElementById('sectAutres').hidden = true;
+  document.getElementById('btnContinuerChoix').hidden = true;
+
+  const avecCle = !!etatCatalogue?.cle;
+  const sans = reglagesActuels?.catalogue_source === 'none' || !avecCle;
+  document.getElementById('s1Titre').textContent = t('offre.titre');
+  document.getElementById('s1Sous').textContent = t(sans ? 'offre.sous_sans' : 'offre.sous');
+
+  const carte = avecCle
+    ? `<div class="offre-source">
+        <div class="ri">${(await iconeSVG('shield-check')) || ''}</div>
+        <div class="offre-corps">
+          <div class="rt">${esc(t('offre.officiel'))} <span class="badge acc">${esc(t('offre.badge_officiel'))}</span></div>
+          <div class="rd">${esc(t('offre.officiel_desc'))}</div>
+          <div class="rd discret">${esc(t('offre.vie_privee'))}</div>
+        </div>
+        <button class="btn primary" type="button" data-offre="installer"${catalogueInstallation ? ' disabled' : ''}>${esc(t('offre.installer'))}</button>
+      </div>`
+    : '';
+  const suite = sans
+    ? `<p class="muted offre-note">${esc(t(avecCle ? 'offre.deposer' : 'offre.deposer_seul'))}</p>
+       <button class="btn" type="button" data-offre="dossier">${esc(t('offre.ouvrir_dossier'))}</button>`
+    : `<button class="btn" type="button" data-offre="sans">${esc(t('offre.continuer_sans'))}</button>
+       <p class="muted offre-note">${esc(t('offre.continuer_sans_aide'))}</p>`;
+  document.getElementById('recoCard').innerHTML =
+    `<div class="offre">${carte}<p class="offre-etat" id="offreEtat" aria-live="polite"></p>${suite}</div>`;
+}
+
+/** Des scripts, mais aucun catalogue : ils ne recevront aucune mise a jour.
+ *  Une fois par session, jamais par-dessus l'accueil du premier lancement. */
+function proposerRappelCatalogue() {
+  if (rappelCatalogueMontre || !etatCatalogue?.cle) return;
+  if (etatCatalogue.installe || etatCatalogue.probleme) return;
+  if (reglagesActuels?.catalogue_reminder_hidden) return;
+  // Sans aucun script, c'est l'accueil qui propose le catalogue.
+  if (catalogue.size === 0) return;
+  if (!document.getElementById('onboarding').hidden) return;
+  rappelCatalogueMontre = true;
+  document.getElementById('rappelNePlus').checked = false;
+  document.getElementById('rappelCatalogue').hidden = false;
+}
+
+async function fermerRappelCatalogue() {
+  document.getElementById('rappelCatalogue').hidden = true;
+  if (!document.getElementById('rappelNePlus').checked) return;
+  try {
+    reglagesActuels = await invoke('hide_catalogue_reminder');
+  } catch (e) {
+    console.error('Rappel du catalogue :', e);
+  }
+}
+
+function cablerCatalogue() {
+  document.getElementById('catInstaller').addEventListener('click', installerCatalogue);
+  document.getElementById('catPlusTard').addEventListener('click', () => {
+    catalogueRepousse = true;
+    document.getElementById('catBanner').hidden = true;
+  });
+  document.getElementById('btnCatalogue').addEventListener('click', () => {
+    if (!etatCatalogue?.installe || bilanCatalogue) installerCatalogue();
+    else verifierCatalogue();
+  });
+  document.getElementById('setCatalogueSelect').onchange = async (ev) => {
+    reglagesActuels = await invoke('set_catalogue_check', { policy: ev.target.value });
+  };
+  document.getElementById('btnRappelFermer').onclick = fermerRappelCatalogue;
+  document.getElementById('btnRappelInstaller').onclick = async () => {
+    await fermerRappelCatalogue();
+    installerCatalogue();
+  };
+  document.getElementById('recoCard').addEventListener('click', async (ev) => {
+    const bouton = ev.target.closest('[data-offre]');
+    if (!bouton) return;
+    if (bouton.dataset.offre === 'installer') return void installerCatalogue();
+    if (bouton.dataset.offre === 'dossier') return void invoke('open_scripts_folder').catch((e) => console.error(e));
+    if (bouton.dataset.offre === 'sans') {
+      try {
+        reglagesActuels = await invoke('set_catalogue_source', { source: 'none' });
+      } catch (e) {
+        console.error('Choix du catalogue :', e);
+      }
+      await rendreEtapeChoisir();
+    }
+  });
 }
 
 /**
@@ -2171,6 +2490,10 @@ async function rendreEtapeChoisir() {
   btnContinuer.innerHTML =
     `${esc(t('simple.continuer'))}<svg class="ico" aria-hidden="true"><use href="#arrow-right" /></svg>`;
 
+  // Aucun script du tout : ce n'est pas qu'il manque un lot, c'est qu'il n'y a
+  // encore rien a ranger. L'accueil propose alors le catalogue (§16.6).
+  if (catalogue.size === 0 && !etatCatalogue?.installe) return void (await rendreOffreCatalogue());
+
   if (!dispo.length) {
     zoneReco.innerHTML = `<p class="muted">${esc(t('simple.aucune_categorie'))}</p>`;
     zoneBuoys.innerHTML = '';
@@ -2652,6 +2975,7 @@ async function lancerEntretien() {
   if (!groupe) return;
   entretienActif = true;
   rendreBandeauMaj();
+  rendreBandeauCatalogue();
 
   afficherEtapeSimple(3);
   document.getElementById('s3Titre').textContent = t('s3.titre');
@@ -2741,6 +3065,7 @@ async function arreterEntretien() {
 function terminerEntretien() {
   entretienActif = false;
   rendreBandeauMaj();
+  rendreBandeauCatalogue();
   // L'eau redescend : elle disait « en cours » alors que tout etait fini, et
   // restait a mi-hauteur sur l'ecran de bilan.
   document.getElementById('riseFill')?.classList.add('termine');
@@ -2980,6 +3305,20 @@ function appliquerTraductionsReglages() {
   document.getElementById('btnVerifierMaj').textContent = t('reglages.maj_verifier_btn');
   rendreBandeauMaj();
 
+  document.getElementById('navCatalogue').textContent = t('reglages.nav_catalogue');
+  document.getElementById('secCatalogueTitre').textContent = t('reglages.nav_catalogue');
+  document.getElementById('setCatalogueLabel').textContent = t('cat.titre_reglage');
+  document.getElementById('setCatalogueVerifLabel').textContent = t('cat.verif_label');
+  document.querySelector('#setCatalogueSelect [value="startup"]').textContent = t('cat.verif_startup');
+  document.querySelector('#setCatalogueSelect [value="manual"]').textContent = t('cat.verif_manual');
+  rendreReglagesCatalogue();
+  rendreBandeauCatalogue();
+  document.getElementById('rappelTitre').textContent = t('rappel.titre');
+  document.getElementById('rappelTexte').textContent = t('rappel.texte');
+  document.getElementById('rappelNePlusLabel').textContent = t('rappel.ne_plus');
+  document.getElementById('btnRappelFermer').textContent = t('rappel.fermer');
+  document.getElementById('btnRappelInstaller').textContent = t('rappel.installer');
+
   document.getElementById('setSectionExpert').textContent = t('reglages.section_expert');
   document.getElementById('setEchecLabel').textContent = t('reglages.echec_comportement');
   document.querySelector('#setEchecSelect [value="continue"]').textContent = t('reglages.echec_continuer');
@@ -3012,6 +3351,8 @@ function remplirFormulaireReglages(reglages) {
     b.setAttribute('aria-pressed', String(b.dataset.setLang === reglages.lang));
   });
   document.getElementById('setMajSelect').value = reglages.update_policy;
+  document.getElementById('setCatalogueSelect').value = reglages.catalogue_check || 'startup';
+  rendreReglagesCatalogue();
   document.getElementById('setEchecSelect').value = reglages.failure_policy;
   document.getElementById('setJournauxInput').value = reglages.log_cap_mb;
   document.getElementById('setPolitiqueSelect').value = reglages.exec_policy;
@@ -3076,6 +3417,7 @@ function cablerOnboarding() {
     await appliquerLangue(lang);
     appliquerTheme(theme, false);
     document.getElementById('onboarding').hidden = true;
+    proposerRappelCatalogue();
   };
 }
 
@@ -3379,6 +3721,7 @@ async function demarrer() {
   await cablerPauseAnimation();
   await cablerMoteur();
   cablerMaj();
+  cablerCatalogue();
 
   try {
     const infos = await invoke('app_info');
@@ -3401,6 +3744,14 @@ async function demarrer() {
     console.error('engines a echoue :', e);
   }
 
+  // Avant les lots : l'accueil a besoin de savoir s'il doit proposer le
+  // catalogue plutot que d'annoncer qu'il n'y a rien.
+  try {
+    etatCatalogue = await invoke('catalogue_state');
+  } catch (e) {
+    console.error('catalogue_state a echoue :', e);
+  }
+
   await rafraichirHistorique();
   await chargerLots();
   basculerMode('simple');
@@ -3413,6 +3764,10 @@ async function demarrer() {
   // Apres l'affichage, et sans l'attendre : une verification lente ou une
   // machine hors ligne ne doit jamais retarder l'ouverture de la fenetre.
   if (reglages.update_policy !== 'never') verifierMaj({ silencieux: true });
+  if (etatCatalogue?.installe && reglagesActuels?.catalogue_check !== 'manual') {
+    verifierCatalogue({ silencieux: true });
+  }
+  proposerRappelCatalogue();
 }
 
 demarrer();

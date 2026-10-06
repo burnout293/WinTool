@@ -1494,3 +1494,39 @@ body[data-simulation="activee"] .btn.primary.big.lancer { animation: none; box-s
   font-size: 12.5px; font-weight: 650;
 }
 #iconesGrille .ic-plus:hover { background: var(--surface-3); color: var(--text); }
+
+/* --- Catalogue d'entretiens (specification §16.6) ---------------------------
+   L'accueil sans aucun script : la liste des catalogues, la source officielle
+   en tete. Meme carte que la recommandation de l'etape 1, mais ce n'est pas un
+   choix de lot : elle ne se selectionne pas, elle porte son propre bouton. */
+.offre {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  width: 100%; max-width: 640px; text-align: center;
+}
+.offre-source {
+  display: flex; align-items: center; gap: 18px; width: 100%; text-align: left;
+  background: var(--surface); border: 2.5px solid var(--acc);
+  border-radius: 26px; padding: 17px 22px;
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--acc) 22%, transparent);
+}
+.offre-source .ri {
+  width: 54px; height: 54px; border-radius: 18px; flex-shrink: 0; color: var(--ink);
+  display: grid; place-items: center; background: linear-gradient(135deg, var(--acc), var(--acc-2));
+}
+.offre-source .ri svg { width: 27px; height: 27px; }
+.offre-corps { flex: 1; min-width: 0; }
+.offre-source .rt { font-size: 19px; font-weight: 800; letter-spacing: -.35px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.offre-source .rd { font-size: 13.5px; color: var(--text-2); margin-top: 4px; }
+.offre-source .rd.discret { font-size: 12px; color: var(--text-3); }
+.offre-source .btn { flex-shrink: 0; }
+.offre-etat { min-height: 1.2em; font-size: 13px; color: var(--text-2); }
+.offre-note { font-size: 12.5px; max-width: 460px; }
+@media (max-width: 560px) {
+  .offre-source { flex-direction: column; text-align: center; }
+  .offre-source .rt { justify-content: center; }
+}
+
+.rappel-case {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 16px;
+  font-size: 12.5px; color: var(--text-2); cursor: pointer;
+}

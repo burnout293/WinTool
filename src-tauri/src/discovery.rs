@@ -4,26 +4,22 @@
 //! (specification 4.3) :
 //!
 //! ```text
-//! <dossier d'installation>\scripts\Default\   scripts livres avec l'application
+//! %LOCALAPPDATA%\WinTool\sources\officiel\   catalogue officiel (§16)
 //! %LOCALAPPDATA%\WinTool\scripts\             scripts de l'utilisateur
 //! ├─ MesScripts\                              il organise comme il veut
 //! └─ Essais\
 //! ```
 //!
-//! Les scripts livres **restent dans le dossier d'installation** et ne sont pas
-//! recopies ailleurs. Program Files n'est pas inscriptible sans elevation : du
-//! code lance sous le compte de l'utilisateur ne peut donc pas les remplacer,
-//! alors que ce sont precisement ceux qu'un debutant lancera en mode Simple sans
-//! les lire. La protection vient des droits du systeme, pas d'un mecanisme qu'il
-//! faudrait ecrire et maintenir.
-//!
-//! Le dossier de l'utilisateur, lui, reste inscriptible — c'est le principe du
-//! projet, on depose un `.ps1` et il apparait. C'est aussi pourquoi tout ce qui
-//! s'y trouve passe par l'approbation avant premiere execution (§12.1).
-//!
-//! Une mise a jour remplace `Default\` avec l'application, sans jamais toucher
-//! aux scripts de l'utilisateur, qui vivent ailleurs.
+//! Depuis la 1.2, l'installeur ne livre plus aucun script (§16.1). Les deux
+//! dossiers sont inscriptibles sans elevation : ce ne sont plus les droits du
+//! systeme qui distinguent un script de confiance, c'est la **signature** du
+//! catalogue. Un script du dossier officiel n'est approuve d'office que si
+//! l'index signe le nomme et que son empreinte est exactement celle que l'index
+//! declare (`verified`). Modifie, il redevient un script ordinaire, soumis a
+//! l'approbation avant premiere execution (§12.1) comme tout ce que
+//! l'utilisateur depose lui-meme.
 
+use crate::catalogue;
 use crate::contract::{self, Finding, Script, Severity};
 use crate::security::{self, PointAttention};
 use serde::Serialize;
@@ -41,8 +37,11 @@ pub struct ScriptEntry {
     pub path: String,
     /// Chemin complet, utilise pour l'execution.
     pub abs_path: String,
-    /// `shipped` (livre avec l'application) ou `user`.
+    /// `official` (nomme par l'index signe du catalogue officiel) ou `user`.
     pub origin: &'static str,
+    /// Vrai pour un script officiel dont l'empreinte est exactement celle que
+    /// declare l'index signe : le seul cas d'approbation implicite (§16.4).
+    pub verified: bool,
     /// Empreinte du contenu : base de l'approbation avant premiere execution
     /// (specification 12.1) et de la detection des modifications.
     pub hash: String,
@@ -58,8 +57,8 @@ pub struct ScriptEntry {
 pub struct DiscoveryResult {
     /// Racine des scripts de l'utilisateur — celle qu'ouvre le bouton du meme nom.
     pub root: String,
-    /// Racine des scripts livres, en lecture seule.
-    pub shipped_root: String,
+    /// Dossier du catalogue officiel.
+    pub catalogue_root: String,
     pub scripts: Vec<ScriptEntry>,
     /// Anomalies qui ne visent aucun script en particulier (dossier illisible…).
     pub problems: Vec<String>,
@@ -81,18 +80,6 @@ pub fn base_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
 /// Racine des scripts de l'utilisateur : `%LOCALAPPDATA%\WinTool\scripts`.
 pub fn scripts_root<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     Ok(base_dir(app)?.join("scripts"))
-}
-
-/// Racine des scripts livres, dans le dossier d'installation.
-///
-/// Tauri renvoie ici un chemin canonicalise, donc prefixe `\\?\` sous Windows.
-/// On le nettoie a la source : tous les chemins derives — ceux qui partent a
-/// PowerShell comme ceux affiches dans l'interface — en heritent.
-pub fn shipped_root<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    app.path()
-        .resolve("scripts/Default", tauri::path::BaseDirectory::Resource)
-        .map(sans_prefixe_long)
-        .map_err(|e| format!("ressources introuvables : {e}"))
 }
 
 /// Retire le prefixe de chemin long (`\\?\`) que Windows ajoute lors d'une
@@ -190,10 +177,14 @@ fn lire_entree(
                 "Pas d'id declare : un renommage ou un deplacement fera perdre la configuration de ce script."
                     .into(),
         });
+        // Le chemin tient lieu d'id : il est reserve comme un id declare.
+        // Sinon un autre script pourrait declarer ce chemin comme id et
+        // partager celui-ci sans qu'aucune collision soit relevee.
+        ids_vus.push(id.clone());
     } else if ids_vus.contains(&id) {
-        // Les scripts livres sont parcourus en premier : un script de
-        // l'utilisateur ne peut donc pas s'approprier l'id d'un script livre
-        // pour heriter de sa configuration ou de son approbation.
+        // Le catalogue est parcouru en premier : un script de l'utilisateur ne
+        // peut donc pas s'approprier l'id d'un script officiel pour heriter de
+        // sa configuration ou de sa place dans les lots.
         meta.findings.push(Finding {
             line: 1,
             severity: Severity::Error,
@@ -214,6 +205,7 @@ fn lire_entree(
         path: relatif,
         abs_path: chemin.to_string_lossy().to_string(),
         origin,
+        verified: false,
         hash: sha256_hex(&octets),
         declared_id,
         attention,
@@ -245,27 +237,82 @@ fn parcourir(
     }
 }
 
+/// Parcourt le dossier du catalogue officiel.
+///
+/// Les fichiers que l'index signe nomme passent **en premier**, avant tout le
+/// reste : ce sont eux qui gardent leur `id` en cas de collision. Sans cet
+/// ordre, un fichier depose a cote, au nom choisi pour etre trie avant eux,
+/// pourrait s'approprier l'id d'un script officiel — et avec lui sa place dans
+/// les lots de l'utilisateur. Il resterait soumis a l'approbation, mais elle lui
+/// serait demandee au milieu d'un entretien familier, la ou l'on clique sans
+/// lire. Ce qui n'est pas a l'index vient ensuite, comme script ordinaire.
+fn parcourir_catalogue(
+    racine: &Path,
+    index: Option<&catalogue::Index>,
+    scripts: &mut Vec<ScriptEntry>,
+    ids_vus: &mut Vec<String>,
+    problems: &mut Vec<String>,
+) {
+    if !racine.is_dir() {
+        return;
+    }
+    let mut fichiers = Vec::new();
+    collect_ps1(racine, &mut fichiers, problems);
+    fichiers.sort();
+
+    let signe = |chemin: &PathBuf| -> Option<String> {
+        // Le dossier d'une source est plat : un sous-dossier n'est jamais a l'index.
+        if chemin.parent() != Some(racine) {
+            return None;
+        }
+        let nom = chemin.file_name()?.to_str()?;
+        catalogue::trouver(index?, nom).map(|e| e.sha256.clone())
+    };
+    let (officiels, autres): (Vec<PathBuf>, Vec<PathBuf>) =
+        fichiers.into_iter().partition(|c| signe(c).is_some());
+
+    for chemin in officiels {
+        let attendu = signe(&chemin);
+        match lire_entree(&chemin, racine, "official", ids_vus) {
+            Ok(mut e) => {
+                e.verified = attendu.as_deref() == Some(e.hash.as_str());
+                scripts.push(e);
+            }
+            Err(e) => problems.push(e),
+        }
+    }
+    for chemin in autres {
+        match lire_entree(&chemin, racine, "user", ids_vus) {
+            Ok(e) => scripts.push(e),
+            Err(e) => problems.push(e),
+        }
+    }
+}
+
 pub fn discover<R: Runtime>(app: &AppHandle<R>) -> Result<DiscoveryResult, String> {
     let racine_utilisateur = scripts_root(app)?;
     fs::create_dir_all(&racine_utilisateur)
         .map_err(|e| format!("creation de {} : {e}", racine_utilisateur.display()))?;
 
     let mut problems = Vec::new();
-    let racine_livree = match shipped_root(app) {
-        Ok(r) => r,
+    let racine_catalogue = catalogue::dossier(app)?;
+    // L'index installe est re-verifie a chaque decouverte. S'il ne se verifie
+    // plus, aucun script du catalogue n'est approuve d'office : on le dit.
+    let index = match catalogue::index_local(&racine_catalogue) {
+        Ok(i) => i,
         Err(e) => {
-            problems.push(e);
-            PathBuf::new()
+            problems.push(format!("Catalogue officiel : {e}"));
+            None
         }
     };
 
     let mut scripts: Vec<ScriptEntry> = Vec::new();
     let mut ids_vus: Vec<String> = Vec::new();
 
-    // Les scripts livres d'abord : ils gardent leur id en cas de collision.
-    parcourir(
-        &racine_livree,
-        "shipped",
+    // Le catalogue d'abord : ses scripts gardent leur id en cas de collision.
+    parcourir_catalogue(
+        &racine_catalogue,
+        index.as_ref(),
         &mut scripts,
         &mut ids_vus,
         &mut problems,
@@ -280,7 +327,7 @@ pub fn discover<R: Runtime>(app: &AppHandle<R>) -> Result<DiscoveryResult, Strin
 
     Ok(DiscoveryResult {
         root: racine_utilisateur.to_string_lossy().to_string(),
-        shipped_root: racine_livree.to_string_lossy().to_string(),
+        catalogue_root: racine_catalogue.to_string_lossy().to_string(),
         scripts,
         problems,
     })
@@ -290,7 +337,7 @@ pub fn discover<R: Runtime>(app: &AppHandle<R>) -> Result<DiscoveryResult, Strin
 // Tests
 //
 // `discover` a besoin d'un AppHandle pour resoudre ses deux racines ; le
-// parcours, lui, n'en a pas besoin. C'est donc lui qu'on eprouve, avec deux
+// parcours, lui, n'en a pas besoin. C'est donc lui qu'on eprouve, avec des
 // racines jetables — et c'est bien la que vit la logique qui compte.
 // ---------------------------------------------------------------------------
 
@@ -346,7 +393,7 @@ mod tests {
         let mut scripts = Vec::new();
         let mut ids = Vec::new();
         let mut problemes = Vec::new();
-        parcourir(&livre.0, "shipped", &mut scripts, &mut ids, &mut problemes);
+        parcourir(&livre.0, "official", &mut scripts, &mut ids, &mut problemes);
         parcourir(&perso.0, "user", &mut scripts, &mut ids, &mut problemes);
         (scripts, problemes)
     }
@@ -370,7 +417,7 @@ mod tests {
         assert!(problemes.is_empty(), "{problemes:?}");
         assert_eq!(scripts.len(), 2);
 
-        assert_eq!(scripts[0].origin, "shipped");
+        assert_eq!(scripts[0].origin, "official");
         assert_eq!(scripts[0].path, "200_SLEEP.ps1");
 
         // Le parcours de la racine personnelle reste recursif.
@@ -382,7 +429,7 @@ mod tests {
     }
 
     #[test]
-    fn un_script_perso_ne_peut_pas_prendre_l_id_d_un_script_livre() {
+    fn un_script_perso_ne_peut_pas_prendre_l_id_d_un_script_officiel() {
         let livre = Bac::neuf("livre2");
         let perso = Bac::neuf("perso2");
         let id = "33333333-3333-4333-8333-333333333333";
@@ -393,10 +440,10 @@ mod tests {
         let (scripts, _) = parcours(&livre, &perso);
         assert_eq!(scripts.len(), 2);
 
-        // Le script livre garde l'id : c'est lui qui portera la configuration
-        // et l'approbation attachees a cet identifiant.
+        // Le script officiel garde l'id : c'est lui qui portera la
+        // configuration attachee a cet identifiant.
         assert_eq!(scripts[0].id, id);
-        assert_eq!(scripts[0].origin, "shipped");
+        assert_eq!(scripts[0].origin, "official");
 
         // L'autre retombe sur son chemin, et la collision est signalee.
         assert_eq!(scripts[1].id, "200_IMPOSTEUR.ps1");
@@ -454,14 +501,13 @@ mod tests {
         let mut scripts = Vec::new();
         let mut ids = Vec::new();
         let mut problemes = Vec::new();
-        // Cas reel : l'application lancee depuis un emplacement ou les
-        // ressources ne sont pas en place.
+        // Cas reel : le catalogue n'a jamais ete installe.
         parcourir(
             Path::new(
                 r"Z:
 existe\pas",
             ),
-            "shipped",
+            "official",
             &mut scripts,
             &mut ids,
             &mut problemes,
@@ -471,5 +517,92 @@ existe\pas",
             problemes.is_empty(),
             "une racine absente ne doit pas alarmer"
         );
+    }
+
+    // ----- Dossier du catalogue (specification 16.4) ----------------------
+
+    const CLE_ESSAI: &str = include_str!("../fixtures/catalogue/cle-essai.pub");
+    const I100: &[u8] = include_bytes!("../fixtures/catalogue/index-1.0.0.json");
+    const S100: &[u8] = include_bytes!("../fixtures/catalogue/index-1.0.0.json.sig");
+    const A1: &[u8] = include_bytes!("../fixtures/catalogue/scripts/A-v1.txt");
+    const B: &[u8] = include_bytes!("../fixtures/catalogue/scripts/B.txt");
+
+    fn catalogue_de_test(bac: &Bac) -> catalogue::Index {
+        std::fs::write(bac.0.join("100_A.ps1"), A1).unwrap();
+        std::fs::write(bac.0.join("200_B.ps1"), B).unwrap();
+        catalogue::verifier_avec(CLE_ESSAI, I100, S100).unwrap()
+    }
+
+    fn parcours_catalogue(bac: &Bac, index: Option<&catalogue::Index>) -> Vec<ScriptEntry> {
+        let mut scripts = Vec::new();
+        let mut ids = Vec::new();
+        let mut problemes = Vec::new();
+        parcourir_catalogue(&bac.0, index, &mut scripts, &mut ids, &mut problemes);
+        scripts
+    }
+
+    #[test]
+    fn un_script_conforme_a_l_index_signe_est_verifie() {
+        let bac = Bac::neuf("cat1");
+        let index = catalogue_de_test(&bac);
+        let scripts = parcours_catalogue(&bac, Some(&index));
+        assert_eq!(scripts.len(), 2);
+        assert!(scripts.iter().all(|s| s.origin == "official" && s.verified));
+    }
+
+    #[test]
+    fn un_script_officiel_modifie_perd_sa_verification() {
+        let bac = Bac::neuf("cat2");
+        let index = catalogue_de_test(&bac);
+        std::fs::write(bac.0.join("200_B.ps1"), b"Write-Output 'pirate'").unwrap();
+        let scripts = parcours_catalogue(&bac, Some(&index));
+        let b = scripts.iter().find(|s| s.path == "200_B.ps1").unwrap();
+        // Toujours a sa place dans le catalogue, mais plus approuve d'office.
+        assert_eq!(b.origin, "official");
+        assert!(!b.verified);
+    }
+
+    #[test]
+    fn sans_index_qui_se_verifie_rien_n_est_officiel() {
+        let bac = Bac::neuf("cat3");
+        catalogue_de_test(&bac);
+        let scripts = parcours_catalogue(&bac, None);
+        assert_eq!(scripts.len(), 2);
+        assert!(scripts.iter().all(|s| s.origin == "user" && !s.verified));
+    }
+
+    #[test]
+    fn un_fichier_glisse_dans_le_catalogue_reste_un_script_ordinaire() {
+        let bac = Bac::neuf("cat4");
+        let index = catalogue_de_test(&bac);
+        // Trie avant les scripts officiels, et declare l'id de l'un d'eux (a
+        // defaut d'id dans l'entete, celui d'un script est son chemin).
+        bac.poser("000_INTRUS.ps1", "100_A.ps1", "Intrus");
+        bac.poser("sous/200_B.ps1", "", "Cache dans un sous-dossier");
+
+        let scripts = parcours_catalogue(&bac, Some(&index));
+        assert_eq!(scripts.len(), 4);
+
+        // Les officiels passent d'abord et gardent leur id.
+        let a = scripts.iter().find(|s| s.path == "100_A.ps1").unwrap();
+        assert_eq!(a.id, "100_A.ps1");
+        assert!(a.verified);
+
+        let intrus = scripts.iter().find(|s| s.path == "000_INTRUS.ps1").unwrap();
+        assert_eq!(intrus.origin, "user");
+        assert!(!intrus.verified);
+        assert_ne!(
+            intrus.id, "100_A.ps1",
+            "l'intrus a pris l'id d'un script officiel"
+        );
+        assert!(intrus
+            .meta
+            .findings
+            .iter()
+            .any(|f| f.code == "ID_COLLISION"));
+
+        // Meme nom qu'un script de l'index, mais pas a sa place : ordinaire.
+        let cache = scripts.iter().find(|s| s.path == "sous/200_B.ps1").unwrap();
+        assert_eq!(cache.origin, "user");
     }
 }

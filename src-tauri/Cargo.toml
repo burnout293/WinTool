@@ -34,6 +34,13 @@ sha2 = "0.10"
 # Tauri : l'ajouter en direct ne coute pas de compilation supplementaire.
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 tauri-plugin-updater = "2"
+# Catalogue officiel de scripts (specification 16) : les briques du greffon de
+# mise a jour, aux memes versions et avec les memes options. Rien de nouveau
+# n'entre dans le binaire, et la verification de signature est la meme.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "system-proxy"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+minisign-verify = "0.2"
+base64 = "0.22"
 
 [profile.release]
 codegen-units = 1

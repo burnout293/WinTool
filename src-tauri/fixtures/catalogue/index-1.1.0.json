@@ -1,0 +1,31 @@
+{
+  "format": 1,
+  "source": "officiel",
+  "version": "1.1.0",
+  "published": "2026-10-06",
+  "tag": "v1.1.0",
+  "scripts": [
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000001",
+      "file": "100_A.ps1",
+      "version": "1.0",
+      "size": 21,
+      "sha256": "e3b4bd4b7ef6edade18cc66aed5e8d42f3c65530dd4daab8e881f4e894dfdc1a",
+      "title": {
+        "en": "Script A",
+        "fr": "Script A"
+      }
+    },
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000003",
+      "file": "300_C.ps1",
+      "version": "1.0",
+      "size": 18,
+      "sha256": "8ae43b1f89ca38bdd6562b41569bf6bdfcf9714b8fcaa6f705eb6ad7ad86c9f5",
+      "title": {
+        "en": "Script C",
+        "fr": "Script C"
+      }
+    }
+  ]
+}

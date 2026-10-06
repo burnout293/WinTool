@@ -1,0 +1,20 @@
+{
+  "format": 1,
+  "source": "officiel",
+  "version": "0.9.0",
+  "published": "2026-10-06",
+  "tag": "v0.9.0",
+  "scripts": [
+    {
+      "id": "aaaaaaaa-0000-4000-8000-000000000001",
+      "file": "100_A.ps1",
+      "version": "1.0",
+      "size": 21,
+      "sha256": "af3b1abd8b875fac715da8ce4dfd58cf46d98c3cd56f67742794ccdd717b94b9",
+      "title": {
+        "en": "Script A",
+        "fr": "Script A"
+      }
+    }
+  ]
+}

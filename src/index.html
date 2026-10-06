@@ -106,6 +106,17 @@
         </span>
       </div>
 
+      <!-- Nouveautes du catalogue d'entretiens (§16.5) : meme gabarit que le
+           bandeau de mise a jour, et la meme regle — proposer, jamais
+           installer sans un clic. -->
+      <div id="catBanner" class="maj-banner" role="status" hidden>
+        <span id="catTexte"></span>
+        <span class="maj-actions">
+          <button class="btn primary" type="button" id="catInstaller"></button>
+          <button class="btn" type="button" id="catPlusTard"></button>
+        </span>
+      </div>
+
       <div id="problems" class="problems-bar" hidden></div>
 
       <!-- Mode Simple (specification §2/§3/§15) : assistant en trois etapes,
@@ -292,10 +303,11 @@
       <div class="set-body">
         <nav class="set-nav" id="setNav">
           <a href="#sec-general"><span class="num">1</span><span id="navGeneral"></span></a>
-          <a href="#sec-expert" class="only-expert"><span class="num">2</span><span id="navExpert"></span></a>
-          <a href="#sec-outils" class="only-expert"><span class="num">3</span><span id="navOutils"></span></a>
-          <a href="#sec-config" class="only-expert"><span class="num">4</span><span id="navConfig"></span></a>
-          <a href="#sec-histo"><span class="num">5</span><span id="navHisto"></span></a>
+          <a href="#sec-catalogue"><span class="num">2</span><span id="navCatalogue"></span></a>
+          <a href="#sec-expert" class="only-expert"><span class="num">3</span><span id="navExpert"></span></a>
+          <a href="#sec-outils" class="only-expert"><span class="num">4</span><span id="navOutils"></span></a>
+          <a href="#sec-config" class="only-expert"><span class="num">5</span><span id="navConfig"></span></a>
+          <a href="#sec-histo"><span class="num">6</span><span id="navHisto"></span></a>
         </nav>
 
         <div class="set-scroll" id="setScroll">
@@ -340,21 +352,39 @@
             <p class="maj-etat" id="majEtat" aria-live="polite"></p>
           </section>
 
-          <section class="set-group only-expert" id="sec-expert">
-            <div class="set-group-title"><span class="num">2</span><span id="setSectionExpert"></span></div>
+          <!-- Catalogue d'entretiens (specification §16) : visible dans les deux
+               modes. Rien ne s'installe sans un clic. -->
+          <section class="set-group" id="sec-catalogue">
+            <div class="set-group-title"><span class="num">2</span><span id="secCatalogueTitre"></span></div>
             <div class="setrow">
-              <span class="setrow-txt"><span class="num">2.1</span><span id="setEchecLabel"></span></span>
+              <span class="setrow-txt"><span class="num">2.1</span><span id="setCatalogueLabel"></span></span>
+              <button class="btn compact" type="button" id="btnCatalogue"></button>
+            </div>
+            <p class="maj-etat" id="catalogueEtat" aria-live="polite"></p>
+            <div class="setrow">
+              <span class="setrow-txt"><span class="num">2.2</span><span id="setCatalogueVerifLabel"></span></span>
+              <select class="cat-select" id="setCatalogueSelect">
+                <option value="startup"></option>
+                <option value="manual"></option>
+              </select>
+            </div>
+          </section>
+
+          <section class="set-group only-expert" id="sec-expert">
+            <div class="set-group-title"><span class="num">3</span><span id="setSectionExpert"></span></div>
+            <div class="setrow">
+              <span class="setrow-txt"><span class="num">3.1</span><span id="setEchecLabel"></span></span>
               <select class="cat-select" id="setEchecSelect">
                 <option value="continue"></option>
                 <option value="stop"></option>
               </select>
             </div>
             <div class="setrow">
-              <span class="setrow-txt"><span class="num">2.2</span><span id="setJournauxLabel"></span></span>
+              <span class="setrow-txt"><span class="num">3.2</span><span id="setJournauxLabel"></span></span>
               <input class="cat-select" type="number" id="setJournauxInput" min="0" step="10" style="width:90px" />
             </div>
             <div class="setrow">
-              <span class="setrow-txt"><span class="num">2.3</span><span id="setPolitiqueLabel"></span>
+              <span class="setrow-txt"><span class="num">3.3</span><span id="setPolitiqueLabel"></span>
                 <button class="aide" type="button" id="aidePolitique" aria-label="?">
                   <svg class="ico i14" aria-hidden="true"><use href="#help" /></svg>
                 </button>
@@ -366,36 +396,36 @@
               </select>
             </div>
             <div class="setrow">
-              <span class="setrow-txt"><span class="num">2.4</span><span id="setNumerosLabel"></span></span>
+              <span class="setrow-txt"><span class="num">3.4</span><span id="setNumerosLabel"></span></span>
               <button class="switch" type="button" role="switch" id="setNumerosToggle" aria-checked="false"></button>
             </div>
           </section>
 
           <section class="set-group only-expert" id="sec-outils">
-            <div class="set-group-title"><span class="num">3</span><span id="secOutilsTitre"></span></div>
-            <div class="setrow"><span class="num">3.1</span><button class="btn" type="button" id="btnOuvrirDossierReglages"></button></div>
+            <div class="set-group-title"><span class="num">4</span><span id="secOutilsTitre"></span></div>
+            <div class="setrow"><span class="num">4.1</span><button class="btn" type="button" id="btnOuvrirDossierReglages"></button></div>
             <p class="mono muted" id="cheminsScripts"></p>
-            <div class="setrow"><span class="num">3.2</span><button class="btn" type="button" id="btnReanalyserReglages"></button></div>
-            <div class="setrow"><span class="num">3.3</span><button class="btn" type="button" id="btnRapportConformite"></button></div>
+            <div class="setrow"><span class="num">4.2</span><button class="btn" type="button" id="btnReanalyserReglages"></button></div>
+            <div class="setrow"><span class="num">4.3</span><button class="btn" type="button" id="btnRapportConformite"></button></div>
             <div class="box" id="conformiteZone" hidden></div>
           </section>
 
           <section class="set-group only-expert" id="sec-config">
-            <div class="set-group-title"><span class="num">4</span><span id="secConfigTitre"></span></div>
-            <div class="setrow"><span class="num">4.1</span><button class="btn" type="button" id="btnExporterConfig"></button></div>
+            <div class="set-group-title"><span class="num">5</span><span id="secConfigTitre"></span></div>
+            <div class="setrow"><span class="num">5.1</span><button class="btn" type="button" id="btnExporterConfig"></button></div>
             <p class="muted" id="exportResultat" hidden></p>
             <div class="setrow">
-              <span class="num">4.2</span>
+              <span class="num">5.2</span>
               <button class="btn" type="button" id="btnImporterConfig"></button>
               <input type="file" id="fichierImportConfig" accept="application/json" hidden />
             </div>
             <p class="muted" id="importResultat" hidden></p>
-            <div class="setrow"><span class="num">4.3</span><button class="btn danger" type="button" id="btnReinitialiserConfig"></button></div>
+            <div class="setrow"><span class="num">5.3</span><button class="btn danger" type="button" id="btnReinitialiserConfig"></button></div>
           </section>
 
           <section class="set-group" id="sec-histo">
-            <div class="set-group-title"><span class="num">5</span><span id="secHistoTitre"></span></div>
-            <div class="setrow"><span class="num">5.1</span><button class="btn" type="button" id="btnVoirHistorique"></button></div>
+            <div class="set-group-title"><span class="num">6</span><span id="secHistoTitre"></span></div>
+            <div class="setrow"><span class="num">6.1</span><button class="btn" type="button" id="btnVoirHistorique"></button></div>
             <div class="box" id="historiqueZone" hidden></div>
           </section>
         </div>
@@ -438,6 +468,21 @@
       </div>
       <div class="ic-grille" id="iconesGrille"></div>
       <p class="muted" id="iconesCompte"></p>
+    </div>
+  </div>
+
+  <!-- Des scripts, mais aucun catalogue (specification §16.6) : un rappel, une
+       fois par session, avec un « ne plus afficher » respecte definitivement. -->
+  <div class="backdrop" id="rappelCatalogue" hidden>
+    <div class="onb-card">
+      <div class="onb-mark"><svg class="ico i28" aria-hidden="true"><use href="#logo" /></svg></div>
+      <h1 id="rappelTitre"></h1>
+      <p class="onb-text" id="rappelTexte"></p>
+      <label class="rappel-case"><input type="checkbox" id="rappelNePlus" /> <span id="rappelNePlusLabel"></span></label>
+      <div class="s-nav center">
+        <button class="btn" type="button" id="btnRappelFermer"></button>
+        <button class="btn primary" type="button" id="btnRappelInstaller"></button>
+      </div>
     </div>
   </div>
 

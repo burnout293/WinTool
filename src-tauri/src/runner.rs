@@ -901,18 +901,16 @@ pub fn lancer(
 
 /// Entree depuis l'interface : retrouve le script, verifie qu'il n'a pas bouge,
 /// puis delegue a [`lancer`].
+/// `entree` est celle que l'appelant a resolue **et approuvee** : le moteur ne
+/// refait pas de decouverte, il executerait sinon ce qu'il trouve a ce
+/// moment-la plutot que ce qui a ete approuve. Son empreinte est ensuite
+/// imposee au fichier verrouille (`lancer`).
 pub fn run_script<R: Runtime>(
     app: &AppHandle<R>,
     runner: Arc<Runner>,
     req: RunRequest,
+    entree: discovery::ScriptEntry,
 ) -> Result<RunStarted, String> {
-    let decouverte = discovery::discover(app)?;
-    let entree = decouverte
-        .scripts
-        .into_iter()
-        .find(|s| s.id == req.script_id)
-        .ok_or_else(|| format!("Script introuvable : {}", req.script_id))?;
-
     if !req.expected_hash.is_empty() && entree.hash != req.expected_hash {
         return Err(format!(
             "Le fichier « {} » a change depuis son analyse. Re-analysez-le avant de le lancer.",

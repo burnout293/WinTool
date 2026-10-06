@@ -107,7 +107,26 @@ pub struct Settings {
     /// ancien fichier se relit sans que l'interface devienne minuscule.
     #[serde(default)]
     pub ui_scale: f32,
+    /// Catalogue de scripts retenu (§16.6) : `""` tant que l'utilisateur n'a
+    /// rien decide, `official` pour le catalogue officiel, `none` s'il a choisi
+    /// de continuer sans. Une preference, pas une decision de confiance : celle-
+    /// ci tient a la cle compilee dans le binaire, pas a ce fichier.
+    #[serde(default)]
+    pub catalogue_source: String,
+    /// Quand verifier le catalogue : `startup` (par defaut, `""` compris) ou
+    /// `manual`. Dans les deux cas, rien n'est installe sans un clic (§16.5).
+    #[serde(default)]
+    pub catalogue_check: String,
+    /// « Ne plus afficher » sur le rappel des scripts sans source (§16.6) :
+    /// respecte definitivement.
+    #[serde(default)]
+    pub catalogue_reminder_hidden: bool,
 }
+
+/// Valeurs admises pour `catalogue_source` une fois la decision prise.
+pub const SOURCES_CATALOGUE: [&str; 2] = ["official", "none"];
+/// Valeurs admises pour `catalogue_check`.
+pub const VERIFICATIONS_CATALOGUE: [&str; 2] = ["startup", "manual"];
 
 /// Echelle utilisable, bornee. Au-dela de 2x l'interface ne tient plus dans
 /// une fenetre de taille raisonnable ; en deca de 1x elle devient illisible,
@@ -185,6 +204,9 @@ pub fn default_settings(factory: Vec<Category>) -> Settings {
         onboarded: false,
         show_setting_numbers: false,
         ui_scale: 1.0,
+        catalogue_source: String::new(),
+        catalogue_check: "startup".to_string(),
+        catalogue_reminder_hidden: false,
     }
 }
 
@@ -532,6 +554,7 @@ mod tests {
             path: format!("{id}.ps1"),
             abs_path: format!("{id}.ps1"),
             origin: "user",
+            verified: false,
             hash: "0".repeat(64),
             declared_id: true,
             attention: Vec::new(),
