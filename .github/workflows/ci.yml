@@ -89,6 +89,11 @@ jobs:
         working-directory: src-tauri
         run: cargo fmt --check
 
+      # Chaque bibliotheque compilee figure dans THIRD-PARTY-NOTICES.md : 46
+      # avaient manque entre la 1.1 et la 1.2 sans que rien ne le signale.
+      - name: Composants tiers mentionnes
+        run: node tools/verifier-mentions-tierces.mjs
+
       # `--lib` seulement : le binaire porte un manifeste `asInvoker` et n'a
       # aucun test ; c'est la bibliotheque qui contient toute la logique.
       - name: Tests

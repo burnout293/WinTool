@@ -1,7 +1,11 @@
-# Mentions relatives aux composants tiers — WinTool 1.0.0
+# Mentions relatives aux composants tiers — WinTool
 
 Document établi le 26 septembre 2026 pour WinTool 1.0.0, à partir de l'état réel du dépôt
 à cette date (`src-tauri/Cargo.lock`, `package-lock.json`, `src/icons/`, `src/fonts/`).
+**Mis à jour le 6 octobre 2026 pour la 1.2** : 46 composants Rust, arrivés en 1.1 avec la
+mise à jour automatique et réutilisés en 1.2 par le catalogue de scripts, y manquaient —
+dont `ring`, `rustls-webpki`, `untrusted`, `subtle` et `sync_wrapper`, qui imposent de
+reproduire des avis. Les comptes des sections 3 et 6 ont été régénérés depuis l'arbre réel.
 
 **Version 2.** Elle remplace la version précédente sur trois points : le texte intégral de
 la licence ISC y figure (avec la totalité du fichier `LICENSE` de Lucide, dont un volet
@@ -69,7 +73,7 @@ Trois précisions pour le lecteur :
 
 | Périmètre | Méthode |
 |---|---|
-| Bibliothèques Rust | `cargo tree --offline --edges normal --target x86_64-pc-windows-msvc --prefix none --no-dedupe` (223 entrées, dont WinTool lui-même), croisé avec le champ `license` de `cargo metadata --offline --format-version 1` |
+| Bibliothèques Rust | `cargo tree --offline --edges normal --target x86_64-pc-windows-msvc --prefix none --no-dedupe` (269 entrées en 1.2, dont WinTool lui-même), croisé avec le champ `license` de `cargo metadata --offline --format-version 1` |
 | Avis de droit d'auteur Rust | Fichiers `LICENSE*` présents dans les sources décompressées du registre, sous `~/.cargo/registry/src/` |
 | Paquets npm | `package.json`, `package-lock.json`, et les fichiers `LICENSE` présents dans `node_modules` |
 | Icônes | Fichiers réellement versionnés dans `src/icons/` (2 113 SVG) et sprite `src/icons.svg` |
@@ -136,21 +140,26 @@ toute lecture implicite.
 
 ### Toutes les expressions de licence présentes dans l'arbre Windows, et l'option exercée
 
-Les 222 bibliothèques tierces de l'arbre Windows se répartissent exactement ainsi. Le
-tableau est exhaustif : la somme de la colonne « Nb » fait 222.
+Les 268 bibliothèques tierces de l'arbre Windows se répartissent exactement ainsi. Le
+tableau est exhaustif : la somme de la colonne « Nb » fait 268. *(Recompté pour la 1.2 :
+46 composants, arrivés avec la mise à jour automatique en 1.1 et réutilisés par le catalogue
+de scripts en 1.2, manquaient à ce document.)*
 
 | Expression déclarée | Nb | Choix offert ? | **Option exercée par WinTool** |
 |---|---:|---|---|
-| `MIT OR Apache-2.0` | 112 | oui | **MIT** |
-| `MIT` | 35 | non | MIT (seule licence) |
-| `Apache-2.0 OR MIT` | 23 | oui | **MIT** |
+| `MIT OR Apache-2.0` | 133 | oui | **MIT** |
+| `MIT` | 50 | non | MIT (seule licence) |
+| `Apache-2.0 OR MIT` | 26 | oui | **MIT** |
 | `Unicode-3.0` | 18 | non | Unicode-3.0 (seule licence) |
 | `MIT/Apache-2.0` (notation ancienne) | 9 | oui | **MIT** |
 | `MPL-2.0` | 5 | non | MPL-2.0 (seule licence) |
 | `Unlicense OR MIT` | 4 | oui | **MIT** |
-| `BSD-3-Clause` | 2 | non | BSD-3-Clause (seule licence) |
+| `BSD-3-Clause` | 3 | non | BSD-3-Clause (seule licence) |
 | `MIT OR Zlib OR Apache-2.0` | 2 | oui | **MIT** |
 | `Unlicense/MIT` (notation ancienne) | 2 | oui | **MIT** |
+| `Apache-2.0 OR ISC OR MIT` | 2 | oui | **MIT** |
+| `ISC` | 2 | non | ISC (seule licence) |
+| `Apache-2.0` | 2 | non | Apache-2.0 (seule licence) |
 | `0BSD OR MIT OR Apache-2.0` | 1 | oui | **MIT** |
 | `Apache-2.0 / MIT` (notation ancienne) | 1 | oui | **MIT** |
 | `MIT OR Apache-2.0 OR Zlib` | 1 | oui | **MIT** |
@@ -158,15 +167,18 @@ tableau est exhaustif : la somme de la colonne « Nb » fait 222.
 | `CC0-1.0 OR MIT-0 OR Apache-2.0` | 1 | oui, mais **pas de MIT** | **MIT-0** |
 | `(MIT OR Apache-2.0) AND Unicode-3.0` | 1 | partiel | **MIT** pour la parenthèse, **+ Unicode-3.0** cumulée |
 | `Apache-2.0 AND MIT` | 1 | non, cumulatives | Apache-2.0 **et** MIT, les deux |
+| `Apache-2.0 AND ISC` | 1 | non, cumulatives | Apache-2.0 **et** ISC, les deux |
 | `BSD-3-Clause AND MIT` | 1 | non, cumulatives | BSD-3-Clause **et** MIT, les deux |
-| `Apache-2.0` | 1 | non | Apache-2.0 (seule licence) |
 | `Zlib` | 1 | non | Zlib (seule licence) |
-| **Total** | **222** | | |
+| **Total** | **268** | | |
 
-Les composants concernés par les six dernières lignes sont nommés : `dunce` 1.0.5
+Les composants des lignes sans choix ou à choix restreint sont nommés : `dunce` 1.0.5
 (`CC0-1.0 OR MIT-0 OR Apache-2.0`), `unicode-ident` 1.0.26, `dpi` 0.1.2
-(`Apache-2.0 AND MIT`), `brotli` 8.0.4 (`BSD-3-Clause AND MIT`), `tao` 0.35.3
-(`Apache-2.0` seule), `foldhash` 0.2.0 (`Zlib` seule).
+(`Apache-2.0 AND MIT`), `brotli` 8.0.4 (`BSD-3-Clause AND MIT`), `ring` 0.17.14
+(`Apache-2.0 AND ISC`), `tao` 0.35.3 et `sync_wrapper` 1.0.2 (`Apache-2.0` seule),
+`rustls-webpki` 0.103.15 et `untrusted` 0.9.0 (`ISC` seule), `subtle` 2.6.1
+(`BSD-3-Clause` seule, avec `alloc-no-stdlib` et `alloc-stdlib`), `foldhash` 0.2.0
+(`Zlib` seule).
 
 ### Ce que ce choix change concrètement
 
@@ -177,7 +189,7 @@ texte. L'Apache-2.0, elle, impose en plus deux choses que MIT ignore :
 - **§4(b)** : signaler de façon apparente tout fichier modifié ;
 - **§4(d)** : reprendre le contenu du fichier `NOTICE` du composant, s'il en existe un.
 
-En exerçant MIT sur les 149 composants qui offrent ce choix face à l'Apache-2.0, ces deux
+En exerçant MIT sur les 175 composants qui offrent ce choix face à l'Apache-2.0, ces deux
 obligations ne s'attachent pas à eux.
 
 ### Conséquence : quels textes de licence doivent malgré tout accompagner WinTool
@@ -187,12 +199,12 @@ dû. C'est la liste des textes reproduits en section 11.
 
 | Licence | Rendue obligatoire par | Reproduite ici ? |
 |---|---|---|
-| MIT | 35 composants sous MIT seule, plus les 149 où MIT est l'option exercée, plus `dpi` et `brotli` (cumulatives) | oui, §11.1 |
+| MIT | 50 composants sous MIT seule, plus les 182 où MIT est l'option exercée, plus `dpi` et `brotli` (cumulatives) | oui, §11.1 |
 | MIT-0 | `dunce` 1.0.5 | oui, §11.2 |
-| ISC | `lucide-static` (icônes) | oui, §11.3 |
+| ISC | `lucide-static` (icônes) ; `rustls-webpki`, `untrusted` (seule) et `ring` (cumulée avec l'Apache-2.0) | oui, §11.3 et §11.10 |
 | OFL-1.1 | Inter, IBM Plex Mono | oui, §11.4 |
-| Apache-2.0 | `tao` 0.35.3 (seule) et `dpi` 0.1.2 (cumulée avec MIT) | oui, §11.5 |
-| BSD-3-Clause | `alloc-no-stdlib`, `alloc-stdlib`, `brotli` | oui, §11.6 |
+| Apache-2.0 | `tao` 0.35.3 et `sync_wrapper` 1.0.2 (seule), `dpi` 0.1.2 (cumulée avec MIT), `ring` 0.17.14 (cumulée avec ISC) | oui, §11.5 |
+| BSD-3-Clause | `alloc-no-stdlib`, `alloc-stdlib`, `brotli`, `subtle` | oui, §11.6 |
 | Zlib | `foldhash` 0.2.0 | oui, §11.7 |
 | Unicode-3.0 | les 18 composants ICU4X, plus `unicode-ident` | oui, §11.8 |
 | MPL-2.0 | `option-ext`, `cssparser`, `cssparser-macros`, `selectors`, `dtoa-short` | **non** — voir §11.9, seule exception, motivée |
@@ -201,7 +213,8 @@ dû. C'est la liste des textes reproduits en section 11.
 a été exercée :** `Unlicense` (6 composants), `0BSD` (`adler2`), `CC0-1.0` (`dunce`).
 `Zlib` n'est dû que pour `foldhash`, qui n'offre aucun choix — l'option Zlib de
 `miniz_oxide` et de `raw-window-handle` n'est pas exercée. `Apache-2.0` n'est dû que pour
-`tao` et `dpi`, jamais pour les 149 autres.
+`tao`, `dpi`, `ring` et `sync_wrapper`, jamais pour les 175 autres. L'option ISC de
+`rustls` et `hyper-rustls` n'est pas exercée non plus : MIT l'est.
 
 ---
 
@@ -217,6 +230,7 @@ Conservancy sous double licence `Apache-2.0 OR MIT`.
 |---|---|---|---|
 | `tauri` | 2.11.6 | Apache-2.0 OR MIT | **MIT** |
 | `tauri-plugin-opener` | 2.5.5 | Apache-2.0 OR MIT | **MIT** |
+| `tauri-plugin-updater` | 2.12.0 | Apache-2.0 OR MIT | **MIT** |
 | `tauri-runtime` | 2.11.3 | Apache-2.0 OR MIT | **MIT** |
 | `tauri-runtime-wry` | 2.11.4 | Apache-2.0 OR MIT | **MIT** |
 | `tauri-utils` | 2.9.3 | Apache-2.0 OR MIT | **MIT** |
@@ -235,8 +249,10 @@ Deux composants de cette famille font exception et **n'offrent aucun choix** :
 | `tao` | 0.35.3 | **Apache-2.0 seule** | Le texte complet de l'Apache-2.0 doit accompagner WinTool |
 | `dpi` | 0.1.2 | **Apache-2.0 AND MIT** (cumulatives) | Les deux textes sont dus, on ne peut pas choisir |
 
-C'est la raison — la seule — pour laquelle le texte de l'Apache-2.0 reste nécessaire alors
-que MIT est retenue partout où le choix existe. Il est reproduit en §11.5.
+C'était, en 1.0.0, la seule raison pour laquelle le texte de l'Apache-2.0 restait
+nécessaire alors que MIT est retenue partout où le choix existe. Depuis la 1.1, `ring` et
+`sync_wrapper`, arrivés avec la mise à jour automatique, s'y ajoutent (section 6). Il est
+reproduit en §11.5.
 
 Le cas de `dpi` mérite une ligne d'explication, car un `AND` est inhabituel : le paquet est
 sous Apache-2.0, mais il incorpore du code repris de `rust-lang/libm`, sous MIT. Ses
@@ -271,16 +287,23 @@ Notes sur les deux paquets npm :
 | `serde_json` | 1.0.151 | MIT OR Apache-2.0 | **MIT** | Lecture et écriture des fichiers de configuration et d'historique |
 | `sha2` | 0.10.9 | MIT OR Apache-2.0 | **MIT** | Empreinte SHA-256 du contenu des scripts (approbation avant exécution) |
 | `chrono` | 0.4.45 | MIT OR Apache-2.0 | **MIT** | Horodatage local des journaux d'exécution |
+| `reqwest` | 0.13.5 | MIT OR Apache-2.0 | **MIT** | Téléchargement du catalogue de scripts et des mises à jour (HTTPS) |
+| `rustls` | 0.23.45 | Apache-2.0 OR ISC OR MIT | **MIT** | TLS des téléchargements, sans OpenSSL ni bibliothèque système |
+| `ring` | 0.17.14 | **Apache-2.0 AND ISC** | aucun choix — les deux | Primitives cryptographiques de `rustls` |
+| `minisign-verify` | 0.2.5 | MIT | — | Vérification des signatures Ed25519 : mises à jour et index du catalogue |
+| `base64` | 0.22.1 | MIT OR Apache-2.0 | **MIT** | Décodage des clés et signatures au format de `tauri signer` |
 
 - `serde`, `serde_json` : <https://github.com/serde-rs/serde> et <https://github.com/serde-rs/json>
 - `sha2` : projet RustCrypto, <https://github.com/RustCrypto/hashes>
 - `chrono` : <https://github.com/chronotope/chrono>
+- `reqwest` : <https://github.com/seanmonstar/reqwest> ; `rustls` : <https://github.com/rustls/rustls>
+- `ring` : <https://github.com/briansmith/ring> ; `minisign-verify` : <https://github.com/jedisct1/rust-minisign-verify>
 
 ---
 
 ## 6. Arbre Rust complet, groupé par licence déclarée
 
-222 bibliothèques tierces, hors WinTool lui-même. Une même bibliothèque peut apparaître
+268 bibliothèques tierces, hors WinTool lui-même. Une même bibliothèque peut apparaître
 en deux versions : c'est normal, Cargo les compile alors séparément et les deux sont
 présentes dans le binaire.
 
@@ -288,7 +311,7 @@ Les expressions telles que `MIT/Apache-2.0` ou `Apache-2.0 / MIT` sont d'ancienn
 notations, antérieures à la normalisation SPDX. Elles signifient « OR » (au choix), pas
 « AND ». L'option exercée sur chacune est celle du tableau de la section 3.
 
-### MIT OR Apache-2.0 — 112 composants — **option exercée : MIT**
+### MIT OR Apache-2.0 — 133 composants — **option exercée : MIT**
 
 `anyhow` 1.0.104 · `base64` 0.22.1 · `base64` 0.23.1 · `bitflags` 2.13.2 ·
 `block-buffer` 0.10.4 · `camino` 1.2.6 · `cargo-platform` 0.1.9 · `cfg-if` 1.0.5 ·
@@ -296,42 +319,49 @@ notations, antérieures à la normalisation SPDX. Elles signifient « OR » (au 
 `crossbeam-channel` 0.5.17 · `crossbeam-utils` 0.8.23 · `crypto-common` 0.1.7 ·
 `deranged` 0.5.8 · `digest` 0.10.7 · `dirs` 6.0.0 · `dirs-sys` 0.5.0 ·
 `displaydoc` 0.2.7 · `dtoa` 1.0.11 · `dyn-clone` 1.0.20 · `erased-serde` 0.4.10 ·
-`fdeflate` 0.3.7 · `flate2` 1.1.10 · `form_urlencoded` 1.2.2 · `getrandom` 0.3.4 ·
-`getrandom` 0.4.3 · `glob` 0.3.4 · `hashbrown` 0.12.3 · `hashbrown` 0.17.1 ·
-`heck` 0.5.0 · `html5ever` 0.38.0 · `http` 1.5.0 · `idna` 1.1.0 · `itoa` 1.0.18 ·
+`fdeflate` 0.3.7 · `flate2` 1.1.10 · `form_urlencoded` 1.2.2 ·
+`futures-channel` 0.3.34 · `futures-core` 0.3.34 · `futures-macro` 0.3.34 ·
+`futures-sink` 0.3.34 · `futures-task` 0.3.34 · `futures-util` 0.3.34 ·
+`getrandom` 0.2.17 · `getrandom` 0.3.4 · `getrandom` 0.4.3 · `glob` 0.3.4 ·
+`hashbrown` 0.12.3 · `hashbrown` 0.17.1 · `heck` 0.5.0 · `html5ever` 0.38.0 ·
+`http` 1.5.0 · `httparse` 1.10.1 · `idna` 1.1.0 · `ipnet` 2.12.2 · `itoa` 1.0.18 ·
 `jsonptr` 0.6.3 · `keyboard-types` 0.7.0 · `libc` 0.2.189 · `lock_api` 0.4.14 ·
 `log` 0.4.34 · `markup5ever` 0.38.0 · `mime` 0.3.17 · `num-conv` 0.2.2 ·
 `num-traits` 0.2.19 · `once_cell` 1.21.4 · `parking_lot` 0.12.5 ·
 `parking_lot_core` 0.9.12 · `percent-encoding` 2.3.2 · `png` 0.17.16 ·
 `powerfmt` 0.2.0 · `proc-macro2` 1.0.107 · `quote` 1.0.47 · `regex` 1.13.1 ·
-`regex-automata` 0.4.18 · `regex-syntax` 0.8.11 · `scopeguard` 1.2.0 · `semver` 1.0.28 ·
-`serde` 1.0.229 · `serde-untagged` 0.1.9 · `serde_core` 1.0.229 ·
+`regex-automata` 0.4.18 · `regex-syntax` 0.8.11 · `reqwest` 0.13.5 ·
+`rustls-pki-types` 1.15.1 · `rustls-platform-verifier` 0.7.1 · `scopeguard` 1.2.0 ·
+`semver` 1.0.28 · `serde` 1.0.229 · `serde-untagged` 0.1.9 · `serde_core` 1.0.229 ·
 `serde_derive` 1.0.229 · `serde_derive_internals` 0.29.1 · `serde_json` 1.0.151 ·
 `serde_repr` 0.1.21 · `serde_spanned` 1.1.1 · `serde_with` 3.23.0 ·
 `serde_with_macros` 3.23.0 · `serialize-to-javascript` 0.1.2 ·
 `serialize-to-javascript-impl` 0.1.2 · `servo_arc` 0.4.3 · `sha2` 0.10.9 ·
-`smallvec` 1.16.1 · `softbuffer` 0.4.8 · `stable_deref_trait` 1.2.1 ·
-`string_cache` 0.9.0 · `syn` 2.0.119 · `syn` 3.0.6 · `tendril` 0.5.1 ·
-`thiserror` 1.0.69 · `thiserror` 2.0.20 · `thiserror-impl` 1.0.69 ·
+`smallvec` 1.16.1 · `socket2` 0.6.5 · `softbuffer` 0.4.8 · `stable_deref_trait` 1.2.1 ·
+`string_cache` 0.9.0 · `syn` 2.0.119 · `syn` 3.0.6 · `tempfile` 3.27.0 ·
+`tendril` 0.5.1 · `thiserror` 1.0.69 · `thiserror` 2.0.20 · `thiserror-impl` 1.0.69 ·
 `thiserror-impl` 2.0.20 · `time` 0.3.55 · `time-core` 0.1.9 · `time-macros` 0.2.32 ·
-`toml` 1.1.6 · `toml_datetime` 1.1.1 · `toml_parser` 1.1.3 · `toml_writer` 1.1.2 ·
-`typeid` 1.0.3 · `typenum` 1.20.1 · `unicode-segmentation` 1.13.3 · `url` 2.5.8 ·
-`web_atoms` 0.2.6 · `windows` 0.61.3 · `windows-collections` 0.2.0 ·
-`windows-core` 0.61.2 · `windows-future` 0.2.1 · `windows-implement` 0.60.2 ·
-`windows-interface` 0.59.3 · `windows-link` 0.1.3 · `windows-link` 0.2.1 ·
-`windows-numerics` 0.2.0 · `windows-result` 0.3.4 · `windows-strings` 0.4.2 ·
-`windows-sys` 0.59.0 · `windows-sys` 0.61.2 · `windows-targets` 0.52.6 ·
-`windows-threading` 0.1.0 · `windows-version` 0.1.7 · `windows_x86_64_msvc` 0.52.6
+`tokio-rustls` 0.26.6 · `toml` 1.1.6 · `toml_datetime` 1.1.1 · `toml_parser` 1.1.3 ·
+`toml_writer` 1.1.2 · `typeid` 1.0.3 · `typenum` 1.20.1 ·
+`unicode-segmentation` 1.13.3 · `url` 2.5.8 · `web_atoms` 0.2.6 · `windows` 0.61.3 ·
+`windows-collections` 0.2.0 · `windows-core` 0.61.2 · `windows-future` 0.2.1 ·
+`windows-implement` 0.60.2 · `windows-interface` 0.59.3 · `windows-link` 0.1.3 ·
+`windows-link` 0.2.1 · `windows-numerics` 0.2.0 · `windows-registry` 0.6.1 ·
+`windows-result` 0.3.4 · `windows-result` 0.4.1 · `windows-strings` 0.4.2 ·
+`windows-strings` 0.5.1 · `windows-sys` 0.59.0 · `windows-sys` 0.60.2 ·
+`windows-sys` 0.61.2 · `windows-targets` 0.52.6 · `windows-targets` 0.53.5 ·
+`windows-threading` 0.1.0 · `windows-version` 0.1.7 · `windows_x86_64_msvc` 0.52.6 ·
+`windows_x86_64_msvc` 0.53.1
 
-### Apache-2.0 OR MIT — 23 composants — **option exercée : MIT**
+### Apache-2.0 OR MIT — 26 composants — **option exercée : MIT**
 
-`bit-set` 0.8.0 · `bit-vec` 0.8.0 · `ctor` 0.8.0 · `ctor-proc-macro` 0.0.7 ·
-`equivalent` 1.0.2 · `fastrand` 2.5.0 · `idna_adapter` 1.2.2 · `indexmap` 1.9.3 ·
-`indexmap` 2.14.2 · `muda` 0.19.3 · `pin-project-lite` 0.2.17 · `rustc-hash` 2.1.3 ·
-`tauri` 2.11.6 · `tauri-codegen` 2.6.3 · `tauri-macros` 2.6.3 ·
-`tauri-plugin-opener` 2.5.5 · `tauri-runtime` 2.11.3 · `tauri-runtime-wry` 2.11.4 ·
-`tauri-utils` 2.9.3 · `utf8_iter` 1.0.4 · `uuid` 1.26.1 · `window-vibrancy` 0.6.0 ·
-`wry` 0.55.1
+`atomic-waker` 1.1.2 · `bit-set` 0.8.0 · `bit-vec` 0.8.0 · `ctor` 0.8.0 ·
+`ctor-proc-macro` 0.0.7 · `equivalent` 1.0.2 · `fastrand` 2.5.0 · `idna_adapter` 1.2.2 ·
+`indexmap` 1.9.3 · `indexmap` 2.14.2 · `muda` 0.19.3 · `pin-project-lite` 0.2.17 ·
+`rustc-hash` 2.1.3 · `tauri` 2.11.6 · `tauri-codegen` 2.6.3 · `tauri-macros` 2.6.3 ·
+`tauri-plugin-opener` 2.5.5 · `tauri-plugin-updater` 2.12.0 · `tauri-runtime` 2.11.3 ·
+`tauri-runtime-wry` 2.11.4 · `tauri-utils` 2.9.3 · `utf8_iter` 1.0.4 · `uuid` 1.26.1 ·
+`window-vibrancy` 0.6.0 · `wry` 0.55.1 · `zeroize` 1.9.0
 
 ### MIT/Apache-2.0 et Apache-2.0 / MIT (notations anciennes, équivalentes à « OR ») — 10 composants — **option exercée : MIT**
 
@@ -339,18 +369,22 @@ notations, antérieures à la normalisation SPDX. Elles signifient « OR » (au 
 `siphasher` 1.0.3 · `unic-char-property` 0.9.0 · `unic-char-range` 0.9.0 ·
 `unic-common` 0.9.0 · `unic-ucd-ident` 0.9.0 · `unic-ucd-version` 0.9.0
 
-### MIT seule — 35 composants — aucun choix
+### MIT seule — 50 composants — aucun choix
 
 `bytes` 1.12.1 · `cargo_metadata` 0.19.2 · `cfb` 0.7.3 · `darling` 0.24.1 ·
 `darling_core` 0.24.1 · `darling_macro` 0.24.1 · `derive_more` 2.1.1 ·
-`derive_more-impl` 2.1.1 · `dom_query` 0.27.0 · `generic-array` 0.14.7 · `ico` 0.5.0 ·
-`infer` 0.19.0 · `new_debug_unreachable` 1.0.6 · `open` 5.4.4 · `phf` 0.13.1 ·
-`phf_generator` 0.13.1 · `phf_macros` 0.13.1 · `phf_shared` 0.13.1 · `plist` 1.10.1 ·
-`precomputed-hash` 0.1.1 · `quick-xml` 0.42.0 · `schemars` 0.8.22 ·
-`schemars_derive` 0.8.22 · `simd-adler32` 0.3.10 · `strsim` 0.11.1 ·
-`synstructure` 0.14.0 · `tokio` 1.53.1 · `tracing` 0.1.44 · `tracing-core` 0.1.36 ·
-`urlpattern` 0.3.0 · `webview2-com` 0.38.2 · `webview2-com-macros` 0.8.1 ·
-`webview2-com-sys` 0.38.2 · `winnow` 1.0.4 · `zmij` 1.0.23
+`derive_more-impl` 2.1.1 · `dom_query` 0.27.0 · `generic-array` 0.14.7 ·
+`http-body` 1.1.0 · `http-body-util` 0.1.5 · `hyper` 1.11.1 · `hyper-util` 0.1.20 ·
+`ico` 0.5.0 · `infer` 0.19.0 · `minisign-verify` 0.2.5 · `mio` 1.2.3 ·
+`new_debug_unreachable` 1.0.6 · `open` 5.4.4 · `phf` 0.13.1 · `phf_generator` 0.13.1 ·
+`phf_macros` 0.13.1 · `phf_shared` 0.13.1 · `plist` 1.10.1 · `precomputed-hash` 0.1.1 ·
+`quick-xml` 0.42.0 · `schemars` 0.8.22 · `schemars_derive` 0.8.22 ·
+`simd-adler32` 0.3.10 · `slab` 0.4.12 · `strsim` 0.11.1 · `synstructure` 0.14.0 ·
+`tokio` 1.53.1 · `tokio-util` 0.7.19 · `tower` 0.5.3 · `tower-http` 0.6.11 ·
+`tower-layer` 0.3.3 · `tower-service` 0.3.3 · `tracing` 0.1.44 · `tracing-core` 0.1.36 ·
+`try-lock` 0.2.5 · `urlpattern` 0.3.0 · `want` 0.3.1 · `webview2-com` 0.38.2 ·
+`webview2-com-macros` 0.8.1 · `webview2-com-sys` 0.38.2 · `winnow` 1.0.4 · `zip` 4.6.1 ·
+`zmij` 1.0.23
 
 ### Unicode-3.0 — 18 composants — aucun choix
 
@@ -381,16 +415,18 @@ Le texte de l'Unlicense n'est donc **pas** dû.
 `aho-corasick` 1.1.5 · `byteorder` 1.5.0 · `memchr` 2.8.3 · `same-file` 1.0.6 ·
 `walkdir` 2.5.0 · `winapi-util` 0.1.11
 
-### BSD-3-Clause et variantes — 4 composants
+### BSD-3-Clause et variantes — 5 composants
 
 | Composant | Version | Licence déclarée | Option exercée |
 |---|---|---|---|
 | `alloc-no-stdlib` | 2.0.4 | BSD-3-Clause seule | aucun choix — BSD-3-Clause |
 | `alloc-stdlib` | 0.2.4 | BSD-3-Clause seule | aucun choix — BSD-3-Clause |
+| `subtle` | 2.6.1 | BSD-3-Clause seule | aucun choix — BSD-3-Clause |
 | `brotli` | 8.0.4 | **BSD-3-Clause AND MIT** | aucun choix — les deux s'appliquent |
 | `brotli-decompressor` | 5.0.3 | BSD-3-Clause/MIT | **MIT** |
 
-Le texte BSD-3-Clause reste dû à cause des trois premiers. Il est reproduit en §11.6.
+Le texte BSD-3-Clause reste dû à cause des trois composants sous BSD-3-Clause seule et de
+`brotli`. Il est reproduit en §11.6, avec l'avis de chacun.
 
 ### Zlib et variantes — 5 composants
 
@@ -405,6 +441,30 @@ Le texte Zlib est dû **uniquement** à cause de `foldhash`, qui n'offre aucune 
 Il est reproduit en §11.7. Le texte 0BSD n'est pas dû, l'option MIT ayant été exercée sur
 `adler2`.
 
+### Apache-2.0 OR ISC OR MIT — 2 composants — **option exercée : MIT**
+
+`hyper-rustls` 0.27.10 · `rustls` 0.23.45
+
+### ISC, seule ou cumulée — 3 composants — aucun choix
+
+Arrivés en 1.1 avec la mise à jour automatique, réutilisés en 1.2 par le catalogue de
+scripts : ce sont les briques TLS et cryptographiques des téléchargements.
+
+| Composant | Version | Licence déclarée | Option exercée |
+|---|---|---|---|
+| `rustls-webpki` | 0.103.15 | **ISC seule** | aucun choix — ISC |
+| `untrusted` | 0.9.0 | **ISC seule** | aucun choix — ISC |
+| `ring` | 0.17.14 | **Apache-2.0 AND ISC** | aucun choix — les deux |
+
+`ring` mérite une ligne, comme `dpi` : son propre code est sous ISC (Brian Smith), le code
+repris de BoringSSL et de fiat-crypto sous Apache-2.0, et un petit module repris de
+`once_cell` sous `MIT OR Apache-2.0`, où MIT est exercée. Ses sources livrent aussi des
+textes sous licence Go et Chromium : ils concernent la suite de tests et l'outillage de
+BoringSSL, que le fichier `LICENSE-BoringSSL` déclare **non compilés** dans la
+bibliothèque, et qui ne sont donc pas redistribués. Les avis ISC et Apache-2.0 des trois
+composants sont reproduits en §11.10 et §11.5. Vérifié : aucun des trois ne livre de
+fichier `NOTICE`.
+
 ### Autres
 
 `dunce` 1.0.5 — `CC0-1.0 OR MIT-0 OR Apache-2.0`. Aucune de ces options n'est la licence
@@ -414,6 +474,9 @@ dus **de ce fait** (l'Apache-2.0 reste due par ailleurs, pour `tao` et `dpi`).
 
 `tao` 0.35.3 (`Apache-2.0` seule) et `dpi` 0.1.2 (`Apache-2.0 AND MIT`) : déjà traités en
 section 4.
+
+`sync_wrapper` 1.0.2 — `Apache-2.0` seule, sans fichier `NOTICE` (vérifié) ; WinTool n'en
+modifie aucun fichier. Son texte est celui du §11.5.
 
 ---
 
@@ -765,7 +828,7 @@ de l'option MIT partout où elle est offerte.
 
 ### 11.1 Licence MIT
 
-Due par 35 composants sous MIT seule, par les 149 composants où l'option MIT a été
+Due par 50 composants sous MIT seule, par les 182 composants où l'option MIT a été
 exercée, et par `dpi` 0.1.2 et `brotli` 8.0.4 où elle est cumulative.
 
 ```
@@ -973,17 +1036,22 @@ FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
 OTHER DEALINGS IN THE FONT SOFTWARE.
 ```
 
-### 11.5 Licence Apache 2.0 — `tao` 0.35.3 et `dpi` 0.1.2
+### 11.5 Licence Apache 2.0 — `tao`, `dpi`, `ring`, `sync_wrapper`
 
 **Pourquoi ce texte figure ici alors que l'option MIT a été exercée partout où elle était
-offerte :** parce que deux composants ne l'offrent pas. `tao` 0.35.3 est sous Apache-2.0
-**seule** ; `dpi` 0.1.2 est sous `Apache-2.0 AND MIT`, où le `AND` est cumulatif et ne se
-choisit pas. Pour ces deux-là — et pour eux seulement — l'Apache-2.0 s'applique, et son
-§4(a) impose de remettre une copie de la licence à tout destinataire. La voici.
+offerte :** parce que quatre composants ne l'offrent pas. `tao` 0.35.3 et `sync_wrapper`
+1.0.2 sont sous Apache-2.0 **seule** ; `dpi` 0.1.2 (`Apache-2.0 AND MIT`) et `ring` 0.17.14
+(`Apache-2.0 AND ISC`) la cumulent avec une autre licence, et un `AND` ne se choisit pas.
+Pour ces quatre-là — et pour eux seulement — l'Apache-2.0 s'applique, et son §4(a) impose
+de remettre une copie de la licence à tout destinataire. La voici.
 
-Rappel de la section 4, vérifié dans les sources du registre : ni `tao` ni `dpi` ne
-livrent de fichier `NOTICE`, et WinTool ne modifie aucun de leurs fichiers ; les §4(b) et
-§4(d) sont donc sans objet.
+Avis de droit d'auteur relevés dans le code de `ring` qui en relève (BoringSSL, OpenSSL,
+fiat-crypto) : The OpenSSL Project Authors ; The BoringSSL Authors ; Google Inc. ; Intel
+Corporation ; ARM Inc. ; CloudFlare, Inc. ; Oracle and/or its affiliates ; the fiat-crypto
+authors.
+
+Vérifié dans les sources du registre : aucun des quatre ne livre de fichier `NOTICE`, et
+WinTool ne modifie aucun de leurs fichiers ; les §4(b) et §4(d) sont donc sans objet.
 
 Texte repris de <https://www.apache.org/licenses/LICENSE-2.0.txt>, identique au fichier
 `LICENSE` livré dans les sources de `tao` et de `dpi`.
@@ -1193,7 +1261,7 @@ Texte repris de <https://www.apache.org/licenses/LICENSE-2.0.txt>, identique au 
    limitations under the License.
 ```
 
-### 11.6 Licence BSD 3-Clause — `alloc-no-stdlib`, `alloc-stdlib`, `brotli`
+### 11.6 Licence BSD 3-Clause — `alloc-no-stdlib`, `alloc-stdlib`, `brotli`, `subtle`
 
 Avis de droit d'auteur, relevé dans les fichiers `LICENSE` livrés par `alloc-no-stdlib`
 2.0.4 et par `brotli` 8.0.4 (`LICENSE.BSD-3-Clause`) :
@@ -1201,6 +1269,13 @@ Avis de droit d'auteur, relevé dans les fichiers `LICENSE` livrés par `alloc-n
 ```
 Copyright (c) 2016 Dropbox, Inc.
 All rights reserved.
+```
+
+Et dans le fichier `LICENSE` livré par `subtle` 2.6.1 :
+
+```
+Copyright (c) 2016-2017 Isis Agora Lovecruft, Henry de Valence. All rights reserved.
+Copyright (c) 2016-2024 Isis Agora Lovecruft. All rights reserved.
 ```
 
 *`alloc-stdlib` 0.2.4 ne livre aucun fichier de licence dans son archive du registre : son
@@ -1234,7 +1309,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 La clause 3 mérite d'être relevée : elle interdit d'utiliser le nom des auteurs de
-`brotli`, `alloc-no-stdlib` et `alloc-stdlib` pour promouvoir WinTool. WinTool ne le fait
+`brotli`, `alloc-no-stdlib`, `alloc-stdlib` et `subtle` pour promouvoir WinTool. WinTool ne le fait
 pas, et ne doit pas commencer.
 
 ### 11.7 Licence Zlib — `foldhash` 0.2.0
@@ -1340,6 +1415,69 @@ verbatim, au choix :
 Tant que ce fichier n'existe pas dans le dépôt, l'obligation n'est pas remplie. C'est le
 point 1 de la section 12.
 
+### 11.10 Licence ISC — `ring`, `rustls-webpki`, `untrusted`
+
+Le texte est celui du §11.3 ; seuls les avis diffèrent. Repris verbatim des fichiers livrés
+dans les sources du registre — `LICENSE-other-bits` pour `ring` 0.17.14, `LICENSE` pour
+`rustls-webpki` 0.103.15, `LICENSE.txt` pour `untrusted` 0.9.0.
+
+`ring` 0.17.14 :
+
+```
+Copyright 2015-2025 Brian Smith.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```
+
+`rustls-webpki` 0.103.15 :
+
+```
+Copyright 2015 Brian Smith.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHORS DISCLAIM ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```
+
+`untrusted` 0.9.0 :
+
+```
+Copyright 2015-2016 Brian Smith.
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHORS DISCLAIM ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```
+
+Le code de `ring` repris de BoringSSL sous ISC porte en outre, en tête de fichier, les
+avis de Google Inc., CloudFlare Ltd et Intel Corporation.
+
 ---
 
 ## 12. À vérifier avant publication
@@ -1435,19 +1573,18 @@ absente.
    supposer.
 
 9. **Fonctionnalités Cargo et arbre réel.** Cette liste provient de la résolution par
-   défaut, vérifiée le 26 septembre 2026 : 223 entrées dont WinTool, soit 222
-   bibliothèques tierces, et la somme des groupes de la section 6 retombe exactement sur
-   222. Si des fonctionnalités sont activées plus tard sur `tauri` ou un autre composant,
+   défaut, vérifiée le 6 octobre 2026 pour la 1.2 : 269 entrées dont WinTool, soit
+   268 bibliothèques tierces, et la somme des groupes de la section 6 retombe exactement
+   sur 268. Depuis la 1.2, `tools/verifier-mentions-tierces.mjs` le contrôle en CI : un
+   composant absent de ce document fait échouer la construction — c'est ainsi que 46
+   composants avaient pu manquer entre la 1.1 et la 1.2 sans que rien ne le signale. Si des fonctionnalités sont activées plus tard sur `tauri` ou un autre composant,
    l'arbre changera. Le fichier généré au point 3 doit alors être régénéré, et ce document
    relu.
 
-10. **Adresse du dépôt public.** Ce document désigne le dépôt de WinTool sans le nommer,
-    parce qu'une migration de GitHub vers GitLab est décidée mais pas faite : `git remote`
-    pointe encore vers `github.com/burnout293/WinTool`. Une fois la migration effectuée,
-    inscrire l'URL GitLab définitive ici et dans `README.md`, et vérifier que les liens de
-    mise à jour automatique de l'application pointent bien au bon endroit. Les URL des
-    projets tiers citées dans ce document, elles, ne changent pas : elles désignent les
-    dépôts de leurs auteurs, où qu'ils soient hébergés.
+10. **Adresse du dépôt public — tranché.** WinTool reste sur GitHub :
+    <https://github.com/burnout293/WinTool>, et son catalogue de scripts sur
+    <https://github.com/burnout293/WinTool-Catalogue>. La migration vers GitLab un temps
+    envisagée a été abandonnée.
 
 ### Hors périmètre
 
@@ -1470,7 +1607,7 @@ absente.
 
 | Événement | Action |
 |---|---|
-| `cargo update` ou modification de `Cargo.toml` | Régénérer l'annexe `cargo about`, refaire le comptage de la section 3 (la somme doit retomber sur le total), relire la section 6 |
+| `cargo update` ou modification de `Cargo.toml` | Régénérer l'annexe `cargo about`, refaire le comptage de la section 3 (la somme doit retomber sur le total), relire la section 6. La CI le rappelle : `tools/verifier-mentions-tierces.mjs` échoue tant qu'un composant de l'arbre manque ici |
 | Apparition d'une expression de licence absente du tableau de la section 3 | **Ne pas la ranger par analogie.** Ajouter une ligne, nommer l'option exercée, et vérifier si un nouveau texte de licence devient dû |
 | Mise à jour de `lucide-static` | Recopier son `LICENSE` entier dans §11.3 : l'année change, et la liste des icônes Feather aussi |
 | Remplacement ou mise à jour d'une police | Reprendre la section 8 en entier, y compris la lecture de la table `name` et l'en-tête OFL amont — c'est là que se cachent les noms réservés |
