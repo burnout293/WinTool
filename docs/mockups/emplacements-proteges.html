@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emplacements protégés — propositions</title>
+<!--
+  Maquette du reglage 3.5 (Reglages > Mode Expert > Emplacements proteges).
+  Quatre propositions, une seule dimension qui varie : la disposition. La
+  palette, les composants (interrupteur, boutons, etiquettes) et les donnees
+  sont ceux de l'application — les jetons ci-dessous sont copies de
+  src/styles.css. Chaque cadre fait la largeur reelle de la colonne des
+  reglages (483 px de contenu), et la hauteur du reglage est mesuree en direct.
+-->
+<style>
+:root {
+  --bg: #F3F6F9; --surface: #FFFFFF; --surface-2: #EDF2F6; --surface-3: #E0E8EF;
+  --border: #DDE5EC; --border-2: #C3D0DA;
+  --text: #0F1A24; --text-2: #4E6172; --text-3: #54697A; --ink: #06121A;
+  --ok: #14915C; --warn: #9A650F; --err: #B8382F;
+  --ok-s: #E6F5EC; --warn-s: #FBF3E2; --err-s: #FBEBEA;
+  --acc: #22D39A; --acc-2: #35C8E8; --acc-on: #0B7D59;
+  --surface-soft: #F7FAFC; --acc-soft: #EAFAF4; --knob-off: #7C8FA0;
+  --sh: 0 1px 2px rgba(15, 26, 36, .05), 0 6px 18px rgba(15, 26, 36, .05);
+  --sh-2: 0 10px 34px rgba(15, 26, 36, .10);
+  --ui: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'Cascadia Mono', Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0A0C10; --surface: #13171E; --surface-2: #1B212A; --surface-3: #242C38;
+    --border: #232B36; --border-2: #333D4B;
+    --text: #F2F6FA; --text-2: #9BA9B9; --text-3: #8397A6;
+    --ok: #22D39A; --warn: #FFB340; --err: #FF6B6B;
+    --ok-s: #0E2A22; --warn-s: #2C2113; --err-s: #2E1717;
+    --acc-on: #4BE8B8; --surface-soft: #171C24; --acc-soft: #12241F; --knob-off: #5B6C7C;
+    --sh: 0 2px 10px rgba(0, 0, 0, .35); --sh-2: 0 16px 46px rgba(0, 0, 0, .55);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0A0C10; --surface: #13171E; --surface-2: #1B212A; --surface-3: #242C38;
+  --border: #232B36; --border-2: #333D4B;
+  --text: #F2F6FA; --text-2: #9BA9B9; --text-3: #8397A6;
+  --ok: #22D39A; --warn: #FFB340; --err: #FF6B6B;
+  --ok-s: #0E2A22; --warn-s: #2C2113; --err-s: #2E1717;
+  --acc-on: #4BE8B8; --surface-soft: #171C24; --acc-soft: #12241F; --knob-off: #5B6C7C;
+  --sh: 0 2px 10px rgba(0, 0, 0, .35); --sh-2: 0 16px 46px rgba(0, 0, 0, .55);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--ui); }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.muted { color: var(--text-3); }
+.mono { font-family: var(--mono); }
+.ico { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor;
+       stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ico.i14 { width: 14px; height: 14px; }
+.ico.i20 { width: 20px; height: 20px; }
+.ico.i22 { width: 22px; height: 22px; }
+
+/* --- Composants de l'application (src/styles.css) ------------------------ */
+.switch { flex-shrink: 0; width: 40px; height: 22px; border-radius: 999px;
+  background: var(--border); border: none; position: relative; transition: background .16s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--knob-off); transition: transform .16s, background .16s; }
+.switch[aria-checked="true"] { background: var(--acc); }
+.switch[aria-checked="true"]::after { transform: translateX(18px); background: var(--ink); }
+.switch:focus-visible, .btn:focus-visible, .puce:focus-visible, .etat:focus-visible,
+.c-tete:focus-visible, .x:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 36px; font-size: 12.5px; font-weight: 700; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--text-2); background: var(--surface);
+  transition: background .15s, border-color .15s; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn.compact { height: 30px; padding: 0 12px; }
+.btn.primary { border: none; color: var(--ink); background: linear-gradient(135deg, var(--acc), var(--acc-2)); }
+.badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700;
+  padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border);
+  color: var(--text-2); background: var(--surface-2); white-space: nowrap; }
+.badge.low  { color: var(--ok);   background: var(--ok-s);   border-color: color-mix(in srgb, var(--ok) 34%, transparent); }
+.badge.med  { color: var(--warn); background: var(--warn-s); border-color: color-mix(in srgb, var(--warn) 34%, transparent); }
+.badge .ico { width: 12px; height: 12px; }
+
+/* --- La page de la maquette ---------------------------------------------- */
+.page { max-width: 1180px; margin: 0 auto; padding: 28px 16px 64px; }
+.page-h { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.page-h h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: -.4px; }
+.page-h p { margin: 0; color: var(--text-2); max-width: 680px; }
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--surface-2);
+  border: 1px solid var(--border); }
+.seg button { border: none; background: none; padding: 6px 14px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--sh); }
+
+.constat { margin-top: 22px; padding: 16px 20px; border-radius: 16px; background: var(--surface);
+  border: 1px solid var(--border); }
+.constat h2, .communs h2, .choix h2 { margin: 0 0 8px; font-size: 15px; }
+.constat ul, .communs ul { margin: 0; padding-left: 20px; color: var(--text-2); }
+.constat li + li, .communs li + li { margin-top: 4px; }
+.constat b, .communs b { color: var(--text); }
+
+.prop { display: grid; grid-template-columns: minmax(0, 517px) minmax(0, 1fr); gap: 28px;
+  align-items: start; margin-top: 26px; padding: 22px; border-radius: 20px;
+  background: var(--surface-soft); border: 1px solid var(--border); }
+@media (max-width: 920px) { .prop { grid-template-columns: minmax(0, 1fr); } }
+.prop-txt h2 { display: flex; align-items: center; gap: 10px; margin: 2px 0 10px; font-size: 19px; letter-spacing: -.3px; }
+.lettre { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 10px;
+  font-size: 14px; font-weight: 800; color: var(--ink); background: linear-gradient(135deg, var(--acc), var(--acc-2)); }
+.prop-txt p { margin: 0 0 10px; color: var(--text-2); }
+.pour, .contre { margin: 0 0 8px; padding-left: 0; list-style: none; color: var(--text-2); }
+.pour li, .contre li { display: flex; gap: 8px; align-items: baseline; }
+.pour li::before { content: "+"; font-weight: 800; color: var(--ok); }
+.contre li::before { content: "−"; font-weight: 800; color: var(--warn); }
+.essai { font-size: 12.5px; color: var(--text-3); font-style: italic; }
+
+/* Le cadre : la colonne des reglages, a sa largeur reelle. */
+.cadre { position: relative; overflow: hidden; width: 100%; max-width: 517px;
+  padding: 16px 17px 18px; border-radius: 16px; background: var(--surface);
+  border: 1px solid var(--border-2); box-shadow: var(--sh); }
+.cadre-groupe { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-3); margin-bottom: 4px; }
+.faux { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13px; opacity: .45; }
+.faux > span:first-child { flex: 1; }
+.faux .sel { height: 28px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border-2);
+  font-size: 12px; display: inline-flex; align-items: center; }
+.num { font-size: 11px; font-weight: 700; color: var(--text-3); font-variant-numeric: tabular-nums; margin-right: 8px; }
+.r35 { display: flex; align-items: center; gap: 6px; padding: 10px 0 8px; font-size: 13px; font-weight: 600; }
+.aide { display: inline-grid; place-items: center; width: 20px; height: 20px; border: none;
+  background: none; color: var(--text-3); border-radius: 50%; }
+.bloc35 { outline: 1px dashed transparent; }
+.mesure { margin-top: 8px; font-size: 12px; color: var(--text-3); }
+.mesure b { color: var(--acc-on); font-variant-numeric: tabular-nums; }
+
+/* --- Elements partages : lignes, champ d'ajout ---------------------------- */
+.l-ligne { display: flex; align-items: center; gap: 12px; padding: 9px 4px; }
+.l-ligne + .l-ligne { border-top: 1px solid var(--border); }
+.l-ico { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px;
+  background: var(--surface-2); color: var(--text-2); flex-shrink: 0; }
+.l-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; font-size: 12.5px; }
+.l-txt .mono { font-size: 10.5px; color: var(--text-3); overflow-wrap: anywhere; }
+.l-txt .mono.fort { font-size: 12px; color: var(--text); }
+.l-ligne.off .l-ico { background: var(--warn-s); color: var(--warn); }
+.l-alerte, .d-alerte { display: flex; gap: 6px; align-items: center; margin-top: 4px;
+  font-size: 11.5px; font-weight: 600; color: var(--warn); }
+.x { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-3); flex-shrink: 0; }
+.x:hover { color: var(--err); border-color: color-mix(in srgb, var(--err) 40%, transparent); background: var(--err-s); }
+.ajout { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 4px 4px 4px 12px;
+  border-radius: 999px; border: 1px dashed var(--border-2); background: var(--surface); }
+.ajout:focus-within { border-style: solid; border-color: var(--acc); }
+.ajout-ico { display: grid; color: var(--text-3); }
+.ajout input { flex: 1; min-width: 0; border: none; background: none; outline: none;
+  font-family: var(--mono); font-size: 12px; padding: 6px 0; }
+.ajout input::placeholder { color: var(--text-3); opacity: .8; }
+.ajout-err { display: flex; gap: 6px; align-items: center; margin: 6px 4px 0;
+  font-size: 11.5px; color: var(--err); }
+.sous-titre { display: flex; align-items: center; gap: 7px; margin: 14px 0 4px; font-size: 11px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); }
+.sous-titre:first-child { margin-top: 2px; }
+
+/* --- A : resume et ecran a part ------------------------------------------ */
+.a-carte { display: flex; align-items: center; gap: 14px; padding: 12px 12px 12px 14px;
+  border-radius: 14px; border: 1px solid color-mix(in srgb, var(--acc) 38%, transparent);
+  background: var(--acc-soft); }
+.a-bouclier { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px;
+  color: var(--acc-on); background: color-mix(in srgb, var(--acc) 18%, transparent); flex-shrink: 0; }
+.a-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 12.5px; }
+.a-txt b { font-size: 13.5px; }
+.a-carte.alerte { border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: var(--warn-s); }
+.a-carte.alerte .a-bouclier { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+.a-carte.alerte .a-txt b { color: var(--warn); }
+.a-panneau { display: none; }
+.a-panneau.ouvert { display: block; animation: glisse .28s cubic-bezier(.2,.8,.2,1); }
+.cadre.panneau-ouvert > :not(.a-panneau) { display: none; }
+@keyframes glisse { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+.a-panneau-h { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; margin-bottom: 6px;
+  border-bottom: 1px solid var(--border); }
+.a-panneau-h b { font-size: 15px; }
+.a-panneau-h p { margin: 0; }
+.a-intro { margin: 6px 0 2px; font-size: 12.5px; color: var(--text-2); }
+
+/* --- B : etiquettes ------------------------------------------------------- */
+.b-aide { margin: 0 0 4px; font-size: 12px; color: var(--text-3); }
+.b-puces { display: flex; flex-wrap: wrap; gap: 8px; }
+.puce { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px 0 11px;
+  border-radius: 999px; font-size: 12.5px; font-weight: 700;
+  border: 1px solid color-mix(in srgb, var(--acc) 40%, transparent);
+  background: var(--acc-soft); color: var(--acc-on); transition: background .15s, border-color .15s; }
+.puce:hover { border-color: var(--acc); }
+.puce.off { border-style: dashed; border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+  background: var(--warn-s); color: var(--warn); }
+.puce.off .lib { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.puce.ajoutee { color: var(--text); background: var(--surface-2); border-color: var(--border-2);
+  padding-right: 5px; font-family: var(--mono); font-weight: 500; font-size: 12px; cursor: default; }
+.puce.ajoutee .ico { color: var(--acc-on); }
+.puce.ajoutee .x { width: 24px; height: 24px; }
+.puce.nouvelle { border-style: dashed; border-color: var(--border-2); background: transparent; color: var(--text-2); }
+.b-groupe .sous-titre { margin-top: 10px; }
+.b-groupe + .b-groupe .sous-titre { margin-top: 16px; }
+.b-saisie { flex-basis: 100%; }
+.b-saisie .ajout { margin-top: 0; }
+
+/* --- C : groupes repliables ---------------------------------------------- */
+.c-groupe { border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.c-groupe + .c-groupe { margin-top: 8px; }
+.c-tete { display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 12px;
+  border: none; background: none; text-align: left; border-radius: 14px; }
+.c-tete:hover { background: var(--surface-2); }
+.c-tete .l-ico { width: 34px; height: 34px; }
+.c-titre { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 13px; }
+.c-titre b { font-weight: 700; }
+.c-titre span { font-size: 11.5px; color: var(--text-3); }
+.chev { color: var(--text-3); transition: transform .2s; }
+.c-tete[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.c-corps { padding: 0 12px 10px; border-top: 1px solid var(--border); }
+
+/* --- D : le plan du disque ------------------------------------------------ */
+.d-arbre { list-style: none; margin: 0; padding: 4px 0; border-radius: 14px;
+  border: 1px solid var(--border); background: var(--surface); }
+.d-noeud { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  min-height: 34px; padding: 2px 10px 2px calc(var(--niv) * 24px + 12px); }
+.d-noeud.lecteur { margin-top: 2px; }
+.d-noeud.lecteur:not(:first-child) { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px; }
+/* Traits de l'arborescence : celui du lecteur pour tout enfant, celui du
+   dossier parent pour un petit-enfant. */
+.d-noeud[style*="--niv:1"], .d-noeud[style*="--niv:2"] {
+  background: linear-gradient(var(--border-2), var(--border-2)) no-repeat 25px 0 / 1px 100%; }
+.d-noeud[style*="--niv:2"]::before { content: ""; position: absolute; left: 49px; top: 0; bottom: 0;
+  width: 1px; background: var(--border-2); }
+.d-noeud[style*="--niv:1"]::after, .d-noeud[style*="--niv:2"]::after { content: ""; position: absolute;
+  top: 17px; height: 1px; width: 10px; background: var(--border-2); }
+.d-noeud[style*="--niv:1"]::after { left: 26px; }
+.d-noeud[style*="--niv:2"]::after { left: 50px; }
+.d-ico { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px;
+  background: var(--surface-2); color: var(--text-2); flex-shrink: 0; }
+.d-nom { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; font-size: 12.5px; }
+.d-nom b { font-weight: 700; }
+.d-nom .muted { font-size: 11px; }
+.d-nom .cadenas { color: var(--text-3); align-self: center; }
+.etat { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px;
+  border-radius: 999px; font-size: 11.5px; font-weight: 700; border: 1px solid transparent; flex-shrink: 0; }
+.etat .ico { width: 14px; height: 14px; }
+.etat.on { color: var(--acc-on); background: var(--acc-soft);
+  border-color: color-mix(in srgb, var(--acc) 40%, transparent); }
+.etat.off { color: var(--warn); background: var(--warn-s); border-style: dashed;
+  border-color: color-mix(in srgb, var(--warn) 55%, transparent); }
+.etat.libre { color: var(--text-3); background: transparent; border-color: var(--border); font-weight: 600; }
+.d-noeud.off .d-ico { background: var(--warn-s); color: var(--warn); }
+.d-noeud.libre .d-ico { background: transparent; border: 1px dashed var(--border-2); }
+.d-noeud.reste { min-height: 28px; }
+.d-reste { font-size: 11.5px; color: var(--text-3); font-style: italic; padding-left: 38px; }
+.d-alerte { flex-basis: 100%; margin: 0 0 4px 38px; }
+.d-droite { display: inline-flex; align-items: center; gap: 6px; }
+.d-pied { margin-top: 10px; }
+
+/* --- Bas de page ---------------------------------------------------------- */
+.communs, .choix { margin-top: 26px; padding: 18px 22px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--border); }
+.choix { border-color: color-mix(in srgb, var(--acc) 45%, transparent); background: var(--acc-soft); }
+.choix p { margin: 0 0 6px; color: var(--text-2); }
+.choix p b { color: var(--text); }
+
+@media (prefers-reduced-motion: reduce) {
+  .chev, .switch, .switch::after { transition: none; }
+  .a-panneau.ouvert { animation: none; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="page-h">
+    <div>
+      <h1>Réglage 3.5 — Emplacements protégés</h1>
+      <p>Quatre dispositions pour le même réglage, avec les mêmes couleurs, les mêmes
+        composants et les mêmes données que l'application. Tout est cliquable : retirez
+        une protection, ajoutez un dossier, ouvrez les groupes.</p>
+    </div>
+    <div class="seg" role="group" aria-label="Thème">
+      <button type="button" data-theme-btn="light">Clair</button>
+      <button type="button" data-theme-btn="dark">Sombre</button>
+    </div>
+  </header>
+
+  <section class="constat">
+    <h2>Ce qui gêne aujourd'hui</h2>
+    <ul>
+      <li><b>602 px de haut</b> : ce seul réglage est plus haut que les quatre précédents réunis.</li>
+      <li><b>Quatre étiquettes orange « Très sensible »</b> : à force d'alerter partout, l'œil ne sait plus où regarder.</li>
+      <li><b>Les interrupteurs à gauche</b>, alors que tous les autres réglages les ont à droite.</li>
+      <li><b>Un cadre dans un cadre</b>, et une phrase d'aide qui ressemble à un champ de saisie.</li>
+      <li><b>Une grande zone de texte et un bouton « Enregistrer »</b>, alors que tous les autres réglages s'appliquent tout seuls.</li>
+    </ul>
+  </section>
+
+  <section class="prop" id="prop-A">
+    <div>
+      <div class="cadre" data-prop="A"></div>
+      <p class="mesure"></p>
+    </div>
+    <div class="prop-txt">
+      <h2><span class="lettre">A</span> Un résumé, et un écran à part</h2>
+      <p>Les réglages redeviennent une liste de réglages. Le 3.5 tient en une ligne qui dit
+        l'essentiel : <b>tout est protégé</b>, ou <b>quelle protection manque</b>. Le détail
+        s'ouvre dans un écran à part, qui glisse par-dessus les réglages.</p>
+      <ul class="pour">
+        <li>Le réglage le plus court des quatre.</li>
+        <li>Une protection retirée se voit sans rien ouvrir : la ligne passe à l'orange.</li>
+      </ul>
+      <ul class="contre">
+        <li>Un clic de plus pour ajouter un dossier.</li>
+      </ul>
+      <p class="essai">Essayez : « Gérer », retirez « Windows », puis revenez aux réglages.</p>
+    </div>
+  </section>
+
+  <section class="prop" id="prop-B">
+    <div>
+      <div class="cadre" data-prop="B"></div>
+      <p class="mesure"></p>
+    </div>
+    <div class="prop-txt">
+      <h2><span class="lettre">B</span> Des étiquettes</h2>
+      <p>Chaque emplacement devient une étiquette. Un clic la désactive : elle passe en
+        pointillés orange, barrée. Vos ajouts sont des étiquettes avec une croix, et
+        « Ajouter un dossier » ouvre un champ sur place.</p>
+      <ul class="pour">
+        <li>Tout se voit d'un coup d'œil, sans rien déplier.</li>
+        <li>Même langage visuel que les étiquettes des scripts.</li>
+      </ul>
+      <ul class="contre">
+        <li>Les chemins exacts ne se voient qu'au survol.</li>
+        <li>Une étiquette se clique moins franchement qu'un interrupteur.</li>
+      </ul>
+      <p class="essai">Essayez : cliquez sur « ProgramData », puis ajoutez un dossier.</p>
+    </div>
+  </section>
+
+  <section class="prop" id="prop-C">
+    <div>
+      <div class="cadre" data-prop="C"></div>
+      <p class="mesure"></p>
+    </div>
+    <div class="prop-txt">
+      <h2><span class="lettre">C</span> Trois groupes repliables</h2>
+      <p>On garde les interrupteurs et les chemins, rangés en trois groupes fermés par
+        défaut. Chaque groupe dit son état en une pastille : « 4 protégés », ou
+        « 1 désactivé ». « Très sensible » n'est plus dit qu'une fois, sur le groupe.</p>
+      <ul class="pour">
+        <li>Le plus proche de l'existant : peu de code à changer.</li>
+        <li>Les chemins restent lisibles dès qu'on ouvre un groupe.</li>
+      </ul>
+      <ul class="contre">
+        <li>Cela reste une liste ; il faut ouvrir un groupe pour agir.</li>
+      </ul>
+      <p class="essai">Essayez : ouvrez « Windows et les programmes ».</p>
+    </div>
+  </section>
+
+  <section class="prop" id="prop-D">
+    <div>
+      <div class="cadre" data-prop="D"></div>
+      <p class="mesure"></p>
+    </div>
+    <div class="prop-txt">
+      <h2><span class="lettre">D</span> Le plan du disque</h2>
+      <p>Au lieu d'une liste, <b>l'endroit où les scripts peuvent agir</b> : l'arborescence
+        du disque, un bouclier sur chaque emplacement protégé, « Autorisé » sur votre
+        profil, et vos ajouts rangés sous leur lecteur.</p>
+      <ul class="pour">
+        <li>Le plus parlant : on voit pourquoi <span class="mono">C:\Users</span> est
+          protégé mais pas votre profil, et que le reste du disque est libre.</li>
+        <li>Le plus « graphique » des quatre.</li>
+      </ul>
+      <ul class="contre">
+        <li>Le plus haut, et le plus de code.</li>
+      </ul>
+      <p class="essai">Essayez : ajoutez <span class="mono">C:\Jeux</span>, il se range sous C:\.</p>
+    </div>
+  </section>
+
+  <section class="choix">
+    <h2>Mon conseil : A + D</h2>
+    <p><b>Le résumé de A dans les réglages</b>, une ligne verte ou orange, et <b>le plan du
+      disque de D dans l'écran qui s'ouvre</b>. Les réglages restent courts, et l'écran
+      détaillé a toute la place pour expliquer où les scripts peuvent agir.</p>
+    <p>Si tu veux le moins de travail possible : <b>C</b>.</p>
+  </section>
+
+  <section class="communs">
+    <h2>Quelle que soit la proposition</h2>
+    <ul>
+      <li><b>Plus de bouton « Enregistrer » ni de grande zone de texte</b> : un champ pour un dossier, appliqué aussitôt, comme tous les autres réglages.</li>
+      <li><b>L'erreur sous le champ</b>, au moment de la saisie (« n'est pas un chemin complet »).</li>
+      <li><b>Un bouton « Parcourir… »</b> pour choisir le dossier plutôt que le taper. Il demande un composant de plus (<span class="mono">tauri-plugin-dialog</span>).</li>
+      <li><b>« Très sensible » dit une fois</b>, pas quatre étiquettes orange. La confirmation avant de retirer une protection très sensible reste.</li>
+      <li><b>Sans droits administrateur</b> : un seul bandeau avec « Obtenir les droits », plutôt que sept interrupteurs grisés.</li>
+      <li><b>Une protection retirée ne se fait pas oublier</b> : elle reste orange ici, et pourrait aussi apparaître dans les points d'attention de l'écran principal.</li>
+      <li><b>L'explication dans la bulle (?)</b>, une phrase visible au plus.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+// --- Icones Lucide (ISC), les memes que l'application --------------------------
+const IC = {
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  'shield-off': '<path d="m2 2 20 20"/><path d="M5 5a1 1 0 0 0-1 1v7c0 5 3.5 7.5 7.67 8.94a1 1 0 0 0 .67.01c2.35-.82 4.48-1.97 5.85-3.7"/><path d="M9.309 3.652A12.252 12.252 0 0 0 11.24 2.28a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1v7a9.784 9.784 0 0 1-.08 1.264"/>',
+  lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  'folder-lock': '<rect width="8" height="5" x="14" y="17" rx="1"/><path d="M10 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v2.5"/><path d="M20 17v-2a2 2 0 1 0-4 0v2"/>',
+  'hard-drive': '<line x1="22" x2="2" y1="12" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/><line x1="10" x2="10.01" y1="16" y2="16"/>',
+  monitor: '<rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>',
+  package: '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.16"/>',
+  waves: '<path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>',
+  database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  'folder-plus': '<path d="M12 10v6"/><path d="M9 13h6"/><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  'chevron-down': '<path d="m6 9 6 6 6-6"/>',
+  'chevron-right': '<path d="m9 18 6-6-6-6"/>',
+  'chevron-left': '<path d="m15 18-6-6 6-6"/>',
+  alerte: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  aide: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+};
+IC['shield-check'] = IC.shield + '<path d="m9 12 2 2 4-4"/>';
+const ico = (n, c = '') => `<svg class="ico ${c}" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// --- Les donnees de l'application (garde.rs, i18n.js) --------------------------
+const INTEGRES = [
+  { id: 'windows', nom: 'Windows', court: 'Windows', icone: 'monitor', tres: true,
+    chemins: ['C:\\Windows'] },
+  { id: 'program_files', nom: 'Program Files', court: 'Program Files', icone: 'package', tres: true,
+    chemins: ['C:\\Program Files', 'C:\\Program Files (x86)'] },
+  { id: 'installation', nom: 'Le dossier de WinTool', court: 'WinTool', icone: 'waves', tres: true,
+    chemins: ['C:\\Program Files\\WinTool'] },
+  { id: 'racines_lecteurs', nom: 'La racine de chaque lecteur', court: 'Racines des lecteurs', icone: 'hard-drive', tres: true,
+    chemins: ['C:\\', 'D:\\', '…'] },
+  { id: 'program_data', nom: 'ProgramData, les données des programmes', court: 'ProgramData', icone: 'database', tres: false,
+    chemins: ['C:\\ProgramData'] },
+  { id: 'profils', nom: 'Les profils des autres comptes', court: 'Autres comptes', icone: 'users', tres: false,
+    note: 'le vôtre et le profil public restent autorisés', chemins: ['C:\\Users'] },
+  { id: 'racine_systeme', nom: 'Les dossiers réservés du système', court: 'Dossiers du système', icone: 'folder-lock', tres: false,
+    chemins: ['C:\\$Recycle.Bin', 'C:\\System Volume Information', '…'] },
+];
+const PAR_ID = Object.fromEntries(INTEGRES.map((i) => [i.id, i]));
+const ETATS = {};
+for (const p of 'ABCD') {
+  ETATS[p] = { retires: new Set(), ajouts: ['D:\\Archives', 'E:\\Photos de famille'],
+               ouvert: false, groupes: new Set(), saisie: false, brouillon: '', erreur: '' };
+}
+const actif = (st, id) => !st.retires.has(id);
+const pluriel = (n, un, plus) => `${n} ${n > 1 ? plus : un}`;
+
+// --- Morceaux partages -----------------------------------------------------------
+function ligneIntegre(st, i) {
+  const on = actif(st, i.id);
+  return `<div class="l-ligne ${on ? '' : 'off'}">
+    <span class="l-ico">${ico(on ? i.icone : 'shield-off')}</span>
+    <span class="l-txt"><b>${i.nom}</b>${i.note ? `<span class="muted">${i.note}</span>` : ''}
+      <span class="mono">${i.chemins.map(esc).join(' · ')}</span>
+      ${!on && i.tres ? `<span class="l-alerte">${ico('alerte', 'i14')} Un script pourra agir ici. Rétablissez dès que possible.</span>` : ''}</span>
+    <button class="switch" type="button" role="switch" aria-checked="${on}" aria-label="Protéger ${esc(i.court)}" data-bascule="${i.id}"></button>
+  </div>`;
+}
+function lignesAjouts(st) {
+  return st.ajouts.map((p, k) => `<div class="l-ligne">
+    <span class="l-ico">${ico('folder')}</span>
+    <span class="l-txt"><span class="mono fort">${esc(p)}</span></span>
+    <button class="x" type="button" data-retirer-ajout="${k}" aria-label="Ne plus protéger ${esc(p)}">${ico('x', 'i14')}</button>
+  </div>`).join('');
+}
+function champAjout(st, bouton = 'Protéger') {
+  return `<form class="ajout" data-ajout>
+      <span class="ajout-ico">${ico('folder-plus')}</span>
+      <input name="chemin" placeholder="Ex. : D:\\Archives" aria-label="Chemin complet du dossier à protéger"
+             autocomplete="off" spellcheck="false" value="${esc(st.brouillon)}">
+      <button class="btn compact" type="submit">${bouton}</button>
+    </form>${st.erreur ? `<p class="ajout-err">${ico('alerte', 'i14')} ${esc(st.erreur)}</p>` : ''}`;
+}
+
+// --- A : resume, et ecran a part -------------------------------------------------
+function rendreA(bloc, st, cadre) {
+  const retires = INTEGRES.filter((i) => !actif(st, i.id));
+  const ok = retires.length === 0;
+  bloc.innerHTML = `<div class="a-carte ${ok ? '' : 'alerte'}">
+    <span class="a-bouclier">${ico(ok ? 'shield-check' : 'shield-off', 'i22')}</span>
+    <span class="a-txt">
+      <b>${ok ? 'Tout est protégé' : pluriel(retires.length, 'protection retirée', 'protections retirées')}</b>
+      <span class="muted">${ok
+        ? `${INTEGRES.length} emplacements du système · ${pluriel(st.ajouts.length, 'dossier ajouté', 'dossiers ajoutés')}`
+        : retires.map((i) => i.court).join(', ')}</span>
+    </span>
+    <button class="btn compact" type="button" data-a="ouvrir">Gérer ${ico('chevron-right', 'i14')}</button>
+  </div>`;
+  let panneau = cadre.querySelector('.a-panneau');
+  if (!panneau) {
+    panneau = document.createElement('div');
+    panneau.className = 'a-panneau';
+    cadre.append(panneau);
+  }
+  panneau.classList.toggle('ouvert', st.ouvert);
+  panneau.innerHTML = `<div class="a-panneau-h">
+      <button class="btn compact" type="button" data-a="fermer">${ico('chevron-left', 'i14')} Réglages</button>
+      <b>Emplacements protégés</b>
+    </div>
+    <p class="a-intro">Aucun réglage de script ne peut désigner ces emplacements.</p>
+    <div class="sous-titre">${ico('lock', 'i14')} Très sensibles</div>
+    ${INTEGRES.filter((i) => i.tres).map((i) => ligneIntegre(st, i)).join('')}
+    <div class="sous-titre">Protégés aussi</div>
+    ${INTEGRES.filter((i) => !i.tres).map((i) => ligneIntegre(st, i)).join('')}
+    <div class="sous-titre">Vos ajouts</div>
+    ${lignesAjouts(st)}${champAjout(st)}`;
+}
+
+// --- B : etiquettes ----------------------------------------------------------------
+function puce(st, i) {
+  const on = actif(st, i.id);
+  return `<button class="puce ${on ? '' : 'off'}" type="button" data-bascule="${i.id}" aria-pressed="${on}"
+      title="${esc(i.chemins.join(' · '))}${on ? '' : ' — protection retirée'}">
+      ${ico(on ? 'shield-check' : 'shield-off', 'i14')}<span class="lib">${i.court}</span></button>`;
+}
+function rendreB(bloc, st) {
+  const tresRetires = INTEGRES.filter((i) => i.tres && !actif(st, i.id));
+  bloc.innerHTML = `<p class="b-aide">Cliquez sur une étiquette pour retirer ou rétablir une protection.</p>
+    <div class="b-groupe">
+      <div class="sous-titre">${ico('lock', 'i14')} Très sensibles</div>
+      <div class="b-puces">${INTEGRES.filter((i) => i.tres).map((i) => puce(st, i)).join('')}</div>
+      ${tresRetires.length ? `<p class="l-alerte">${ico('alerte', 'i14')} Un script pourra agir dans ${tresRetires.map((i) => i.court).join(', ')}.</p>` : ''}
+    </div>
+    <div class="b-groupe">
+      <div class="sous-titre">Protégés aussi</div>
+      <div class="b-puces">${INTEGRES.filter((i) => !i.tres).map((i) => puce(st, i)).join('')}</div>
+    </div>
+    <div class="b-groupe">
+      <div class="sous-titre">Vos ajouts</div>
+      <div class="b-puces">
+        ${st.ajouts.map((p, k) => `<span class="puce ajoutee">${ico('shield-check', 'i14')}${esc(p)}
+          <button class="x" type="button" data-retirer-ajout="${k}" aria-label="Ne plus protéger ${esc(p)}">${ico('x', 'i14')}</button></span>`).join('')}
+        ${st.saisie
+          ? `<div class="b-saisie">${champAjout(st)}</div>`
+          : `<button class="puce nouvelle" type="button" data-saisie>${ico('plus', 'i14')}<span class="lib">Ajouter un dossier</span></button>`}
+      </div>
+    </div>`;
+}
+
+// --- C : groupes repliables --------------------------------------------------------
+const GROUPES = [
+  { id: 'systeme', titre: 'Windows et les programmes', sous: 'Très sensibles', icone: 'lock',
+    items: INTEGRES.filter((i) => i.tres) },
+  { id: 'partage', titre: 'Données partagées et autres comptes', sous: 'Sensibles', icone: 'users',
+    items: INTEGRES.filter((i) => !i.tres) },
+  { id: 'ajouts', titre: 'Vos ajouts', sous: 'Les dossiers que vous protégez en plus', icone: 'folder-plus' },
+];
+function rendreC(bloc, st) {
+  bloc.innerHTML = GROUPES.map((g) => {
+    const ouvert = st.groupes.has(g.id);
+    let pastille;
+    if (g.items) {
+      const n = g.items.filter((i) => !actif(st, i.id)).length;
+      pastille = n
+        ? `<span class="badge med">${ico('shield-off')} ${pluriel(n, 'retirée', 'retirées')}</span>`
+        : `<span class="badge low">${ico('shield-check')} ${g.items.length} protégés</span>`;
+    } else {
+      pastille = `<span class="badge">${pluriel(st.ajouts.length, 'dossier', 'dossiers')}</span>`;
+    }
+    const corps = g.items ? g.items.map((i) => ligneIntegre(st, i)).join('') : lignesAjouts(st) + champAjout(st);
+    return `<div class="c-groupe">
+      <button class="c-tete" type="button" data-groupe="${g.id}" aria-expanded="${ouvert}">
+        <span class="l-ico">${ico(g.icone)}</span>
+        <span class="c-titre"><b>${g.titre}</b><span>${g.sous}</span></span>
+        ${pastille}${ico('chevron-down', 'chev')}
+      </button>
+      <div class="c-corps" ${ouvert ? '' : 'hidden'}>${corps}</div>
+    </div>`;
+  }).join('');
+}
+
+// --- D : le plan du disque ---------------------------------------------------------
+function rendreD(bloc, st) {
+  const surC = (p) => /^c:\\/i.test(p);
+
+  const etat = (id) => {
+    const on = actif(st, id);
+    return `<button class="etat ${on ? 'on' : 'off'}" type="button" data-bascule="${id}" aria-pressed="${on}">
+      ${ico(on ? 'shield-check' : 'shield-off')}${on ? 'Protégé' : 'Ouvert'}</button>`;
+  };
+  const libre = `<span class="etat libre">Autorisé</span>`;
+  const lignes = [];
+  const noeud = (niv, icone, nom, sous, droite, { id, cls = '' } = {}) => {
+    const i = id && PAR_ID[id];
+    const off = id && !actif(st, id);
+    lignes.push(`<li class="d-noeud ${cls} ${off ? 'off' : ''}" style="--niv:${niv}">
+      <span class="d-ico">${ico(off ? 'shield-off' : icone, 'i14')}</span>
+      <span class="d-nom"><b>${nom}</b>${i && i.tres ? `<span class="cadenas" title="Très sensible">${ico('lock', 'i14')}</span>` : ''}${sous ? `<span class="muted">${sous}</span>` : ''}</span>
+      <span class="d-droite">${droite}</span>
+      ${off && i.tres ? `<span class="d-alerte">${ico('alerte', 'i14')} Un script pourra agir ici. Rétablissez dès que possible.</span>` : ''}
+    </li>`);
+  };
+  const ajout = (p, k, nom) => noeud(1, 'folder', esc(nom), 'votre ajout',
+    `<span class="etat on">${ico('shield-check')}Protégé</span>
+     <button class="x" type="button" data-retirer-ajout="${k}" aria-label="Ne plus protéger ${esc(p)}">${ico('x', 'i14')}</button>`);
+
+  noeud(0, 'hard-drive', 'C:\\', 'le lecteur lui-même, comme D:\\, E:\\…', etat('racines_lecteurs'), { id: 'racines_lecteurs', cls: 'lecteur' });
+  noeud(1, 'monitor', 'Windows', '', etat('windows'), { id: 'windows' });
+  noeud(1, 'package', 'Program Files', 'et Program Files (x86)', etat('program_files'), { id: 'program_files' });
+  noeud(2, 'waves', 'WinTool', '', etat('installation'), { id: 'installation' });
+  noeud(1, 'database', 'ProgramData', '', etat('program_data'), { id: 'program_data' });
+  noeud(1, 'users', 'Users', 'les autres comptes', etat('profils'), { id: 'profils' });
+  noeud(2, 'user', 'Votre profil', '', libre, { cls: 'libre' });
+  noeud(2, 'users', 'Public', '', libre, { cls: 'libre' });
+  noeud(1, 'folder-lock', 'Dossiers réservés', '$Recycle.Bin, System Volume Information…', etat('racine_systeme'), { id: 'racine_systeme' });
+  st.ajouts.forEach((p, k) => { if (surC(p)) ajout(p, k, p.slice(3)); });
+  lignes.push(`<li class="d-noeud reste" style="--niv:1"><span class="d-reste">Partout ailleurs : autorisé</span></li>`);
+
+  const ailleurs = st.ajouts.map((p, k) => [p, k]).filter(([p]) => !surC(p));
+  if (ailleurs.length) {
+    noeud(0, 'hard-drive', 'Autres lecteurs et réseau', '', '', { cls: 'lecteur' });
+    for (const [p, k] of ailleurs) ajout(p, k, p);
+  }
+  bloc.innerHTML = `<ul class="d-arbre">${lignes.join('')}</ul>
+    <div class="d-pied">${champAjout(st, 'Protéger')}</div>`;
+}
+
+// --- Rendu, mesure, evenements -----------------------------------------------------
+const RENDUS = { A: rendreA, B: rendreB, C: rendreC, D: rendreD };
+function rendre(p) {
+  const cadre = document.querySelector(`.cadre[data-prop="${p}"]`);
+  let bloc = cadre.querySelector('.bloc35');
+  if (!bloc) {
+    cadre.insertAdjacentHTML('afterbegin', `<div class="cadre-groupe">Mode Expert</div>
+      <div class="faux"><span><span class="num">3.3</span>Politique d’exécution PowerShell</span><span class="sel">Bypass</span></div>
+      <div class="faux"><span><span class="num">3.4</span>Afficher les numéros des réglages</span><span class="switch" aria-hidden="true"></span></div>
+      <div class="r35"><span class="num">3.5</span>Emplacements protégés
+        <button class="aide" type="button" aria-label="Aide" title="Aucun réglage de script ne peut désigner ces emplacements : un script lancé en administrateur n’y touchera pas à cause d’une valeur saisie — ou modifiée à votre insu.">${ico('aide', 'i14')}</button></div>
+      <div class="bloc35"></div>`);
+    bloc = cadre.querySelector('.bloc35');
+  }
+  RENDUS[p](bloc, ETATS[p], cadre);
+  cadre.classList.toggle('panneau-ouvert', p === 'A' && ETATS.A.ouvert);
+  requestAnimationFrame(() => mesurer(p));
+}
+// Le bloc seul, comme les 602 px mesurés dans l'application.
+function mesurer(p) {
+  const cadre = document.querySelector(`.cadre[data-prop="${p}"]`);
+  const panneau = p === 'A' && ETATS.A.ouvert;
+  const el = panneau ? cadre.querySelector('.a-panneau') : cadre.querySelector('.bloc35');
+  const h = Math.round(el.getBoundingClientRect().height);
+  cadre.parentElement.querySelector('.mesure').innerHTML = panneau
+    ? `Écran à part : <b>${h} px</b>, à la place des réglages`
+    : `Hauteur du réglage : <b>${h} px</b> — aujourd’hui 602 px`;
+}
+addEventListener('resize', () => { for (const p of 'ABCD') mesurer(p); });
+
+function ajouter(st, brut) {
+  const p = brut.trim().replace(/[\\/]+$/, (m) => (/^[A-Za-z]:[\\/]*$/.test(brut.trim()) ? '\\' : ''));
+  st.brouillon = brut;
+  if (!p) { st.erreur = ''; return false; }
+  if (!/^[A-Za-z]:\\./.test(p) && !/^\\\\[^\\]+\\[^\\]+/.test(p)) {
+    st.erreur = `« ${p} » n’est pas un chemin complet (exemple : D:\\Archives).`;
+    return false;
+  }
+  if (st.ajouts.some((a) => a.toLowerCase() === p.toLowerCase())) {
+    st.erreur = `« ${p} » est déjà protégé.`;
+    return false;
+  }
+  st.ajouts.push(p);
+  st.brouillon = '';
+  st.erreur = '';
+  return true;
+}
+
+document.addEventListener('click', (ev) => {
+  const cadre = ev.target.closest('.cadre');
+  if (!cadre) return;
+  const p = cadre.dataset.prop;
+  const st = ETATS[p];
+  const cible = ev.target.closest('[data-bascule],[data-retirer-ajout],[data-a],[data-groupe],[data-saisie]');
+  if (!cible) return;
+  const d = cible.dataset;
+  if (d.bascule) st.retires.has(d.bascule) ? st.retires.delete(d.bascule) : st.retires.add(d.bascule);
+  else if (d.retirerAjout !== undefined) st.ajouts.splice(Number(d.retirerAjout), 1);
+  else if (d.a) st.ouvert = d.a === 'ouvrir';
+  else if (d.groupe) st.groupes.has(d.groupe) ? st.groupes.delete(d.groupe) : st.groupes.add(d.groupe);
+  else if (d.saisie !== undefined) st.saisie = true;
+  rendre(p);
+  if (d.saisie !== undefined) cadre.querySelector('.ajout input')?.focus();
+  else {
+    // Garder le focus sur la commande actionnee : on recherche son equivalent.
+    const sel = d.bascule ? `[data-bascule="${d.bascule}"]` : d.groupe ? `[data-groupe="${d.groupe}"]` : null;
+    if (sel) cadre.querySelector(sel)?.focus();
+  }
+});
+document.addEventListener('submit', (ev) => {
+  const form = ev.target.closest('form[data-ajout]');
+  if (!form) return;
+  ev.preventDefault();
+  const cadre = form.closest('.cadre');
+  const p = cadre.dataset.prop;
+  const ok = ajouter(ETATS[p], form.elements.chemin.value);
+  if (ok && p === 'B') ETATS[p].saisie = false;
+  rendre(p);
+  if (!ok || p !== 'B') cadre.querySelector('.ajout input')?.focus();
+});
+
+// --- Theme -------------------------------------------------------------------------
+const sombreSysteme = matchMedia('(prefers-color-scheme: dark)');
+function marquerTheme() {
+  const t = document.documentElement.dataset.theme || (sombreSysteme.matches ? 'dark' : 'light');
+  document.querySelectorAll('[data-theme-btn]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.themeBtn === t));
+}
+document.querySelectorAll('[data-theme-btn]').forEach((b) => b.addEventListener('click', () => {
+  document.documentElement.dataset.theme = b.dataset.themeBtn;
+  marquerTheme();
+}));
+sombreSysteme.addEventListener('change', marquerTheme);
+marquerTheme();
+
+for (const p of 'ABCD') rendre(p);
+</script>
+</body>
+</html>
