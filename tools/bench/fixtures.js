@@ -84,6 +84,9 @@
       ]),
       opt('ApplyToIPv6', 'bool', "Appliquer à l'IPv6", 'résolveurs équivalents', true),
       opt('FlushCache', 'hidden', 'Vider le cache', 'après application', true),
+      // Deux scripts simulables au moins : sans cela, l'etat « partiel » de la
+      // simulation ne s'observe pas sur le banc.
+      opt('SafeTest', 'bool', 'Safe test', 'simulates every change', false),
     ],
   });
 
@@ -216,16 +219,28 @@
     [1300, 'stdout', 'DONE', null, '[DONE] Finished'],
   ];
 
-  const etatTest = { actif: false };
   let compteur = 0;
   let enCours = null;
 
+  // Simulation (§6.9) : meme regle que simulation.rs, sur les reglages du banc.
+  const simulable = (s) => (s.meta.options || []).some((o) => o.key === 'SafeTest');
+  const simule = (s) => {
+    if (!simulable(s)) return false;
+    const v = reglages.overrides[s.id]?.config?.SafeTest;
+    if (v !== undefined) return v === true || v === 1 || String(v).toLowerCase() === 'true';
+    return s.meta.options.find((o) => o.key === 'SafeTest').default === true;
+  };
+  const bilanSimulation = () => {
+    const simulables = TOUS.filter(simulable).length;
+    const simules = TOUS.filter(simule).length;
+    const etat = simules === 0 ? 'desactivee' : simules === simulables ? 'activee' : 'partielle';
+    return { etat, simulables, simules };
+  };
+
   function lancer(req) {
-    if (etatTest.actif) {
-      const s = TOUS.find((x) => x.id === req?.script_id);
-      const declare = (s?.meta.options || []).some((o) => o.key === 'SafeTest');
-      if (!declare) throw new Error('SANS_MODE_TEST');
-    }
+    const s = TOUS.find((x) => x.id === req?.script_id);
+    if (s && !simulable(s) && bilanSimulation().etat === 'activee') throw new Error('SANS_SIMULATION');
+    const estSimule = !!s && simule(s);
     compteur += 1;
     const run_id = `run-${compteur}`;
     const script_id = req?.script_id || 'set-dns';
@@ -263,6 +278,7 @@
       policy: 'Bypass',
       log_path: 'C:\\Users\\Buly\\AppData\\Local\\WinTool\\logs\\2026-09-24_101200-set-dns.log',
       pid: 4242,
+      simulated: estSimule,
     };
   }
 
@@ -320,7 +336,7 @@
     record_script_run: (a) => {
       historique.scripts.push({
         script_id: a.scriptId, title: a.title, at: '2026-09-25T00:00:00Z',
-        success: a.success, killed: a.killed, duration_ms: a.durationMs,
+        success: a.success, killed: a.killed, duration_ms: a.durationMs, simulated: !!a.simulated,
       });
       return null;
     },
@@ -367,8 +383,14 @@
     },
     set_ui_scale: (a) => { reglages.ui_scale = a.value; return JSON.parse(JSON.stringify(reglages)); },
     relaunch_elevated: () => null,
-    test_mode: () => etatTest.actif,
-    set_test_mode: (a) => { etatTest.actif = !!a.value; return etatTest.actif; },
+    simulation_state: () => bilanSimulation(),
+    set_simulation_all: (a) => {
+      TOUS.filter(simulable).forEach((s) => {
+        (reglages.overrides[s.id] ||= { config: {} }).config ||= {};
+        reglages.overrides[s.id].config.SafeTest = !!a.value;
+      });
+      return JSON.parse(JSON.stringify(reglages));
+    },
     create_restore_point: () => 'created',
     set_show_setting_numbers: (a) => { reglages.show_setting_numbers = !!a.value; return JSON.parse(JSON.stringify(reglages)); },
     export_settings: () => 'C:\\Users\\Buly\\Documents\\wintool-config.json',

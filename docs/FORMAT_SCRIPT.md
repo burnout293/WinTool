@@ -19,7 +19,7 @@ Référence normative : `docs/SPECIFICATION.md` §5.
 
 Un script non conforme **s'exécute quand même** : WinTool signale, il ne bloque pas
 (§5.4). **Mais plusieurs situations font refuser le lancement** — approbation manquante,
-ancienne ligne d'override, script non simulable en mode test, interpréteur absent, fichier
+ancienne ligne d'override, script non simulable alors que la simulation est activée, interpréteur absent, fichier
 modifié depuis son analyse. Elles sont toutes listées dans **« Ce qui empêche un script de
 se lancer »**, plus bas : lisez cette section avant d'écrire votre premier script.
 
@@ -107,7 +107,7 @@ Tous les scripts officiels vivent à plat dans `Default\`, sans sous-dossiers.
 ##   quad9      : Quad9 — 9.9.9.9, blocks known malicious domains
 ## ApplyToIPv6  : [bool]   Apply to IPv6 — equivalent resolvers
 ## FlushCache   : [hidden] Flush the resolver cache afterwards
-## SafeTest     : [bool]   Safe test — simulates every change, modifies nothing
+## SafeTest     : [bool]   Simulate — shows what would be done, changes nothing
 ## WINTOOL:END
 
 ## WINTOOL:LANG fr
@@ -119,7 +119,7 @@ Tous les scripts officiels vivent à plat dans `Default\`, sans sous-dossiers.
 ##   quad9      : Quad9 — 9.9.9.9, bloque les domaines malveillants connus
 ## ApplyToIPv6  : Appliquer à l'IPv6 — résolveurs équivalents
 ## FlushCache   : Vider le cache de résolution ensuite
-## SafeTest     : Test sans risque — simule chaque modification, ne change rien
+## SafeTest     : Simuler — montre ce qui serait fait, sans rien modifier
 ## WINTOOL:END
 
 $CONFIG = @{
@@ -558,7 +558,7 @@ de corbeille sans rien modifier.
 ##   user     : Your temporary files
 ##   windows  : Windows temporary files
 ## RecycleBin : [bool]  Empty the recycle bin
-## SafeTest   : [bool]  Safe test — simulates every change, modifies nothing
+## SafeTest   : [bool]  Simulate — shows what would be done, changes nothing
 ## WINTOOL:END
 
 ## WINTOOL:LANG fr
@@ -568,7 +568,7 @@ de corbeille sans rien modifier.
 ##   user     : Vos fichiers temporaires
 ##   windows  : Les fichiers temporaires de Windows
 ## RecycleBin : Vider la corbeille
-## SafeTest   : Test sans risque — simule chaque modification, ne change rien
+## SafeTest   : Simuler — montre ce qui serait fait, sans rien modifier
 ## WINTOOL:END
 
 $CONFIG = @{
@@ -916,19 +916,27 @@ $hosts = Get-Content -LiteralPath "$env:SystemRoot\System32\drivers\etc\hosts" -
 Le validateur signale le même problème sous le code `OVERRIDE_FICHIER`, avec le
 numéro de ligne, avant même que vous n'essayiez de lancer le script.
 
-### 3. Le mode test, pour un script qui ne sait pas se simuler
+### 3. La simulation, pour un script qui ne sait pas se simuler
 
-Quand le **mode test** est actif, WinTool impose `SafeTest = true` à chaque script.
-Un script qui ne déclare pas cette option est **refusé**, pas exécuté.
+Un script qui déclare l'option `SafeTest` sait **se simuler** : il montre ce qu'il ferait,
+sans rien modifier. L'utilisateur règle la simulation script par script, et une pastille
+« Simulation » permet de tout simuler d'un coup (§6.9 de la spécification).
 
-C'est volontaire : injecter une clé qu'un script n'utilise pas ajouterait une
-entrée inerte à sa table, et il modifierait la machine pendant que l'interface
-annonce une simulation. Un refus visible vaut mieux qu'une garantie fausse.
+Quand la simulation est **activée** — tous les scripts simulables simulés —, un script
+qui ne déclare pas `SafeTest` est **refusé**, pas exécuté. C'est volontaire : injecter une
+clé qu'un script n'utilise pas ajouterait une entrée inerte à sa table, et il modifierait
+la machine pendant que l'interface annonce une simulation. Un refus visible vaut mieux
+qu'une garantie fausse.
 
-Pour qu'un script soit utilisable en mode test, déclarez l'option et honorez-la :
+**Le libellé de l'option ne vous appartient pas.** WinTool affiche partout « Simuler »,
+quel que soit celui que vous écrivez : le terme doit être le même pour tous les scripts.
+Le bloc `OPTIONS` exige néanmoins un libellé, et la traduction, une ligne ; écrivez donc
+celui-ci, pour que votre script se lise comme l'interface le montrera.
+
+Pour qu'un script sache se simuler, déclarez l'option et honorez-la :
 
 ```powershell
-## SafeTest      : [bool]   Safe test — simulates every change, modifies nothing
+## SafeTest      : [bool]   Simulate — shows what would be done, changes nothing
 ```
 
 ```powershell

@@ -6,6 +6,7 @@ mod restore;
 mod runner;
 mod security;
 mod settings;
+mod simulation;
 mod update;
 
 use serde::Serialize;
@@ -173,40 +174,37 @@ fn relaunch_elevated(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// Cle d'option par laquelle un script declare savoir se simuler.
-/// Convention documentee dans `docs/FORMAT_SCRIPT.md`.
-const CLE_TEST: &str = "SafeTest";
-
-/// Mode test global.
-///
-/// **En memoire de session uniquement, jamais dans `settings.json`.** Un mode
-/// test qui survivrait au redemarrage ferait passer un entretien reel pour une
-/// simulation : c'est exactement l'erreur qu'on ne peut pas se permettre. Au
-/// prochain lancement, WinTool repart donc toujours en mode reel.
-#[derive(Default)]
-pub struct ModeTest(std::sync::atomic::AtomicBool);
-
-impl ModeTest {
-    fn actif(&self) -> bool {
-        self.0.load(std::sync::atomic::Ordering::Relaxed)
-    }
-}
-
+/// Etat de l'interrupteur general de simulation, deduit des scripts (§6.9).
 #[tauri::command]
-fn test_mode(state: tauri::State<'_, Arc<ModeTest>>) -> bool {
-    state.actif()
+fn simulation_state(app: tauri::AppHandle) -> Result<simulation::Bilan, String> {
+    let decouverte = discovery::discover(&app)?;
+    let reglages = settings::load(&app)?;
+    Ok(simulation::bilan(
+        &reglages,
+        decouverte.scripts.iter().map(|s| (s.id.as_str(), &s.meta)),
+    ))
 }
 
+/// L'interrupteur general : regle la simulation de tous les scripts qui savent
+/// se simuler. Chacun se regle ensuite a nouveau un par un, comme n'importe
+/// quelle option, par `set_script_config`.
 #[tauri::command]
-fn set_test_mode(state: tauri::State<'_, Arc<ModeTest>>, value: bool) -> bool {
-    state.0.store(value, std::sync::atomic::Ordering::Relaxed);
-    value
+fn set_simulation_all(app: tauri::AppHandle, value: bool) -> Result<Settings, String> {
+    let decouverte = discovery::discover(&app)?;
+    with_settings(&app, |s| {
+        simulation::tout_regler(
+            s,
+            decouverte.scripts.iter().map(|e| (e.id.as_str(), &e.meta)),
+            value,
+        );
+        Ok(())
+    })
 }
 
-/// Sentinelle : ce script ne sait pas se simuler, il n'a pas ete lance.
-/// Distincte d'une erreur ordinaire pour que l'interface puisse l'expliquer
-/// plutot que d'afficher un message technique.
-const SANS_MODE_TEST: &str = "SANS_MODE_TEST";
+/// Sentinelle : la simulation est activee et ce script ne sait pas se simuler,
+/// il n'a pas ete lance. Distincte d'une erreur ordinaire pour que l'interface
+/// puisse l'expliquer plutot que d'afficher un message technique.
+const SANS_SIMULATION: &str = "SANS_SIMULATION";
 
 /// Lance un script. Rend la main immediatement : la suite arrive par les
 /// evenements `script:line` puis `script:end`.
@@ -214,7 +212,6 @@ const SANS_MODE_TEST: &str = "SANS_MODE_TEST";
 fn run_script(
     app: tauri::AppHandle,
     state: tauri::State<'_, Arc<runner::Runner>>,
-    mode_test: tauri::State<'_, Arc<ModeTest>>,
     mut req: runner::RunRequest,
 ) -> Result<runner::RunStarted, String> {
     // La seule exception au principe "constater, jamais bloquer" (§5.4,
@@ -224,33 +221,49 @@ fn run_script(
     // confiance a ce que le frontend affirme sur un script qu'il ne controle
     // pas.
     let decouverte = discovery::discover(&app)?;
+    let mut simule = false;
     if let Some(entree) = decouverte.scripts.iter().find(|s| s.id == req.script_id) {
         if !script_approuve(entree.origin, &entree.hash)? {
             return Err(NON_APPROUVE.to_string());
         }
 
-        // Mode test : on impose `SafeTest` a la configuration, ce qui ecrase la
-        // valeur venue de l'interface sans rien ecrire dans les reglages.
+        // Simulation (§6.9). Ce sont les reglages enregistres qui decident, pas
+        // la configuration envoyee par l'interface : la valeur de `SafeTest`
+        // est imposee ici, si bien que ce qui s'execute est toujours ce que les
+        // reglages annoncent.
         //
-        // **On refuse si le script ne declare pas cette option.** Injecter une
-        // cle qu'il n'utilise pas ajouterait une entree inerte a sa table et le
-        // script modifierait la machine pendant que l'interface annonce une
+        // **Simulation activee, script sans `SafeTest` : refus.** Lui injecter
+        // une cle qu'il n'utilise pas ajouterait une entree inerte a sa table,
+        // et il modifierait la machine pendant que l'interface annonce une
         // simulation. Un refus visible vaut mieux qu'une garantie fausse
         // (§12.2 : ne jamais laisser croire a une protection absente).
-        if mode_test.actif() {
-            let declare = entree.meta.options.iter().any(|o| o.key == CLE_TEST);
-            if !declare {
-                return Err(SANS_MODE_TEST.to_string());
+        let reglages = settings::load(&app)?;
+        let general = simulation::bilan(
+            &reglages,
+            decouverte.scripts.iter().map(|s| (s.id.as_str(), &s.meta)),
+        );
+        match simulation::decision(&reglages, &entree.id, &entree.meta, &general) {
+            simulation::Decision::Refuser => return Err(SANS_SIMULATION.to_string()),
+            simulation::Decision::Simuler => {
+                req.config
+                    .insert(simulation::CLE.to_string(), serde_json::Value::Bool(true));
+                simule = true;
             }
-            req.config
-                .insert(CLE_TEST.to_string(), serde_json::Value::Bool(true));
+            simulation::Decision::Reel => {
+                if simulation::simulable(&entree.meta) {
+                    req.config
+                        .insert(simulation::CLE.to_string(), serde_json::Value::Bool(false));
+                }
+            }
         }
     }
 
     // Un `Arc` plutot qu'un etat emprunte : le fil qui attend la fin du
     // processus doit pouvoir liberer l'emplacement bien apres le retour de
     // cette commande.
-    runner::run_script(&app, state.inner().clone(), req)
+    let mut demarre = runner::run_script(&app, state.inner().clone(), req)?;
+    demarre.simulated = simule;
+    Ok(demarre)
 }
 
 /// Le contenu et le hash affiches a l'ecran de confiance viennent de la
@@ -423,6 +436,8 @@ fn record_script_run(
     success: bool,
     killed: bool,
     duration_ms: u64,
+    // `Option` : un appel qui l'omettrait reste valide, et vaut « reel ».
+    simulated: Option<bool>,
 ) -> Result<(), String> {
     history::record_script_run(
         &app,
@@ -432,6 +447,7 @@ fn record_script_run(
             success,
             killed,
             duration_ms,
+            simulated: simulated.unwrap_or(false),
             at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         },
     )
@@ -865,7 +881,6 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             app.manage(Arc::new(runner::Runner::default()));
-            app.manage(Arc::new(ModeTest::default()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -876,8 +891,8 @@ pub fn run() {
             scripts_root,
             engines,
             run_script,
-            test_mode,
-            set_test_mode,
+            simulation_state,
+            set_simulation_all,
             check_script,
             cancel_script,
             run_status,

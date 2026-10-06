@@ -461,28 +461,61 @@ applet absente ou une erreur de logique ne se voient qu'à l'exécution. C'est u
 forme, pas un essai à blanc — et laisser croire l'inverse serait pire que ne rien afficher
 (même principe qu'au §12.2).
 
-### 6.9 Mode test global
+### 6.9 Simulation
 
-Une bascule **Mode test** impose `SafeTest = true` à la configuration de chaque script
-lancé, quel que soit le mode. Un lot entier en hérite donc sans réglage script par script.
+Un script qui déclare l'option `SafeTest` sait **se simuler** : il montre ce qu'il ferait,
+sans rien modifier. L'interface parle partout de **simulation** — jamais de « test sans
+risque », de « Safe Test » ni de « mode test » — et **impose son propre libellé** à cette
+option, quel que soit celui que l'auteur du script a écrit : « Simuler ». Le terme est
+ainsi le même partout, sans dépendre de chaque auteur.
 
-Trois règles non négociables :
+**Script par script.** Que chaque script soit simulé ou non est un réglage ordinaire,
+enregistré dans sa configuration comme n'importe quelle option, et **conservé d'une
+session à l'autre** (1.1.1). Il se règle dans le mode Expert ; le mode Simple ne montre pas
+cette option.
 
-- **L'état vit en mémoire de session, jamais dans les réglages.** Un mode test qui
-  survivrait au redémarrage ferait passer un entretien réel pour une simulation. WinTool
-  repart toujours en mode réel.
-- **Un script qui ne déclare pas l'option `SafeTest` est refusé, pas exécuté.** Injecter
-  une clé qu'il n'utilise pas ajouterait une entrée inerte à sa table, et il modifierait la
-  machine pendant que l'interface annonce une simulation. Un refus visible vaut mieux
-  qu'une garantie fausse.
-- **L'état est rappelé à deux endroits** — la pastille de la barre de titre et un bandeau
-  en tête d'écran. Croire qu'on simule alors qu'on modifie est le pire résultat possible,
-  et une seule pastille se perd dans une barre chargée.
+**L'interrupteur général.** La pastille « Simulation » n'a pas d'état propre : elle se
+déduit des scripts.
+
+| État | Condition | Pastille |
+|---|---|---|
+| Désactivée | aucun script simulable n'est simulé | éteinte |
+| Partielle | certains le sont | « Simulation n/total », bord en pointillés |
+| Activée | tous ceux qui le peuvent le sont | allumée |
+
+La basculer simule tous les scripts qui le permettent, ou les repasse tous en réel.
+Chacun se règle ensuite à nouveau un par un.
+
+Quatre règles non négociables :
+
+- **Les réglages enregistrés décident, pas l'interface.** Au lancement, le moteur impose
+  à `SafeTest` la valeur enregistrée pour ce script, quelle que soit la configuration que
+  l'interface lui a transmise. Ce qui s'exécute est toujours ce que les réglages annoncent.
+- **Simulation activée, script qui ne sait pas se simuler : refusé, pas exécuté.**
+  L'intention « rien de réel » est alors sans ambiguïté. Injecter une clé que le script
+  n'utilise pas ajouterait une entrée inerte à sa table, et il modifierait la machine
+  pendant que l'interface annonce une simulation : un refus visible vaut mieux qu'une
+  garantie fausse. En simulation **partielle**, chaque script suit son propre réglage —
+  l'utilisateur a choisi script par script —, et celui qui ne sait pas se simuler
+  s'exécute réellement. Le récapitulatif de l'étape 2 dit, pour chaque script, s'il sera
+  simulé ou non lancé.
+- **Une exécution simulée n'est jamais « faite ».** Elle porte `simulated` jusque dans
+  l'historique, qui la garde, mais « Fait le … » (§7) ne retient que les exécutions
+  réelles. Le bilan dit combien de scripts ont été simulés.
+- **L'état est rappelé à deux endroits** — la pastille et un bandeau en tête d'écran,
+  affiché dès qu'un seul script est simulé.
+
+**Pourquoi la persistance, et ce qu'elle change.** Jusqu'à la 1.1.0, le mode test était un
+état de session, perdu à la fermeture, pour qu'un entretien réel ne passe jamais pour une
+simulation. Régler la simulation script par script impose de la conserver — c'est le choix
+fait pour la 1.1.1. Le risque s'inverse alors : croire réel un entretien simulé. Ce sont
+les deux dernières règles qui le ferment, et c'est pourquoi elles ne se discutent pas.
 
 **Limite assumée** : `SafeTest` est une convention de script. WinTool garantit que la clé
-est transmise et que les scripts qui ne la déclarent pas ne partent pas ; il ne peut pas
-garantir qu'un script qui la déclare l'honore complètement. Cette responsabilité est celle
-de l'auteur du script, et `docs/FORMAT_SCRIPT.md` la lui rappelle.
+est transmise avec la valeur enregistrée, et qu'aucun script incapable de se simuler ne
+part quand la simulation est activée ; il ne peut pas garantir qu'un script qui la déclare
+l'honore complètement. Cette responsabilité est celle de l'auteur du script, et
+`docs/FORMAT_SCRIPT.md` la lui rappelle.
 
 ---
 

@@ -101,7 +101,9 @@ let moteurs = { winps: null, pwsh: null };
 /** Execution en cours, ou null. Une seule a la fois (specification 6.6). */
 let course = null;
 /** Mode test global (§6.9) : en memoire de session, jamais persiste. */
-let modeTest = false;
+/** Etat de l'interrupteur general de simulation (§6.9), deduit des scripts par
+ *  le moteur : { etat: 'desactivee' | 'partielle' | 'activee', simulables, simules }. */
+let simulation = { etat: 'desactivee', simulables: 0, simules: 0 };
 /** Vrai si le processus a les droits administrateur. */
 let estEleve = false;
 /** Heure de depart de l'execution en cours, pour horodater les lignes du journal. */
@@ -161,6 +163,19 @@ function valeurOption(entree, opt) {
   return optionFigee(entree, opt.key) ? reglagesScript(entree.id).config[opt.key] : opt.default;
 }
 
+/** Meme regle que le moteur (simulation.rs) : la valeur enregistree, sinon le
+ *  defaut du script. Sert a l'AFFICHAGE ; au lancement, c'est le moteur qui
+ *  decide, d'apres les reglages enregistres. */
+function estSimulable(entree) {
+  return (entree.meta.options || []).some((o) => o.key === CLE_SIMULATION);
+}
+function estSimule(entree) {
+  const opt = (entree.meta.options || []).find((o) => o.key === CLE_SIMULATION);
+  if (!opt) return false;
+  const v = valeurOption(entree, opt);
+  return v === true || v === 1 || String(v).toLowerCase() === 'true';
+}
+
 /** Ce script exige-t-il un point de restauration ? Pre-coche si le script se
  *  declare non reversible (4.2), mais l'utilisateur a le dernier mot. */
 function besoinPointRestauration(entree) {
@@ -210,7 +225,13 @@ function aDesReglagesFiges(entree) {
    ------------------------------------------------------------------------- */
 
 /** Libelle affiche pour une option, traduit si la langue le permet. */
+/** Cle d'option par laquelle un script declare savoir se simuler (§6.9). */
+const CLE_SIMULATION = 'SafeTest';
+
 function libelleOption(entree, opt) {
+  // La simulation porte le meme nom partout, quel que soit le libelle ecrit par
+  // l'auteur du script : c'est WinTool qui l'impose, pas chaque script.
+  if (opt.key === CLE_SIMULATION) return { label: t('simulation.option_label'), desc: t('simulation.option_desc') };
   const tr = entree.meta.translations?.[currentLang()]?.options?.[opt.key];
   if (tr && tr[0]) return { label: tr[0], desc: tr[1] || '' };
   return { label: opt.label, desc: opt.desc };
@@ -976,6 +997,8 @@ async function persisterReglage(el) {
   // script palit dans la colonne de gauche, et le bouton Executer suit.
   if (drapeau === 'enabled') await rendreLots();
   if (!etaitFige || drapeau === 'enabled') await rendreDetail();
+  // Simuler un script un par un change l'etat de l'interrupteur general.
+  if (el.dataset.opt === CLE_SIMULATION) await rafraichirSimulation();
 }
 
 /* -------------------------------------------------------------------------
@@ -1144,30 +1167,58 @@ function cablerMaj() {
   document.getElementById('btnVerifierMaj').addEventListener('click', () => verifierMaj());
 }
 
-function appliquerModeTest(actif) {
-  modeTest = !!actif;
-  document.body.classList.toggle('mode-test', modeTest);
+/**
+ * Reflete l'etat de la simulation (§6.9) : pastille a trois etats, bandeau.
+ *
+ * La simulation est conservee d'une session a l'autre. Le risque n'est donc
+ * plus d'oublier qu'elle est active a la fermeture, mais de croire reel un
+ * entretien simule : le bandeau reste affiche tant qu'un seul script l'est.
+ */
+function appliquerSimulation(bilan) {
+  if (bilan) simulation = bilan;
+  const { etat, simules, simulables } = simulation;
+  document.body.dataset.simulation = etat;
 
   const pastille = document.getElementById('testPill');
   if (pastille) {
-    pastille.setAttribute('aria-pressed', String(modeTest));
-    pastille.dataset.tip = t('test.infobulle');
-    document.getElementById('testPillText').textContent = t('test.pastille');
+    pastille.setAttribute('aria-pressed', etat === 'activee' ? 'true' : etat === 'partielle' ? 'mixed' : 'false');
+    pastille.dataset.tip = t(`simulation.infobulle_${etat}`, { n: simules, total: simulables });
+    document.getElementById('testPillText').textContent = t(`simulation.pastille_${etat}`, { n: simules, total: simulables });
   }
 
   const bandeau = document.getElementById('testBanner');
   if (bandeau) {
-    bandeau.hidden = !modeTest;
-    bandeau.textContent = t('test.bandeau');
+    bandeau.hidden = etat === 'desactivee';
+    bandeau.textContent = etat === 'activee'
+      ? t('simulation.bandeau_activee')
+      : t('simulation.bandeau_partielle', { n: simules, total: simulables });
   }
 }
 
-async function basculerModeTest() {
+async function rafraichirSimulation() {
   try {
-    const nouveau = await invoke('set_test_mode', { value: !modeTest });
-    appliquerModeTest(nouveau);
+    appliquerSimulation(await invoke('simulation_state'));
   } catch (e) {
-    console.error('Mode test non modifie :', e);
+    console.error('Etat de la simulation illisible :', e);
+  }
+}
+
+/** L'interrupteur general : simule tout ce qui peut l'etre, ou repasse tout en
+ *  reel. Chaque script se regle ensuite a nouveau un par un. */
+async function basculerSimulation() {
+  try {
+    const reglages = await invoke('set_simulation_all', { value: simulation.etat !== 'activee' });
+    reglagesActuels = reglages;
+    if (etatGroupes) etatGroupes.overrides = reglages.overrides;
+  } catch (e) {
+    console.error('Simulation non modifiee :', e);
+  }
+  await rafraichirSimulation();
+  rendreDetail();
+  // L'etape 2 du mode Simple affiche quels scripts seront simules.
+  if (entretienEnCours && !entretienActif && document.querySelector('[data-script-recap]')) {
+    const groupe = etatGroupes?.categories.find((g) => g.category.id === entretienEnCours.categorieId);
+    if (groupe) await rendreEtapeVerifier(groupe);
   }
 }
 
@@ -1548,7 +1599,7 @@ async function lancer(id) {
     });
 
     departCourse = Date.now();
-    course = { runId: demarre.run_id, id, logPath: demarre.log_path };
+    course = { runId: demarre.run_id, id, logPath: demarre.log_path, simule: !!demarre.simulated };
     if (bouton) bouton.disabled = true;
     document.querySelectorAll('[data-run]').forEach((b) => (b.disabled = true));
     ouvrirTerminal(entree, demarre);
@@ -1600,7 +1651,7 @@ function journaliserRefus(entree, message) {
 /** Traduit les sentinelles du moteur en phrase comprehensible. */
 function messageLancement(brut) {
   const texte = String(brut);
-  if (texte.includes('SANS_MODE_TEST')) return t('test.script_sans_simulation');
+  if (texte.includes('SANS_SIMULATION')) return t('simulation.script_refuse');
   if (texte.includes('APPROBATION_SANS_DROITS')) return t('droits.approbation_impossible');
   return texte;
 }
@@ -1672,11 +1723,11 @@ async function cablerMoteur() {
     const titre = tr?.title || entree?.meta.title || payload.script_id;
     // Une entree par script execute (specification §14), quel que soit le
     // mode — ne bloque jamais la suite, ne fait que rafraichir "Fait le ...".
-    enregistrerExecution(payload, titre).then(() => rendreLots());
+    enregistrerExecution(payload, titre, course.simule).then(() => rendreLots());
 
     if (course.entretien) {
       const succes = payload.success && !payload.killed;
-      entretienEnCours.resultats.push({ id: payload.script_id, success: succes });
+      entretienEnCours.resultats.push({ id: payload.script_id, success: succes, simule: course.simule });
       course = null;
       majEtatJournalCompact();
       // Comportement d'echec (specification §6.2, reglage Expert §8) : par
@@ -2216,7 +2267,9 @@ async function choisirCategorie(id) {
  * directes des regles de langage du §3.
  */
 function reglagesSimples(entree) {
-  return (entree.meta.options || []).filter((o) => o.kind !== 'hidden' && !o.hidden);
+  // La simulation se regle par la pastille, seul controle qu'un debutant doit
+  // connaitre ; script par script, c'est l'affaire du mode Expert.
+  return (entree.meta.options || []).filter((o) => o.kind !== 'hidden' && !o.hidden && o.key !== CLE_SIMULATION);
 }
 
 /**
@@ -2302,6 +2355,15 @@ function cablerReglagesSimples() {
   });
 }
 
+/** Ce que la simulation fera de ce script, en clair, a l'etape 2. */
+function marqueSimulation(entree) {
+  if (estSimule(entree)) return ` <span class="chip simule">${esc(t('simulation.marque'))}</span>`;
+  if (simulation.etat === 'activee' && !estSimulable(entree)) {
+    return ` <span class="chip simule refuse">${esc(t('simulation.marque_refuse'))}</span>`;
+  }
+  return '';
+}
+
 async function rendreEtapeVerifier(groupe) {
   document.getElementById('recapTitre').textContent = nomCategorie(groupe.category);
   document.getElementById('recapBoxTitre').textContent = t('simple.recap_titre');
@@ -2318,7 +2380,7 @@ async function rendreEtapeVerifier(groupe) {
       return `
         <div class="rrow" data-script-recap="${esc(s.id)}">
           <div class="ri">${icone}</div>
-          <div class="rt">${esc(titre)}</div>
+          <div class="rt">${esc(titre)}${marqueSimulation(s)}</div>
           <span class="badge">${esc(t(`duree.${s.meta.duration}`))}</span>
           ${reglables.length
             ? `<button class="rrow-plus" type="button" data-deplier="${esc(s.id)}"
@@ -2453,7 +2515,7 @@ async function lancerScriptEntretien(entree) {
       },
     });
     departCourse = Date.now();
-    course = { runId: demarre.run_id, id: entree.id, logPath: demarre.log_path, entretien: true };
+    course = { runId: demarre.run_id, id: entree.id, logPath: demarre.log_path, entretien: true, simule: !!demarre.simulated };
     majProgression();
   } catch (e) {
     // La raison est conservee ET affichee : dans le journal pour le detail,
@@ -2488,7 +2550,9 @@ function terminerEntretien() {
   const total = entretienEnCours.resultats.length;
   document.getElementById('tasksBilan').hidden = false;
   document.getElementById('tasksBilan').textContent = t('simple.bilan_titre');
-  document.getElementById('tasksBilanDetail').textContent = t('simple.bilan_detail', { ok, total });
+  const simules = entretienEnCours.resultats.filter((r) => r.simule).length;
+  document.getElementById('tasksBilanDetail').textContent = t('simple.bilan_detail', { ok, total })
+    + (simules ? ` ${t('simulation.bilan', { n: simules })}` : '');
 }
 
 /** Icone d'etat d'une tache : coche (reussi), point d'exclamation (echoue),
@@ -2597,7 +2661,8 @@ let historiqueActuel = { categories: [], scripts: [] };
  *  sont ajoutees dans l'ordre chronologique : le dernier du tableau est le
  *  plus recent. */
 function derniereExecution(scriptId) {
-  const trouves = historiqueActuel.scripts.filter((r) => r.script_id === scriptId);
+  // Une execution simulee n'a rien modifie : elle ne compte pas comme « Fait le ».
+  const trouves = historiqueActuel.scripts.filter((r) => r.script_id === scriptId && !r.simulated);
   return trouves[trouves.length - 1];
 }
 
@@ -2624,7 +2689,7 @@ async function rafraichirHistorique() {
 
 /** Appele apres chaque script:end, quel que soit le mode : la granularite de
  *  l'historique est "une entree par script execute", sans exception. */
-async function enregistrerExecution(payload, titre) {
+async function enregistrerExecution(payload, titre, simule) {
   try {
     await invoke('record_script_run', {
       scriptId: payload.script_id,
@@ -2632,6 +2697,7 @@ async function enregistrerExecution(payload, titre) {
       success: payload.success && !payload.killed,
       killed: payload.killed,
       durationMs: payload.duration_ms,
+      simulated: !!simule,
     });
     await invoke('enforce_log_cap');
   } catch (e) {
@@ -2666,9 +2732,10 @@ function rendreHistorique() {
     .slice(0, 40)
     .map((s) => {
       const etat = s.killed ? t('histo.interrompu') : s.success ? t('histo.reussi') : t('histo.echoue');
+      const simule = s.simulated ? ` <span class="chip simule">${esc(t('simulation.marque'))}</span>` : '';
       return `
       <div class="rrow">
-        <div class="rt">${esc(s.title)} — ${esc(etat)}</div>
+        <div class="rt">${esc(s.title)} — ${esc(etat)}${simule}</div>
         <span class="muted mono">${esc(s.at)}</span>
       </div>`;
     })
@@ -3057,7 +3124,7 @@ async function demarrer() {
   cablerInfobulles();
   cablerConsole();
   cablerReglagesSimples();
-  document.getElementById('testPill').onclick = basculerModeTest;
+  document.getElementById('testPill').onclick = basculerSimulation;
   document.getElementById('adminPill').onclick = ouvrirFenetreDroits;
   document.getElementById('btnFermerDroits').onclick = () => {
     document.getElementById('droitsOverlay').hidden = true;
@@ -3121,9 +3188,9 @@ async function demarrer() {
   }
 
   try {
-    appliquerModeTest(await invoke('test_mode'));
+    appliquerSimulation(await invoke('simulation_state'));
   } catch (e) {
-    console.error('test_mode a echoue :', e);
+    console.error('simulation_state a echoue :', e);
   }
 
   try {

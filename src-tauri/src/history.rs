@@ -27,6 +27,12 @@ pub struct ScriptRunRecord {
     /// connait que u64/i64/f64. Un `u128` faisait echouer la deserialisation
     /// de `record_script_run`, et l'historique restait vide sans le dire.
     pub duration_ms: u64,
+    /// Execution simulee (§6.9) : rien n'a ete modifie. Elle reste dans
+    /// l'historique, mais ne compte jamais comme « Fait le … » (§7).
+    /// `default` : les historiques ecrits avant la 1.1.1 n'ont pas ce champ, et
+    /// la simulation n'y etait jamais persistante.
+    #[serde(default)]
+    pub simulated: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -114,12 +120,29 @@ mod tests {
             success: true,
             killed: false,
             duration_ms: 1_420,
+            simulated: true,
         };
         // `to_value` puis `from_value` : exactement le chemin d'une commande.
         let valeur = serde_json::to_value(&record).expect("serialisation");
         let relu: ScriptRunRecord = serde_json::from_value(valeur).expect("deserialisation");
         assert_eq!(relu.duration_ms, 1_420);
         assert_eq!(relu.script_id, "set-dns");
+        assert!(
+            relu.simulated,
+            "une execution simulee doit le rester apres relecture"
+        );
+    }
+
+    /// Un historique ecrit par la 1.1.0 n'a pas le champ `simulated` : il doit
+    /// se relire tel quel, chaque entree etant alors une execution reelle — la
+    /// simulation n'etait jamais persistante avant la 1.1.1.
+    #[test]
+    fn un_historique_d_avant_la_simulation_persistante_se_relit() {
+        let ancien = r#"{"scripts":[{"script_id":"s1","title":"T","at":"2026-10-01 10:00:00",
+                        "success":true,"killed":false,"duration_ms":10}],"categories":[]}"#;
+        let h: History = serde_json::from_str(ancien).expect("historique 1.1.0 illisible");
+        assert_eq!(h.scripts.len(), 1);
+        assert!(!h.scripts[0].simulated);
     }
 
     #[test]
@@ -143,6 +166,7 @@ mod tests {
             success: true,
             killed: false,
             duration_ms: 100,
+            simulated: false,
         });
         save_to(&chemin, &h).unwrap();
 
@@ -154,6 +178,7 @@ mod tests {
             success: false,
             killed: false,
             duration_ms: 50,
+            simulated: false,
         });
         save_to(&chemin, &h2).unwrap();
 

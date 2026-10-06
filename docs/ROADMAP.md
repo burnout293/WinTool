@@ -9,7 +9,7 @@ d'un cran (1.1, 1.2…), une version de corrections seules prend un troisième c
 |---|---|---|
 | **1.0.0** | Première version publiée | Publiée le 27/09/2026 |
 | **1.1** | Mise à jour automatique de WinTool | Publiée le 06/10/2026 |
-| **1.1.1** | Mode test unifié, bouées posées sur la vague, rangées multiples — et premier test réel de la mise à jour automatique | À faire |
+| **1.1.1** | Simulation réglable script par script, bouées posées sur la vague, rangées multiples — et premier test réel de la mise à jour automatique | À faire |
 | **1.2** | Analyser → cocher → nettoyer (§17) | Contrat script prêt, interface à faire |
 | **1.3** | Catégories distinctes des lots, onglets Scripts / Lots en Expert | À faire |
 | **1.4** | Sources de scripts, index signé Ed25519 (§16) | Spécifié |

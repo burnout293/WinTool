@@ -63,17 +63,17 @@ alors disponible.
 
 ---
 
-## Le mode test
+## La simulation
 
-Une bascule **Mode test** dans la barre de titre fait tourner chaque script **en
-simulation** : il annonce ce qu'il ferait, sans rien modifier.
+Un script **simulé** montre ce qu'il ferait, sans rien modifier. Chaque script se règle
+séparément dans le mode Expert, et la pastille **Simulation** de la barre de titre les
+simule tous d'un coup — ou les repasse tous en réel.
 
-Deux choses à savoir :
-
-- L'état **ne survit pas au redémarrage** de WinTool. Un mode test oublié ferait passer un
-  entretien réel pour une simulation — l'application repart donc toujours en mode réel.
-- Un script qui ne sait pas se simuler est **refusé, pas exécuté**. Mieux vaut un refus
-  visible qu'une fausse garantie.
+- Vos choix **sont conservés** d'une session à l'autre. Pour qu'on ne puisse jamais croire
+  réel un entretien simulé, un bandeau le signale dès qu'un seul script est simulé, le
+  bilan dit combien l'ont été, et une exécution simulée ne compte jamais comme « Fait le … ».
+- Tant que la simulation est **activée**, un script qui ne sait pas se simuler est
+  **refusé, pas exécuté**. Mieux vaut un refus visible qu'une fausse garantie.
 
 ---
 

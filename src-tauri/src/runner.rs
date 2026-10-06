@@ -383,6 +383,10 @@ pub struct RunStarted {
     pub policy: String,
     pub log_path: String,
     pub pid: u32,
+    /// Lance en simulation (§6.9) : il ne modifie rien. Decide par la commande
+    /// qui appelle `run_script`, jamais par le moteur, qui ignore tout des
+    /// reglages ; c'est elle qui le renseigne apres le lancement.
+    pub simulated: bool,
 }
 
 /// Le script a lancer, reduit a ce dont l'execution a besoin.
@@ -891,6 +895,7 @@ pub fn lancer(
         policy: politique,
         log_path: fichier_log.to_string_lossy().to_string(),
         pid,
+        simulated: false,
     })
 }
 

@@ -1356,7 +1356,21 @@ body.inactive .btn.primary.big.lancer { animation-play-state: paused; }
   color: var(--warn); background: var(--warn-s);
   border-color: color-mix(in srgb, var(--warn) 42%, transparent);
 }
+/* Partielle : certains scripts simules, d'autres non. Meme couleur que
+   l'etat active, mais un bord en pointilles : ce n'est pas « tout ». */
+.pill.test[aria-pressed="mixed"] {
+  color: var(--warn); background: var(--warn-s);
+  border-style: dashed; border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+}
 .pill.test:hover { opacity: 1; }
+
+/* Marque « simule » : etape 2, historique. */
+.chip.simule {
+  color: var(--warn); background: var(--warn-s);
+  border-color: color-mix(in srgb, var(--warn) 35%, transparent);
+  font-size: 11px; margin-left: 6px; vertical-align: 1px;
+}
+.chip.simule.refuse { color: var(--err); background: var(--err-s); border-color: color-mix(in srgb, var(--err) 35%, transparent); }
 
 .test-banner {
   position: relative; z-index: 3; flex-shrink: 0;
@@ -1391,7 +1405,7 @@ body.inactive .btn.primary.big.lancer { animation-play-state: paused; }
 /* Le bouton qui engage une execution rappelle lui aussi l'etat : en mode test
    il cesse de respirer et perd son insistance visuelle — ce n'est plus le
    meme geste. */
-body.mode-test .btn.primary.big.lancer { animation: none; box-shadow: var(--sh); }
+body[data-simulation="activee"] .btn.primary.big.lancer { animation: none; box-shadow: var(--sh); }
 
 
 /* --- Poignee de reordonnancement -------------------------------------------
