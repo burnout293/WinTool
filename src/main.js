@@ -1272,6 +1272,7 @@ function appliquerEchelle(valeur) {
   // comprise. --echelle permet a ces regles de se compenser (styles.css).
   document.documentElement.style.zoom = String(echelle);
   document.documentElement.style.setProperty('--echelle', String(echelle));
+  requestAnimationFrame(positionnerBouees);
 }
 
 /**
@@ -2114,6 +2115,7 @@ let etapeEntretienActuelle = null;
 
 function basculerMode(mode) {
   modeCourant = mode;
+  if (mode !== 'simple') retirerVaguesArriere();
   document.body.dataset.mode = mode;
   document.querySelector('.simple').hidden = mode !== 'simple';
   document.querySelector('.expert').hidden = mode !== 'expert';
@@ -2138,6 +2140,7 @@ function afficherEtapeSimple(n) {
   });
   majRepere(n);
   if (n === 1) rendreEtapeChoisir();
+  else retirerVaguesArriere();
 }
 
 /** Etape 1 : la categorie epinglee en grand, les autres en bouees sur une
@@ -2171,6 +2174,7 @@ async function rendreEtapeChoisir() {
   if (!dispo.length) {
     zoneReco.innerHTML = `<p class="muted">${esc(t('simple.aucune_categorie'))}</p>`;
     zoneBuoys.innerHTML = '';
+    retirerVaguesArriere();
     sectAutres.hidden = true;
     btnContinuer.hidden = true;
     return;
@@ -2198,10 +2202,9 @@ async function rendreEtapeChoisir() {
   const buoys = await Promise.all(
     autres.map(async (g, i) => {
       const icone = (await iconeSVG(g.category.icon)) || '';
-      const decalage = hauteurBouee(i, autres.length);
       const actif = selectionSimpleId === g.category.id;
       return `
-        <button class="buoy" type="button" data-lot="${esc(g.category.id)}" aria-current="${actif}" style="transform:translateY(${decalage}px)">
+        <button class="buoy" type="button" data-lot="${esc(g.category.id)}" aria-current="${actif}">
           <span class="bi">${icone}</span>
           <span class="blabel">
             <span class="bt">${esc(nomCategorie(g.category))}</span>
@@ -2211,37 +2214,236 @@ async function rendreEtapeChoisir() {
     })
   );
   zoneBuoys.innerHTML = buoys.join('');
+  positionnerBouees();
   btnContinuer.hidden = false;
 }
 
-/**
- * Hauteur d'une bouee : elle flotte **sur la vague reellement dessinee**.
- *
- * La nappe de surface fait exactement deux periodes sur la largeur de la
- * fenetre (son motif compte quatre periodes pour une largeur double). La
- * phase d'une bouee se deduit donc de sa position horizontale, sans rien
- * mesurer : deux tours complets d'un bout a l'autre de la rangee.
- *
- * `0.47` cale la rangee sur la vague — la rangee est en retrait de 44 px de
- * chaque bord, la vague non. Sans ce calage les bouees flottaient a
- * contretemps, sur le creux quand la vague etait en crete.
- *
- * L'amplitude vient de la maquette : 82 px entre la plus haute et la plus
- * basse. L'ancienne valeur, 14 px, aplatissait la rangee au point qu'on ne
- * voyait plus qu'elle ondulait. Le resultat est centre sur zero pour ne pas
- * deplacer la rangee dans la page.
- *
- * Specification 15.2 : la hauteur se calcule, elle n'est jamais figee — c'est
- * ce qui permet d'afficher six bouees comme trois.
- */
-function hauteurBouee(i, total) {
-  if (total < 2) return 0;
-  const RETRAIT = 0.925;   // la rangee est en retrait des bords, la vague non
-  const CALAGE = 0.47;     // rad, pour poser la premiere bouee sur la crete
-  const AMPLITUDE = 41;    // px de part et d'autre : 82 px de creux a crete
-  const phase = CALAGE + 4 * Math.PI * RETRAIT * ((i + 0.5) / total);
-  return Math.round(-AMPLITUDE * Math.sin(phase));
+/* --- Champ de bouees (etape 1, specification §15.2) ------------------------
+   Chaque bouee flotte sur une ligne d'eau REELLEMENT dessinee, et en suit le
+   mouvement.
+
+   La vague est ancree au BAS de la scene : sa ligne d'eau (y = 452 dans une
+   boite de 760) est toujours a 308 px du bas, quelle que soit la hauteur de la
+   fenetre. Les bouees se posent donc par rapport au bas, et a leur position
+   horizontale mesuree — pas par rapport au titre, comme avant la 1.1.1 : sur un
+   grand ecran, elles flottaient alors a mi-hauteur, loin de l'eau.
+
+   La vague derive : chaque nappe fait deux largeurs de scene et glisse d'une
+   largeur en `duree` secondes. Sa longueur d'onde est d'une demi-largeur
+   (lambda = W/2) ; vue d'un point fixe, elle monte et descend donc avec une
+   periode T = duree / 2. Une bouee qui oscille a cette cadence, dephasee selon
+   sa position, epouse la vague en mouvement — avec une animation CSS ordinaire,
+   sans calcul a chaque image (voir retardHoule).
+
+   Quand les lots sont nombreux, ils se repartissent en rangees, chacune sur sa
+   propre vague, etagees vers le haut et vers l'arriere. */
+const VAGUE = {
+  ligne: 308,         // px entre le bas de la scene et la ligne d'eau de devant
+  amplitude: 37.5,    // px : la courbe dessinee monte de 452 a 414,5 (Bezier, 0,75 x 50)
+  ecart: 170,         // px entre deux lignes d'eau
+  houleArriere: 0.65, // amplitude de chaque vague plus lointaine : un large paraît plus calme
+  duree: 29,          // s : derive de la nappe de devant (.water.surface)
+  ralenti: 0.35,      // chaque vague plus loin derive 35 % plus lentement
+  attenue: 0.68,      // et s'efface d'autant
+  marge: 44,          // px de bord, de chaque cote
+  pasMin: 150,        // px par bouee : en dessous, on ouvre une rangee de plus
+  pasMax: 230,        // px par bouee : au-dela, la rangee s'etire trop
+  parRangee: 8,       // au plus : sur un tres grand ecran, une rangee de seize se lit mal
+  flotteur: 29,       // px : demi-hauteur du flotteur (.buoy .bi, 58 px)
+  libelle: 46,        // px reserves au-dessus de la rangee du haut pour « Ou choisissez… »
+};
+
+function echelleCourante() {
+  const e = Number(getComputedStyle(document.documentElement).getPropertyValue('--echelle'));
+  return Number.isFinite(e) && e > 0 ? e : 1;
 }
+
+/** Le moins de rangees possible, equilibrees. Les rangees se lisent de haut en
+ *  bas : celle du haut prend les surplus, pour garder l'ordre des lots. */
+function repartirRangees(n, largeur) {
+  const capacite = Math.max(1, Math.min(VAGUE.parRangee, Math.floor((largeur - 2 * VAGUE.marge) / VAGUE.pasMin)));
+  const rangees = Math.max(1, Math.ceil(n / capacite));
+  const base = Math.floor(n / rangees);
+  const reste = n % rangees;
+  return Array.from({ length: rangees }, (_, k) => base + (k < reste ? 1 : 0));
+}
+
+/** La nappe qui porte la rangee de profondeur `d` (0 = devant). */
+function vagueDeRang(d) {
+  if (d === 0) return document.querySelector('.water.surface:not(.arriere)');
+  return document.querySelector(`.water.arriere[data-rang="${d}"]`);
+}
+
+function dureeDeRang(d) {
+  return VAGUE.duree * (1 + VAGUE.ralenti * d);
+}
+
+/** Amplitude de la vague de profondeur `d` (0 = devant). */
+function amplitudeDeRang(d) {
+  return VAGUE.amplitude * VAGUE.houleArriere ** d;
+}
+
+/** Le trace de la nappe de devant (index.html), a une amplitude donnee : quatre
+ *  periodes de 590 sur 2360, chacune un arc montant puis un arc descendant. */
+function cheminVague(facteur) {
+  const y = (dy) => (452 + dy * facteur).toFixed(1);
+  let d = 'M0,452';
+  for (let x = 0; x < 2360; x += 590) {
+    d += ` C${x + 98},${y(-50)} ${x + 197},${y(-50)} ${x + 295},452`;
+    d += ` C${x + 393},${y(50)} ${x + 492},${y(50)} ${x + 590},452`;
+  }
+  return d;
+}
+
+/** Cree ou retire les nappes arriere pour qu'il y en ait exactement `n`. */
+function assurerVaguesArriere(n) {
+  const scene = document.querySelector('.stage');
+  if (!scene || !vagueDeRang(0)) return;
+  scene.querySelectorAll('.water.arriere').forEach((v) => {
+    if (Number(v.dataset.rang) > n) v.remove();
+  });
+  for (let d = 1; d <= n; d++) {
+    if (vagueDeRang(d)) continue;
+    const trace = cheminVague(VAGUE.houleArriere ** d);
+    const boite = document.createElement('div');
+    boite.innerHTML = `<svg class="water surface arriere" data-rang="${d}" viewBox="0 0 2360 760" preserveAspectRatio="none" aria-hidden="true">
+      <path d="${trace} L2360,760 L0,760 Z" fill="url(#eau)" opacity="0.26" />
+      <path d="${trace}" fill="none" stroke="var(--acc)" stroke-width="2.5" opacity="0.55" />
+    </svg>`;
+    const v = boite.firstElementChild;
+    v.style.bottom = `${d * VAGUE.ecart}px`;
+    v.style.opacity = String(VAGUE.attenue ** d);
+    v.style.animationDuration = `${dureeDeRang(d)}s`;
+    // Derriere toutes les autres : la nappe de devant la recouvre la ou elles
+    // se chevauchent.
+    scene.insertBefore(v, scene.querySelector('.water'));
+  }
+}
+
+function retirerVaguesArriere() {
+  document.querySelectorAll('.water.arriere').forEach((v) => v.remove());
+}
+
+/**
+ * Retard d'animation pour qu'une bouee placee en `x` (px depuis le bord gauche
+ * de la scene) soit en crete exactement quand la vague l'est sous elle.
+ *
+ * Sous un point fixe x, la hauteur de la vague vaut -A sin(2 pi (x + v t) / lambda),
+ * avec v t / lambda = t / T : crete quand frac(x / lambda + t / T) = 1/4. L'animation
+ * de la bouee part de la crete (keyframes `houle`) ; on la decale donc pour que
+ * son temps propre soit nul a ce moment-la. `tVague` est l'avance de l'animation
+ * de la vague a l'instant ou la bouee est posee : les deux horloges sont alignees
+ * meme si la bouee est redessinee bien apres le depart de la vague.
+ */
+function retardHoule(x, lambda, periode, tVague) {
+  let p = (0.25 - x / lambda - tVague / periode) % 1;
+  if (p < 0) p += 1;
+  return (p - 1) * periode;
+}
+
+/** Pose les bouees deja rendues dans #buoysZone, et cree les vagues qui les
+ *  portent. A rappeler a chaque redimensionnement et changement d'echelle. */
+function positionnerBouees() {
+  const etape = document.querySelector('.s-step[data-s="1"]');
+  const zone = document.getElementById('buoysZone');
+  const bouees = zone ? [...zone.querySelectorAll('.buoy')] : [];
+  const visible = etape && !etape.hidden && !document.querySelector('.simple').hidden;
+  if (!visible || !bouees.length) {
+    retirerVaguesArriere();
+    return;
+  }
+
+  const z = echelleCourante();
+  const scene = document.querySelector('.stage').getBoundingClientRect();
+  const largeur = scene.width / z;
+  const hauteur = scene.height / z;
+  const tailles = repartirRangees(bouees.length, largeur);
+  const R = tailles.length;
+  const hauteurChamp = VAGUE.ligne + (R - 1) * VAGUE.ecart + VAGUE.flotteur + VAGUE.amplitude + VAGUE.libelle;
+
+  // Le champ ne doit jamais recouvrir le titre ni la carte recommandee. S'il ne
+  // tient pas — fenetre basse, echelle forte, beaucoup de rangees —, les bouees
+  // restent dans le flux de la page, qui defile : rien n'est jamais inaccessible.
+  const sect = document.getElementById('sectAutres');
+  const basFlux = (sect.getBoundingClientRect().top - scene.top) / z;
+  const flottant = hauteur - hauteurChamp >= basFlux + 8;
+  zone.classList.toggle('flottant', flottant);
+  etape.classList.toggle('champ-flottant', flottant);
+
+  let libelle = zone.querySelector('.sect-champ');
+  if (!libelle) {
+    libelle = document.createElement('div');
+    libelle.className = 'sect sect-champ';
+    zone.prepend(libelle);
+  }
+  libelle.textContent = sect.textContent;
+
+  const immobile = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const lambda = largeur / 2;
+
+  if (!flottant) {
+    retirerVaguesArriere();
+    zone.style.height = '';
+    bouees.forEach((b) => {
+      b.style.left = b.style.top = b.style.zIndex = '';
+      b.style.transform = '';
+      b.classList.remove('houle');
+    });
+    return;
+  }
+
+  assurerVaguesArriere(R - 1);
+  zone.style.height = `${hauteurChamp}px`;
+  libelle.style.top = '0px';
+
+  // La hauteur de champ suppose l'amplitude de devant pour toutes les rangees :
+  // c'est un majorant, les vagues lointaines ondulant moins.
+  let i = 0;
+  tailles.forEach((n, k) => {
+    const d = R - 1 - k;                           // 0 = rangee de devant
+    const ligne = VAGUE.ligne + d * VAGUE.ecart;   // px depuis le bas
+    const amplitude = amplitudeDeRang(d);
+    const pas = Math.min(VAGUE.pasMax, Math.max(VAGUE.pasMin, (largeur - 2 * VAGUE.marge) / n));
+    // En quinconce : deux rangees de meme effectif seraient alignees, et dans le
+    // pire dephasage (arriere au creux, devant en crete) l'etiquette du haut
+    // tomberait sur le flotteur du bas. Un demi-pas les ecarte. Des effectifs
+    // differents se decalent deja d'eux-memes, par le centrage.
+    const devant = tailles[k + 1];
+    const decale = devant === n && d % 2 === 1 ? pas / 2 : 0;
+    let depart = (largeur - pas * n) / 2 + decale;
+    depart = Math.min(depart, largeur - VAGUE.marge - pas * n);
+    const periode = dureeDeRang(d) / 2;
+    const anim = vagueDeRang(d)?.getAnimations?.()[0];
+    const tVague = anim && anim.currentTime != null ? (anim.currentTime / 1000) % dureeDeRang(d) : 0;
+
+    for (let j = 0; j < n; j++, i++) {
+      const b = bouees[i];
+      const x = depart + (j + 0.5) * pas;
+      b.style.left = `${x}px`;
+      b.style.top = `${hauteurChamp - ligne - VAGUE.flotteur}px`;
+      // Ce qui est devant passe devant : si une bouee lointaine frole une
+      // bouee proche, c'est la proche qui la recouvre, comme en vrai.
+      b.style.zIndex = String(10 + R - d);
+      if (immobile) {
+        // Vague immobile : elle reste dans sa position de depart.
+        b.classList.remove('houle');
+        b.style.transform = `translateY(${-amplitude * Math.sin((2 * Math.PI * x) / lambda)}px)`;
+      } else {
+        b.classList.add('houle');
+        b.style.transform = '';
+        b.style.setProperty('--amp', `${amplitude}px`);
+        b.style.setProperty('--demi', `${periode / 2}s`);
+        b.style.setProperty('--retard', `${retardHoule(x, lambda, periode, tVague)}s`);
+      }
+    }
+  });
+}
+
+let minuteurBouees = 0;
+window.addEventListener('resize', () => {
+  cancelAnimationFrame(minuteurBouees);
+  minuteurBouees = requestAnimationFrame(positionnerBouees);
+});
 
 function selectionnerChoix(id) {
   selectionSimpleId = id;

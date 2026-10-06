@@ -828,18 +828,31 @@ accepter : à cet écran l'eau est décorative, elle n'est plus porteuse d'infor
 Le pourcentage et la liste portent seuls le sens. L'alternative (inverser la liste, ou
 faire redescendre la marée) a été écartée.
 
-### 15.2 Ligne d'eau et nombre de catégories
+### 15.2 Ligne d'eau et nombre de lots
 
-Les catégories étant créées librement par l'utilisateur (§4.1), leur nombre est variable.
+Les lots étant créés librement par l'utilisateur (§4.1), leur nombre est variable.
 
-- **Six bouées au maximum par ligne d'eau.**
-- Au-delà, une **seconde ligne d'eau** apparaît en dessous avec les suivantes.
-- La hauteur de chaque bouée est **calculée à partir de la fonction de la vague**, jamais
-  codée en dur, pour que l'arrangement reste intentionnel quel que soit le nombre.
+- Les bouées flottent **sur une ligne d'eau réellement dessinée**, ancrée au bas de la
+  scène — à 308 px du bas, quelle que soit la hauteur de la fenêtre —, et **en suivent le
+  mouvement** : chaque bouée oscille à la cadence de sa vague, déphasée selon sa position
+  (§15.3). Elles ne se placent jamais par rapport au titre : avant la 1.1.1, c'est ce qui
+  les faisait flotter à mi-hauteur, loin de l'eau, sur un grand écran.
+- **Autant de bouées par ligne d'eau que la largeur le permet** — 150 px chacune au
+  moins —, **huit au plus**. Au-delà, une **ligne d'eau de plus apparaît derrière**, plus
+  haut : les rangées s'étagent vers le large, chacune sur sa propre vague, plus lente et
+  plus calme que celle de devant. L'ordre des lots se lit de haut en bas.
+- Deux rangées de même effectif sont **en quinconce**, et les bouées de devant passent
+  devant celles de derrière. Les vagues dérivant à des vitesses différentes, tous les
+  déphasages finissent par se produire ; dans le pire, une étiquette ne tombe pas sur un
+  flotteur.
+- **Fenêtre trop basse** pour poser toutes les rangées sur l'eau sans recouvrir le titre
+  ni le lot épinglé : les bouées reviennent dans le flux de la page, qui défile. Rien n'est
+  jamais inaccessible, et rien ne recouvre le reste.
 
-**Contrainte d'implémentation qui en découle** : la mise en page de l'étape 1 doit être
-dessinée dès le départ pour que deux lignes d'eau tiennent dans la hauteur de fenêtre,
-la catégorie épinglée comprise. C'est le cas le plus contraint de cet écran.
+La position de chaque bouée se calcule à partir de la fonction de la vague et de sa
+position mesurée — jamais codée en dur. Vérifié sur le banc : à trois instants espacés de
+2,5 s, chaque bouée se trouve à un pixel près de la hauteur de la vague sous elle, sur
+l'une comme sur l'autre rangée.
 
 ### 15.3 Animation
 
@@ -854,6 +867,14 @@ Deux nappes dérivent horizontalement à des vitesses différentes, ce qui crée
 **Technique de bouclage** : chaque nappe fait deux fois la largeur de la fenêtre et
 contient deux motifs identiques. La translater d'exactement une largeur la ramène sur
 elle-même : la boucle est donc **sans raccord visible**.
+
+**La houle des bouées.** Vue d'un point fixe, une vague qui dérive est une simple
+oscillation verticale : la longueur d'onde vaut une demi-largeur de fenêtre, la nappe
+glisse d'une largeur par cycle, donc sa hauteur sous un point revient avec une période
+moitié de sa durée de dérive. Chaque bouée oscille à cette cadence, son retard calé sur
+l'horloge de l'animation de la vague à l'instant où elle est posée : elle épouse la vague
+en mouvement sans aucun calcul à chaque image, même redessinée longtemps après le départ
+de la vague.
 
 Deux obligations :
 

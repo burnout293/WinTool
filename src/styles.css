@@ -307,10 +307,14 @@ svg { display: block; }
 }
 .water.fond    { animation: derive 46s linear infinite; }
 .water.surface { animation: derive 29s linear infinite; }
+/* Nappes arriere : une par rangee de bouees au-dela de la premiere, creees par
+   assurerVaguesArriere ; hauteur, opacite et vitesse fixees a la creation. */
+.water.arriere { pointer-events: none; }
 
 /* Deux obligations de la specification, section 15.3. */
 @media (prefers-reduced-motion: reduce) {
   .water { animation: none !important; }
+  .buoy.houle { animation: none !important; }
 }
 body.inactive .water { animation-play-state: paused; }
 body[data-mode="expert"] .water { display: none; }
@@ -923,9 +927,38 @@ body[data-mode="simple"] .titlebar { background: none; border-bottom: none; }
 
 /* Une bouee, ce n'est pas une pastille ronde avec du texte dedans : c'est un
    flotteur rond, et son etiquette pend dessous (maquette). */
+/* Champ de bouees (positionnerBouees). Par defaut — fenetre trop basse pour
+   tout poser sur l'eau —, les bouees restent dans le flux de la page, en
+   rangees qui passent a la ligne, et la page defile. En « flottant », le champ
+   est ancre au bas de la scene, comme l'eau, et chaque bouee est posee sur sa
+   ligne d'eau. */
 .buoys {
-  position: relative; z-index: 1; display: flex; align-items: flex-start;
-  justify-content: space-between; gap: 12px; padding: 34px 0 0;
+  position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: flex-start;
+  justify-content: center; gap: 22px 12px; padding: 34px 0 0;
+}
+.buoys.flottant {
+  position: absolute; left: 0; right: 0; bottom: 0; display: block; padding: 0;
+  pointer-events: none;
+}
+.buoys.flottant .buoy { position: absolute; width: 150px; margin-left: -75px; pointer-events: auto; }
+.buoys .sect-champ { display: none; }
+.buoys.flottant .sect-champ { display: block; position: absolute; left: 0; right: 0; margin: 0; }
+/* En flottant, « Ou choisissez un domaine precis » vit dans le champ, juste
+   au-dessus de la rangee du haut : celui du flux flotterait loin des bouees.
+   `visibility` plutot que `display` : la mesure qui decide du mode ne bouge pas. */
+.s-step[data-s="1"].champ-flottant #sectAutres { visibility: hidden; }
+
+/* La houle : vue d'un point fixe, une vague qui derive est une oscillation
+   verticale. Chaque bouee monte et descend a la cadence de sa vague, dephasee
+   selon sa position, et epouse ainsi la vague en mouvement. Cycle complet =
+   deux demi-periodes (`alternate`), de la crete au creux puis retour. */
+@keyframes houle {
+  from { transform: translateY(calc(-1 * var(--amp, 0px))); }
+  to   { transform: translateY(var(--amp, 0px)); }
+}
+.buoy.houle {
+  animation: houle var(--demi, 7.25s) ease-in-out infinite alternate;
+  animation-delay: var(--retard, 0s);
 }
 .buoy {
   width: 162px; display: block; text-align: center; background: none; border: none; padding: 0;
