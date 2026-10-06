@@ -17,9 +17,38 @@
   TAURI_SIGNING_PRIVATE_KEY_PASSWORD tirees des secrets du depot. Les valeurs
   nettoyees sont ecrites dans GITHUB_ENV : l'etape de construction doit donc
   les lire de la, et NE PAS reprendre les secrets bruts dans son propre env.
-  Usage local : memes variables, depuis la racine du depot.
+  Usage local, pour verifier une cle AVANT de la confier a GitHub, depuis la
+  racine du depot :
+    powershell -NoProfile -File tools\verifier-cle-signature.ps1 -FichierCle "$env:USERPROFILE\.tauri\wintool.key"
+  Le mot de passe est alors demande en saisie masquee. Lance ainsi, dans un
+  processus a part, rien ne survit dans la session : ni la cle, ni le mot de
+  passe.
 #>
-param([string] $Config = 'src-tauri/tauri.conf.json')
+param(
+    [string] $Config = 'src-tauri/tauri.conf.json',
+    # Usage local : le fichier de cle privee, plutot que la variable.
+    [string] $FichierCle
+)
+
+if ($FichierCle) {
+    if (-not (Test-Path -LiteralPath $FichierCle)) {
+        Write-Host "::error title=Fichier introuvable::$FichierCle n'existe pas."
+        exit 1
+    }
+    $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content -LiteralPath $FichierCle -Raw
+}
+
+# En local seulement, un mot de passe absent se demande, en saisie masquee. En
+# CI, jamais : un secret manquant doit faire echouer, pas attendre une saisie.
+if ($env:GITHUB_ACTIONS -ne 'true' -and [string]::IsNullOrEmpty($env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD)) {
+    $saisie = Read-Host 'Mot de passe de la cle (saisie masquee, collez-le)' -AsSecureString
+    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($saisie)
+    try {
+        $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+    } finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+    }
+}
 
 function Echec([string] $Titre, [string] $Message) {
     Write-Host "::error title=$Titre::$Message"
