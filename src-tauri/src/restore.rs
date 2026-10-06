@@ -41,7 +41,8 @@ pub fn creer_point_de_restauration(description: &str) -> Result<RestoreOutcome, 
         "Checkpoint-Computer -Description '{description_echappee}' -RestorePointType MODIFY_SETTINGS"
     );
 
-    let sortie = Command::new("powershell.exe")
+    // Chemin absolu, lu dans HKLM : ce processus est eleve (specification 12.4).
+    let sortie = Command::new(crate::systeme::emplacements().powershell())
         .args(["-NoProfile", "-NonInteractive", "-Command", &commande])
         .output()
         .map_err(|e| format!("lancement de Checkpoint-Computer impossible : {e}"))?;

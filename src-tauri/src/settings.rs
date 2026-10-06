@@ -121,6 +121,11 @@ pub struct Settings {
     /// respecte definitivement.
     #[serde(default)]
     pub catalogue_reminder_hidden: bool,
+    /// Emplacements que l'utilisateur protege en plus de ceux du systeme
+    /// (`garde`). Additifs seulement : la liste integree ne vit pas ici, sans
+    /// quoi un programme malveillant la viderait en reecrivant ce fichier.
+    #[serde(default)]
+    pub protected_paths: Vec<String>,
 }
 
 /// Valeurs admises pour `catalogue_source` une fois la decision prise.
@@ -207,6 +212,7 @@ pub fn default_settings(factory: Vec<Category>) -> Settings {
         catalogue_source: String::new(),
         catalogue_check: "startup".to_string(),
         catalogue_reminder_hidden: false,
+        protected_paths: Vec::new(),
     }
 }
 

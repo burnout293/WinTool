@@ -65,6 +65,20 @@ const DICO = {
     'badge.sans_id': 'Sans id',
     'badge.perso': 'Perso',
 
+    // Garde des reglages et emplacements proteges (specification 12.4)
+    'garde.refus_emplacement': 'Le réglage « {option} » désigne un emplacement protégé ({valeur}). Le script n’a pas été lancé : avec les droits administrateur, il y aurait agi. Si ce réglage ne vient pas de vous, un programme a pu le modifier.',
+    'garde.refus_type': 'Le réglage « {option} » n’a pas la forme attendue par le script. Il a pu être modifié hors de WinTool : rétablissez-le dans le détail du script.',
+    'garde.refus_choix': 'Le réglage « {option} » vaut « {valeur} », qui ne fait pas partie des choix du script. Il a pu être modifié hors de WinTool : rétablissez-le dans le détail du script.',
+    'reglages.proteges': 'Emplacements protégés',
+    'reglages.proteges_aide': 'Aucun réglage de script ne peut désigner ces emplacements : un script lancé en administrateur n’y touchera jamais à cause d’une valeur saisie — ou modifiée à votre insu.',
+    'reglages.proteges_integres': 'Toujours protégés. Ils ne se retirent pas ici : ce qu’un réglage pourrait retirer, un programme malveillant le pourrait aussi.',
+    'reglages.proteges_sauf_profil': '(sauf votre profil et le profil public)',
+    'reglages.proteges_racines': 'La racine de chaque lecteur (C:\\, D:\\…)',
+    'reglages.proteges_ajouts': 'Vos ajouts, un chemin complet par ligne :',
+    'reglages.proteges_enregistrer': 'Enregistrer',
+    'reglages.proteges_enregistre': 'Enregistré.',
+    'reglages.proteges_non_absolu': '« {p} » n’est pas un chemin complet (exemple : D:\\Archives).',
+
     // Catalogue d'entretiens (specification §16)
     'chrome.catalogue_titre': 'Catalogue officiel',
     'badge.officiel': 'Officiel',
@@ -391,6 +405,20 @@ const DICO = {
     'badge.admin_requis': 'Admin required',
     'badge.sans_id': 'No id',
     'badge.perso': 'Personal',
+
+    // Settings guard and protected locations (specification 12.4)
+    'garde.refus_emplacement': 'The “{option}” setting points to a protected location ({valeur}). The script was not started: with administrator rights, it would have acted there. If you did not set this, a program may have changed it.',
+    'garde.refus_type': 'The “{option}” setting does not have the form the script expects. It may have been changed outside WinTool: reset it in the script’s details.',
+    'garde.refus_choix': 'The “{option}” setting is “{valeur}”, which is not one of the script’s choices. It may have been changed outside WinTool: reset it in the script’s details.',
+    'reglages.proteges': 'Protected locations',
+    'reglages.proteges_aide': 'No script setting can point to these locations: a script running as administrator will never touch them because of a value someone typed — or changed behind your back.',
+    'reglages.proteges_integres': 'Always protected. They cannot be removed here: whatever a setting could remove, a malicious program could remove too.',
+    'reglages.proteges_sauf_profil': '(except your profile and the public profile)',
+    'reglages.proteges_racines': 'The root of every drive (C:\\, D:\\…)',
+    'reglages.proteges_ajouts': 'Your additions, one full path per line:',
+    'reglages.proteges_enregistrer': 'Save',
+    'reglages.proteges_enregistre': 'Saved.',
+    'reglages.proteges_non_absolu': '“{p}” is not a full path (example: D:\\Archives).',
 
     // Maintenance catalogue (specification §16)
     'chrome.catalogue_titre': 'Official catalogue',

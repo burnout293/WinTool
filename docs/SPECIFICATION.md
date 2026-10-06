@@ -438,6 +438,14 @@ entre `pwsh.exe` (PowerShell 7+) et `powershell.exe` (5.1, présent nativement s
 Windows 10/11). Un script peut forcer `engine : pwsh` ou `engine : winps` dans son entête
 s'il a besoin d'une version précise (ex : opérateurs `??`/`?:`, propres à PowerShell 7+).
 
+**Où WinTool cherche les interpréteurs** : `powershell.exe` dans System32, `pwsh.exe` dans
+`Program Files\PowerShell\7` (ou `8`) — deux dossiers qu'un compte sans élévation ne peut
+pas écrire, lus dans `HKLM` et jamais dans les variables d'environnement. **Ni le `PATH`, ni
+le profil de l'utilisateur** : jusqu'à la 1.1.1, PowerShell 7 était aussi cherché dans
+`%LOCALAPPDATA%` puis dans le `PATH`, et un `pwsh.exe` déposé là était lancé en
+administrateur (§12.4). Conséquence assumée : un PowerShell 7 installé pour un seul
+utilisateur n'est pas utilisé.
+
 Si `engine : pwsh` est demandé et que PowerShell 7 n'est pas installé, WinTool ne se
 replie **jamais silencieusement** sur 5.1 (risque de plantage en cours d'exécution sur une
 syntaxe incompatible) : le script est marqué indisponible (§4.3), et WinTool propose comme
@@ -560,6 +568,7 @@ réellement.
 | Rapport de conformité | Expert |
 | Ré-analyser tous les scripts (§5.5) | Expert |
 | Politique d'exécution : Bypass / RemoteSigned / Unrestricted (§6.7) | Expert |
+| Emplacements protégés : la liste du système (en lecture seule) et vos ajouts (§12.4) | Expert |
 
 Une personne à qui l'on a installé l'outil peut éclaircir ou agrandir son interface sans
 jamais croiser un réglage qu'elle pourrait casser.
@@ -766,8 +775,12 @@ chemin identifié.
 | Catalogue | Son dossier est inscriptible : on y remplace un script officiel, ou on retouche l'index installé | Approbation implicite seulement si l'empreinte égale celle de l'**index signé**, signature **re-vérifiée à chaque découverte** avec la clé compilée (§16.4) |
 | Lancement | Le profil PowerShell vit sous `Documents`, inscriptible | `-NoProfile` |
 | Lancement | `Import-Module` cherche d'abord sous `Documents`, inscriptible | `PSModulePath` réduit aux **chemins système** |
-| Lancement | L'interpréteur résolu par le `PATH` | **Chemin absolu** (§6.7) |
-| Bouton Arrêter | `taskkill` résolu par le `PATH`, exécuté en administrateur | **Chemin absolu** |
+| Lancement | L'interpréteur résolu par le `PATH`, ou cherché dans le profil (`%LOCALAPPDATA%\PowerShell`) | **Chemin lu dans `HKLM`** : System32 et Program Files seulement ; ni `PATH`, ni profil, ni variable d'environnement (§6.7, corrigé en 1.2) |
+| Lancement | Dossier courant = dossier du script, inscriptible : `cmd /c outil` et `Process.Start("outil.exe")` y cherchent l'exécutable avant le système | Dossier courant **System32**, et `NoDefaultCurrentDirectoryInExePath` (1.2) |
+| Environnement | Les variables de l'utilisateur (`HKCU\Environment`) sont héritées par le processus élevé : `COR_PROFILER_PATH` et `DOTNET_STARTUP_HOOKS` font charger du code dans PowerShell, `WEBVIEW2_BROWSER_EXECUTABLE_FOLDER` lance un autre moteur d'interface, `windir`, `SystemRoot` ou `TEMP` redéfinis font viser un autre dossier aux scripts | Familles `COR_`, `CORECLR_`, `COMPLUS_`, `DOTNET_`, `WEBVIEW2_` **retirées au démarrage**, et signalées ; variables du système **rétablies depuis `HKLM`** pour chaque script ; `TEMP`, `TMP`, `LOCALAPPDATA`, `APPDATA`, `USERPROFILE` ramenées dans le profil s'ils visent un emplacement protégé (1.2) |
+| Réglages | `settings.json` est inscriptible, et ses valeurs partent à un script élevé : écrire `C:\Windows` dans les dossiers à vider du nettoyage suffit | **Garde** : chaque valeur doit avoir le type et faire partie des choix déclarés ; un texte libre ne peut pas viser un **emplacement protégé** — liste intégrée non retirable, ajouts de l'utilisateur, chemins résolus avant comparaison (1.2) |
+| Journal | Une valeur secrète (mot de passe de sauvegarde) écrite en clair dans le journal technique | Valeurs des clés `Password`, `Secret`, `Token` **masquées** (1.2) |
+| Bouton Arrêter | `taskkill` résolu par le `PATH`, exécuté en administrateur | **Chemin absolu**, lu dans `HKLM` |
 
 **Règle de lecture unique — approbation.** L'écran d'approbation affiche le contenu du
 script et enregistre son empreinte. **Les deux viennent d'une seule et même lecture**, sous
@@ -776,16 +789,59 @@ l'utilisateur approuverait ce qu'il a vu pendant que l'application enregistrerai
 l'empreinte d'un contenu substitué — l'approbation porterait alors sur un contenu que
 personne n'a jamais lu.
 
-**Magasin d'approbations.** La liste des empreintes approuvées vit dans un emplacement que
-seul un administrateur peut écrire. Dans un fichier de réglages inscriptible par
-l'utilisateur, un logiciel malveillant y ajouterait simplement sa propre empreinte, et tout
-le dispositif du §12.1 deviendrait décoratif.
+**Magasin d'approbations.** La liste des empreintes approuvées vit sous
+`HKLM\SOFTWARE\WinTool\Approbations`, où rien ne se crée ni ne s'écrit sans élévation.
+Dans un fichier de réglages inscriptible par l'utilisateur, un logiciel malveillant y
+ajouterait simplement sa propre empreinte, et tout le dispositif du §12.1 deviendrait
+décoratif.
 
-**Résidu assumé.** Le `PATH` n'est pas restreint : un script qui appelle un outil sans
-chemin absolu suit toujours l'ordre du `PATH`, qui contient des dossiers inscriptibles sans
-élévation — `winget` vit précisément dans l'un d'eux. Le restreindre casserait des scripts
-légitimes. C'est une limite connue, à réexaminer quand les scripts livrés seront écrits et
-qu'on saura lesquels appellent quoi.
+C'est exactement ce que permettait l'ancien emplacement, `%ProgramData%\WinTool\approved.json`
+(jusqu'à la 1.1.1). `ProgramData` laisse n'importe quel compte y **créer** dossiers et
+fichiers, et en devenir propriétaire : un programme sans droits pouvait créer ce fichier
+avant WinTool et s'y approuver. Aucune vérification ne rattrape cela de façon simple — il
+aurait fallu contrôler propriétaire et droits de chaque fichier. La base de registre `HKLM`
+ne laisse rien préparer d'avance : la garantie vient du système. Les approbations de
+l'ancien fichier ne sont pas reprises, faute de savoir qui l'a écrit.
+
+**Garde des réglages et emplacements protégés.** Les valeurs envoyées à un script sont
+contrôlées juste avant le lancement, contre ce que le script déclare : un booléen est un
+booléen, un nombre un nombre, un choix fait partie de ses choix. Un texte libre est découpé
+aux points-virgules, et chaque chemin qu'il contient est **résolu** (jonctions, liens, noms
+courts 8.3, `..`, casse) avant d'être comparé aux emplacements protégés : Windows, les
+Program Files, ProgramData, les profils autres que celui de l'utilisateur et le profil
+public, les dossiers réservés à la racine du lecteur système, le dossier d'installation, la
+racine de chaque lecteur. Sont refusés aussi les chemins de fournisseur PowerShell
+(`HKLM:`, `Registry::`…), les chemins de périphérique (`\\?\`), les partages
+d'administration (`\\machine\C$`) et un chemin relatif qui désigne quelque chose dans
+System32, d'où partent les scripts. La liste intégrée ne se retire pas depuis l'interface :
+tout ce que l'interface pourrait retirer, un programme malveillant le retirerait en
+réécrivant le même fichier. L'utilisateur peut seulement ajouter des emplacements.
+
+**Résidus assumés.**
+
+- Le `PATH` n'est pas restreint : un script qui appelle un outil sans chemin absolu suit
+  toujours l'ordre du `PATH`, qui contient des dossiers inscriptibles sans élévation —
+  `winget` vit précisément dans l'un d'eux. Le restreindre casserait des scripts
+  légitimes. Les dossiers du système y passent en premier.
+- Un texte libre qui n'est pas un chemin (un mot de passe, une adresse) n'est contrôlé que
+  par son type : WinTool ne sait pas ce que le script en fera. C'est au script de le
+  valider (`FORMAT_SCRIPT.md`, « Sécurité »).
+- Les réglages qui ne sont pas des valeurs de script — la composition des lots, la
+  simulation, l'exigence d'un point de restauration — restent modifiables par un programme
+  sous le compte de l'utilisateur. Ils peuvent rendre WinTool **moins prudent**, jamais lui
+  faire exécuter un script non approuvé ni viser un emplacement protégé.
+- Le dossier de données de l'interface (`%LOCALAPPDATA%\com.wintool.app`, géré par
+  WebView2) est inscriptible et lu par l'interface élevée. Non audité en profondeur ;
+  l'interface elle-même est embarquée dans le binaire.
+
+**Le cadre, pour mesurer ces résidus.** Quand l'utilisateur est administrateur de son PC
+(le cas courant à la maison), Microsoft ne considère pas l'invite UAC comme une frontière de
+sécurité : un programme qui tourne déjà sous son compte dispose de moyens connus d'obtenir
+l'élévation, avec ou sans WinTool. Ces mesures ne prétendent donc pas rendre la machine
+inviolable ; elles évitent que WinTool soit **le chemin le plus simple**. Quand l'utilisateur
+est un compte standard et qu'un administrateur saisit son mot de passe, WinTool élevé
+tourne sous le profil de l'administrateur : les fichiers et variables du compte standard ne
+le concernent plus.
 
 ---
 

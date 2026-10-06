@@ -399,6 +399,25 @@
               <span class="setrow-txt"><span class="num">3.4</span><span id="setNumerosLabel"></span></span>
               <button class="switch" type="button" role="switch" id="setNumerosToggle" aria-checked="false"></button>
             </div>
+            <!-- Emplacements proteges (specification 12.4) : aucun reglage de
+                 script ne peut les viser. La liste du systeme ne se retire pas. -->
+            <div class="setrow">
+              <span class="setrow-txt"><span class="num">3.5</span><span id="setProtegesLabel"></span>
+                <button class="aide" type="button" id="aideProteges" aria-label="?">
+                  <svg class="ico i14" aria-hidden="true"><use href="#help" /></svg>
+                </button>
+              </span>
+            </div>
+            <div class="box proteges">
+              <p class="muted" id="protegesIntegresTitre"></p>
+              <ul class="mono proteges-liste" id="protegesIntegres"></ul>
+              <label class="muted" for="protegesAjouts" id="protegesAjoutsLabel"></label>
+              <textarea class="mono" id="protegesAjouts" rows="3" spellcheck="false"></textarea>
+              <div class="proteges-actions">
+                <button class="btn compact" type="button" id="btnProtegesEnregistrer"></button>
+                <span class="muted" id="protegesEtat" aria-live="polite"></span>
+              </div>
+            </div>
           </section>
 
           <section class="set-group only-expert" id="sec-outils">

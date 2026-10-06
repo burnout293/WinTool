@@ -41,6 +41,10 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls-no-p
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 minisign-verify = "0.2"
 base64 = "0.22"
+# Emplacements du systeme et magasin d'approbations, lus et ecrits dans HKLM
+# (specification 12.4). Deja dans l'arbre, par le greffon de mise a jour.
+[target.'cfg(windows)'.dependencies]
+windows-registry = "0.6"
 
 [profile.release]
 codegen-units = 1

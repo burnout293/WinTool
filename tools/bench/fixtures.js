@@ -270,6 +270,10 @@
   function lancer(req) {
     const s = TOUS.find((x) => x.id === req?.script_id);
     if (s && !simulable(s) && bilanSimulation().etat === 'activee') throw new Error('SANS_SIMULATION');
+    // ?garde : la garde des reglages refuse un « dossier » qui vise Windows.
+    if (s?.id === 'clean-temp' && new URLSearchParams(location.search).has('garde')) {
+      throw new Error('REGLAGE_REFUSE:emplacement:Targets:C:\\Windows\\System32');
+    }
     const estSimule = !!s && simule(s);
     compteur += 1;
     const run_id = `run-${compteur}`;
@@ -376,6 +380,20 @@
       return SCENARIO === 'maj'
         ? { version: '1.1.0', ecrits: 3, copies: [], retires: [{ id: 'smart', file: '110_SMART.ps1', title: { fr: 'Vérifier la santé du disque', en: 'Check disk health' } }] }
         : { version: '1.0.0', ecrits: TOUT.length, copies: [], retires: [] };
+    },
+    // Emplacements proteges (§12.4). `lib::EmplacementsProteges`.
+    protected_paths: () => ({
+      integres: ['C:\\Windows', 'C:\\Program Files', 'C:\\Program Files (x86)', 'C:\\ProgramData',
+        'C:\\System Volume Information', 'C:\\$Recycle.Bin', 'C:\\Program Files\\WinTool'],
+      profils: 'C:\\Users',
+      ajouts: reglages.protected_paths || [],
+    }),
+    set_protected_paths: (a) => {
+      const propres = (a.paths || []).map((p) => p.trim()).filter(Boolean);
+      const mauvais = propres.find((p) => !/^[A-Za-z]:[\\/]/.test(p));
+      if (mauvais) throw new Error(`CHEMIN_NON_ABSOLU:${mauvais}`);
+      reglages.protected_paths = propres;
+      return JSON.parse(JSON.stringify(reglages));
     },
     set_catalogue_source: (a) => { reglages.catalogue_source = a.source; return JSON.parse(JSON.stringify(reglages)); },
     set_catalogue_check: (a) => { reglages.catalogue_check = a.policy; return JSON.parse(JSON.stringify(reglages)); },

@@ -859,6 +859,60 @@ longue peuvent y conduire.
 
 ---
 
+## Sécurité : ce que votre script reçoit n'est pas fiable
+
+Un script officiel s'exécute en administrateur, souvent sans que personne relise son code
+(§16.4 de la spécification). Or une partie de ce qu'il lit vient de fichiers et de
+variables que **n'importe quel programme tournant sous le compte de l'utilisateur peut
+modifier**, sans élévation. Tout ce qu'un tel programme peut écrire, il peut le faire viser
+par votre script.
+
+| Ce que vous lisez | D'où ça vient | Ce que WinTool garantit | Ce qui vous reste |
+|---|---|---|---|
+| `$CONFIG` | `settings.json`, inscriptible par l'utilisateur | Type et choix conformes à votre bloc `OPTIONS` ; aucun chemin d'un texte libre ne vise un emplacement protégé | Bornes des nombres, sens des textes |
+| `$env:SystemRoot`, `$env:ProgramData`, `$env:SystemDrive`, `$env:ProgramFiles` | Rétablies par WinTool depuis la base de registre `HKLM` | Justes sous WinTool | **Rien hors de WinTool** : en double-clic, elles viennent du profil |
+| `$env:TEMP`, `$env:TMP`, `$env:LOCALAPPDATA`, `$env:APPDATA`, `$env:USERPROFILE` | Le profil de l'utilisateur | Ramenées dans son profil si elles visent le système | À vérifier avant toute suppression |
+| Le dossier courant | System32 sous WinTool | — | **Ne vous en servez jamais** : `$PSScriptRoot` pour vos fichiers |
+
+Les règles qui en découlent :
+
+1. **Avant de supprimer ou d'écraser, vérifiez où vous êtes.** Un chemin issu de `$CONFIG`
+   ou d'une variable de l'utilisateur ne doit jamais désigner Windows, les Program Files,
+   ProgramData, la racine d'un lecteur ou un autre profil. WinTool le refuse déjà pour les
+   textes libres, mais votre script peut être lancé seul — et un double-clic n'a pas de
+   garde.
+2. **Bornez vos nombres.** WinTool garantit qu'un `[number]` est un nombre, pas qu'il est
+   raisonnable : une ancienneté de `-1` heure, un délai de `100000` jours se refusent dans
+   le script.
+3. **N'exécutez jamais une valeur.** Pas d'`Invoke-Expression`, pas de
+   `[scriptblock]::Create`, pas de commande bâtie par concaténation avec une valeur de
+   `$CONFIG`. Passez les valeurs en paramètres (`-LiteralPath $chemin`).
+4. **Appelez les outils du système par leur chemin complet**
+   (`"$env:SystemRoot\System32\ipconfig.exe"`), jamais par leur seul nom.
+5. **Pas de secret dans une option.** Une option `[string]` est enregistrée en clair dans
+   `settings.json`. WinTool masque dans le journal les valeurs des clés dont le nom contient
+   `Password`, `Secret` ou `Token` — nommez-les ainsi si vous ne pouvez pas faire autrement.
+
+Exemple, pour une liste de dossiers à vider reçue en texte libre :
+
+```powershell
+$interdits = @($env:SystemRoot, $env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:ProgramData) |
+    Where-Object { $_ } | ForEach-Object { [IO.Path]::GetFullPath($_).TrimEnd('\') }
+
+foreach ($dossier in ("$($CONFIG.CustomPaths)" -split ';' | ForEach-Object { $_.Trim() } | Where-Object { $_ })) {
+    $plein = [IO.Path]::GetFullPath($dossier).TrimEnd('\')
+    $racine = [IO.Path]::GetPathRoot($plein).TrimEnd('\')
+    $refuse = ($plein -eq $racine) -or ($interdits | Where-Object { $plein -eq $_ -or $plein.StartsWith("$_\", 'OrdinalIgnoreCase') })
+    if ($refuse) {
+        Write-Host "[WARN] Protected location skipped: $dossier"
+        continue
+    }
+    # ... nettoyage de $plein
+}
+```
+
+---
+
 ## Ce qui empêche un script de se lancer
 
 WinTool applique partout le principe « **constater, jamais bloquer** » : un script
@@ -918,7 +972,18 @@ $hosts = Get-Content -LiteralPath "$env:SystemRoot\System32\drivers\etc\hosts" -
 Le validateur signale le même problème sous le code `OVERRIDE_FICHIER`, avec le
 numéro de ligne, avant même que vous n'essayiez de lancer le script.
 
-### 3. La simulation, pour un script qui ne sait pas se simuler
+### 3. Un réglage refusé par la garde
+
+Juste avant le lancement, WinTool contrôle chaque valeur de `$CONFIG` contre votre bloc
+`OPTIONS` (section « Sécurité » ci-dessus). Le script **n'est pas lancé** si une valeur n'a
+pas le type déclaré, si un choix ne fait pas partie de la liste, ou si un texte libre
+désigne un emplacement protégé. L'utilisateur voit quel réglage est en cause, et pourquoi.
+
+Conséquence pour vous : **déclarez précisément.** Une option qui reçoit un chemin doit être
+un `[string]`, une liste fermée un `[select]` ou un `[multi]`. Les clés de `$CONFIG` absentes
+de `OPTIONS` ne sont pas transmises.
+
+### 4. La simulation, pour un script qui ne sait pas se simuler
 
 Un script qui déclare l'option `SafeTest` sait **se simuler** : il montre ce qu'il ferait,
 sans rien modifier. L'utilisateur règle la simulation script par script, et une pastille

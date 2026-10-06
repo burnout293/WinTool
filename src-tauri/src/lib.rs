@@ -2,12 +2,14 @@ mod approval;
 mod catalogue;
 mod contract;
 mod discovery;
+mod garde;
 mod history;
 mod restore;
 mod runner;
 mod security;
 mod settings;
 mod simulation;
+mod systeme;
 mod update;
 
 use serde::Serialize;
@@ -72,10 +74,12 @@ fn list_scripts_grouped(app: tauri::AppHandle) -> Result<GroupedResult, String> 
     let decouverte = discovery::discover(&app)?;
     let reglages = settings::load(&app)?;
     let groupes = settings::group_scripts(&reglages, decouverte.scripts);
+    let mut problems = systeme::alertes();
+    problems.extend(decouverte.problems);
     Ok(GroupedResult {
         root: decouverte.root,
         catalogue_root: decouverte.catalogue_root,
-        problems: decouverte.problems,
+        problems,
         categories: groupes.categories,
         unclassified: groupes.unclassified,
         overrides: reglages.overrides,
@@ -241,6 +245,17 @@ fn run_script(
         return Err(NON_APPROUVE.to_string());
     }
 
+    // Garde des reglages (§12.4) : ils viennent de settings.json, que tout
+    // programme sous le compte de l'utilisateur peut reecrire, et partent a un
+    // script eleve. Chaque valeur doit avoir le type que le script declare, et
+    // aucun texte libre ne doit viser un emplacement protege. C'est un refus,
+    // pas un constat : il s'agit d'execution avec les droits administrateur.
+    let reglages = settings::load(&app)?;
+    let zones = zones_protegees(&app, &reglages)?;
+    let e = systeme::emplacements();
+    req.config = garde::verifier_config(&entree.meta, &req.config, &zones, e, &e.system32())
+        .map_err(|r| r.message())?;
+
     // Simulation (§6.9). Ce sont les reglages enregistres qui decident, pas
     // la configuration envoyee par l'interface : la valeur de `SafeTest`
     // est imposee ici, si bien que ce qui s'execute est toujours ce que les
@@ -251,7 +266,6 @@ fn run_script(
     // et il modifierait la machine pendant que l'interface annonce une
     // simulation. Un refus visible vaut mieux qu'une garantie fausse
     // (§12.2 : ne jamais laisser croire a une protection absente).
-    let reglages = settings::load(&app)?;
     let general = simulation::bilan(
         &reglages,
         decouverte.scripts.iter().map(|s| (s.id.as_str(), &s.meta)),
@@ -339,9 +353,73 @@ fn approve_script(hash: String) -> Result<(), String> {
     if !is_elevated() {
         return Err(APPROBATION_SANS_DROITS.to_string());
     }
-    let mut store = approval::load()?;
-    approval::approve(&mut store, hash);
-    approval::save(&store)
+    approval::enregistrer(&hash)
+}
+
+/// Les emplacements proteges : ceux du systeme, plus ceux que l'utilisateur
+/// ajoute (`garde`).
+fn zones_protegees<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    reglages: &Settings,
+) -> Result<garde::Zones, String> {
+    let profil = app
+        .path()
+        .home_dir()
+        .map_err(|e| format!("profil introuvable : {e}"))?;
+    let installation = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()));
+    Ok(garde::Zones::nouvelles(
+        systeme::emplacements(),
+        &profil,
+        installation.as_deref(),
+        &reglages.protected_paths,
+    ))
+}
+
+#[derive(Serialize)]
+struct EmplacementsProteges {
+    integres: Vec<String>,
+    /// Dossier des profils : protege, sauf le profil de l'utilisateur et le
+    /// profil public.
+    profils: String,
+    ajouts: Vec<String>,
+}
+
+/// Les emplacements proteges, pour les Reglages : ceux du systeme (non
+/// modifiables) et ceux que l'utilisateur a ajoutes.
+#[tauri::command]
+fn protected_paths(app: tauri::AppHandle) -> Result<EmplacementsProteges, String> {
+    let installation = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()));
+    Ok(EmplacementsProteges {
+        integres: garde::Zones::integres(systeme::emplacements(), installation.as_deref()),
+        profils: systeme::emplacements().profils.display().to_string(),
+        ajouts: settings::load(&app)?.protected_paths,
+    })
+}
+
+/// Remplace la liste des emplacements ajoutes par l'utilisateur. Seuls des
+/// chemins absolus sont admis : un chemin relatif ne designerait rien de sur.
+#[tauri::command]
+fn set_protected_paths(app: tauri::AppHandle, paths: Vec<String>) -> Result<Settings, String> {
+    let mut propres = Vec::new();
+    for p in paths.iter().map(|p| p.trim().trim_matches('"').trim()) {
+        if p.is_empty() {
+            continue;
+        }
+        if !garde::absolu(p) {
+            return Err(format!("CHEMIN_NON_ABSOLU:{p}"));
+        }
+        if !propres.iter().any(|x: &String| x.eq_ignore_ascii_case(p)) {
+            propres.push(p.to_string());
+        }
+    }
+    with_settings(&app, |s| {
+        s.protected_paths = propres;
+        Ok(())
+    })
 }
 
 /// Sentinelle : approbation impossible faute de droits administrateur.
@@ -956,11 +1034,43 @@ fn reorder_category_scripts(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // En tout premier, avant le moindre fil et la moindre vue : WebView2 lit
+    // ces variables en creant son moteur, et chaque processus lance en herite.
+    let retirees = systeme::retirer_variables_dangereuses();
+    if !retirees.is_empty() {
+        systeme::signaler(format!(
+            "Variables d'environnement retirees au demarrage : {}. Elles font charger du code \
+             dans PowerShell ou dans l'interface ; aucun logiciel courant ne les pose sur un \
+             PC de particulier. Une analyse antivirus est conseillee.",
+            retirees.join(", ")
+        ));
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             app.manage(Arc::new(runner::Runner::default()));
+
+            // Environnement de chaque script : variables du systeme retablies
+            // depuis HKLM, dossiers de l'utilisateur ramenes dans son profil
+            // s'ils visent un emplacement protege.
+            let handle = app.handle();
+            let reglages =
+                settings::load(handle).unwrap_or_else(|_| settings::default_settings(Vec::new()));
+            if let (Ok(profil), Ok(zones)) =
+                (handle.path().home_dir(), zones_protegees(handle, &reglages))
+            {
+                let corrigees =
+                    systeme::preparer_environnement_enfants(&profil, |p| zones.protege(p));
+                if !corrigees.is_empty() {
+                    systeme::signaler(format!(
+                        "Variables d'environnement corrigees pour les scripts : {}. Elles visaient \
+                         un emplacement du systeme, ou manquaient.",
+                        corrigees.join(", ")
+                    ));
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1014,6 +1124,8 @@ pub fn run() {
             set_ui_scale,
             set_exec_policy,
             set_log_cap,
+            protected_paths,
+            set_protected_paths,
             complete_onboarding,
             reset_settings,
             export_settings,

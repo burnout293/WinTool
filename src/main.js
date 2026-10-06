@@ -1941,7 +1941,7 @@ async function lancer(id) {
     }
     // Le journal garde la trace, le panneau explique : les deux, parce qu'un
     // refus qu'on ne peut pas relire plus tard est un refus a moitie dit.
-    const raison = messageLancement(e);
+    const raison = messageLancement(e, entree);
     journaliserRefus(entree, raison);
     alerterEchecLancement(entree, raison);
   }
@@ -1975,10 +1975,20 @@ function journaliserRefus(entree, message) {
 }
 
 /** Traduit les sentinelles du moteur en phrase comprehensible. */
-function messageLancement(brut) {
-  const texte = String(brut);
+function messageLancement(brut, entree) {
+  const texte = String(brut).replace(/^Error:\s*/, '');
   if (texte.includes('SANS_SIMULATION')) return t('simulation.script_refuse');
   if (texte.includes('APPROBATION_SANS_DROITS')) return t('droits.approbation_impossible');
+  // Garde des reglages (§12.4) : `REGLAGE_REFUSE:<nature>:<cle>:<detail>`. Le
+  // detail peut contenir des deux-points (un chemin) : on ne coupe qu'aux trois
+  // premiers.
+  if (texte.startsWith('REGLAGE_REFUSE:')) {
+    const [, nature, cle, ...reste] = texte.split(':');
+    const valeur = reste.join(':');
+    const opt = entree?.meta?.options?.find((o) => o.key === cle);
+    const option = opt ? libelleOption(entree, opt).label : cle;
+    return t(`garde.refus_${nature}`, { option, valeur });
+  }
   return texte;
 }
 
@@ -3052,7 +3062,7 @@ async function lancerScriptEntretien(entree) {
   } catch (e) {
     // La raison est conservee ET affichee : dans le journal pour le detail,
     // sur la ligne de la tache pour qu'on la voie sans le deplier.
-    const raison = messageLancement(e);
+    const raison = messageLancement(e, entree);
     entretienEnCours.resultats.push({ id: entree.id, success: false, raison });
     journaliserRefus(entree, raison);
     majProgression();
@@ -3337,6 +3347,11 @@ function appliquerTraductionsReglages() {
   const aide = document.getElementById('aidePolitique');
   if (aide) aide.dataset.tip = t('reglages.politique_aide');
   document.getElementById('setNumerosLabel').textContent = t('reglages.numeros_reglages');
+  document.getElementById('setProtegesLabel').textContent = t('reglages.proteges');
+  document.getElementById('aideProteges').dataset.tip = t('reglages.proteges_aide');
+  document.getElementById('protegesIntegresTitre').textContent = t('reglages.proteges_integres');
+  document.getElementById('protegesAjoutsLabel').textContent = t('reglages.proteges_ajouts');
+  document.getElementById('btnProtegesEnregistrer').textContent = t('reglages.proteges_enregistrer');
   document.getElementById('setEchelleLabel').textContent = t('reglages.echelle');
   document.getElementById('btnOuvrirDossierReglages').textContent = t('reglages.dossier_scripts');
   document.getElementById('btnReanalyserReglages').textContent = t('reglages.reanalyser');
@@ -3375,7 +3390,28 @@ function appliquerNumerosReglages(actif) {
   if (bouton) bouton.setAttribute('aria-checked', String(!!actif));
 }
 
+/** Emplacements proteges (§12.4) : ceux du systeme, en lecture seule, et les
+ *  ajouts de l'utilisateur. */
+async function rendreEmplacementsProteges() {
+  const liste = document.getElementById('protegesIntegres');
+  const zone = document.getElementById('protegesAjouts');
+  if (!liste || !zone) return;
+  try {
+    const p = await invoke('protected_paths');
+    liste.innerHTML = [
+      ...p.integres.map((c) => `<li>${esc(c)}</li>`),
+      `<li>${esc(p.profils)} <span class="muted">${esc(t('reglages.proteges_sauf_profil'))}</span></li>`,
+      `<li><span class="muted">${esc(t('reglages.proteges_racines'))}</span></li>`,
+    ].join('');
+    zone.value = p.ajouts.join('\n');
+    document.getElementById('protegesEtat').textContent = '';
+  } catch (e) {
+    console.error('Emplacements proteges :', e);
+  }
+}
+
 function ouvrirReglages() {
+  rendreEmplacementsProteges();
   remplirFormulaireReglages(reglagesActuels);
   document.getElementById('exportResultat').hidden = true;
   document.getElementById('importResultat').hidden = true;
@@ -3466,6 +3502,20 @@ function cablerReglages() {
   };
   document.getElementById('setPolitiqueSelect').onchange = async (ev) => {
     reglagesActuels = await invoke('set_exec_policy', { policy: ev.target.value });
+  };
+  document.getElementById('btnProtegesEnregistrer').onclick = async () => {
+    const etat = document.getElementById('protegesEtat');
+    const paths = document.getElementById('protegesAjouts').value.split(/\r?\n/);
+    try {
+      reglagesActuels = await invoke('set_protected_paths', { paths });
+      await rendreEmplacementsProteges();
+      etat.textContent = t('reglages.proteges_enregistre');
+    } catch (e) {
+      const texte = String(e).replace(/^Error:\s*/, '');
+      etat.textContent = texte.startsWith('CHEMIN_NON_ABSOLU:')
+        ? t('reglages.proteges_non_absolu', { p: texte.slice('CHEMIN_NON_ABSOLU:'.length) })
+        : texte;
+    }
   };
   document.getElementById('setNumerosToggle').onclick = async (ev) => {
     const actif = ev.currentTarget.getAttribute('aria-checked') !== 'true';

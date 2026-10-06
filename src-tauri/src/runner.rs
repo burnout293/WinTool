@@ -25,6 +25,7 @@
 //! (specification 12.3). Le script est passe par `-File`, en clair.
 
 use crate::discovery;
+use crate::systeme;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -72,56 +73,24 @@ pub struct Engines {
     pub pwsh: Option<String>,
 }
 
-/// Cherche un executable dans les emplacements connus puis dans le `PATH`.
+/// Les interpreteurs, aux seuls emplacements qu'un compte sans elevation ne
+/// peut pas ecrire : System32 et Program Files, lus dans `HKLM` (`systeme`).
 ///
-/// On resout un chemin absolu plutot que de laisser Windows chercher : le
-/// processus est eleve, et s'en remettre a l'ordre du `PATH` reviendrait a
-/// laisser n'importe quel dossier inscriptible qui y figure decider quel
-/// interpreteur recoit les droits administrateur.
-fn chercher(nom: &str, connus: &[PathBuf]) -> Option<String> {
-    for c in connus {
-        if c.is_file() {
-            return Some(c.to_string_lossy().to_string());
-        }
-    }
-    let chemin = std::env::var_os("PATH")?;
-    for dossier in std::env::split_paths(&chemin) {
-        let candidat = dossier.join(nom);
-        if candidat.is_file() {
-            return Some(candidat.to_string_lossy().to_string());
-        }
-    }
-    None
-}
-
+/// Ni le `PATH` ni le profil de l'utilisateur. Jusqu'a la 1.1.1, PowerShell 7
+/// etait aussi cherche dans `%LOCALAPPDATA%\PowerShell\7`, puis dans le `PATH` :
+/// deux endroits inscriptibles sans elevation. Y deposer un `pwsh.exe`
+/// suffisait a le faire lancer en administrateur au prochain entretien — le
+/// moteur `auto` prefere PowerShell 7. Et les chemins etaient batis sur
+/// `SystemRoot` et `ProgramFiles`, que le profil de l'utilisateur peut
+/// redefinir. Consequence assumee : un PowerShell 7 installe pour un seul
+/// utilisateur n'est pas utilise ; il faut l'installation pour tous.
 pub fn engines() -> Engines {
-    let sysroot = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
-    let winps = chercher(
-        "powershell.exe",
-        &[PathBuf::from(&sysroot)
-            .join("System32")
-            .join("WindowsPowerShell")
-            .join("v1.0")
-            .join("powershell.exe")],
-    );
-
-    let mut connus = Vec::new();
-    for var in ["ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA"] {
-        if let Ok(base) = std::env::var(var) {
-            // Les versions majeures futures s'installent dans un dossier frere ;
-            // on ne les devine pas, le PATH prendra le relais.
-            for v in ["7", "8"] {
-                connus.push(
-                    PathBuf::from(&base)
-                        .join("PowerShell")
-                        .join(v)
-                        .join("pwsh.exe"),
-                );
-            }
-        }
-    }
-    let pwsh = chercher("pwsh.exe", &connus);
-
+    let e = systeme::emplacements();
+    let present = |p: PathBuf| p.is_file().then(|| p.to_string_lossy().to_string());
+    let winps = present(e.powershell());
+    let pwsh = ["7", "8"]
+        .iter()
+        .find_map(|v| present(e.program_files.join("PowerShell").join(v).join("pwsh.exe")));
     Engines { winps, pwsh }
 }
 
@@ -434,10 +403,11 @@ fn assainir(nom: &str) -> String {
 /// sous `Documents` sont volontairement absents : c'est tout l'objet de la
 /// fonction.
 fn chemins_modules_systeme(moteur: &str) -> String {
-    let sysroot = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
-    let progfiles = std::env::var("ProgramFiles").unwrap_or_else(|_| r"C:\Program Files".into());
+    let e = systeme::emplacements();
+    let progfiles = &e.program_files;
 
-    let mut chemins = vec![PathBuf::from(&sysroot)
+    let mut chemins = vec![e
+        .windows
         .join("system32")
         .join("WindowsPowerShell")
         .join("v1.0")
@@ -450,13 +420,9 @@ fn chemins_modules_systeme(moteur: &str) -> String {
                 .join("7")
                 .join("Modules"),
         );
-        chemins.push(PathBuf::from(&progfiles).join("PowerShell").join("Modules"));
+        chemins.push(progfiles.join("PowerShell").join("Modules"));
     } else {
-        chemins.push(
-            PathBuf::from(&progfiles)
-                .join("WindowsPowerShell")
-                .join("Modules"),
-        );
+        chemins.push(progfiles.join("WindowsPowerShell").join("Modules"));
     }
 
     chemins
@@ -464,6 +430,32 @@ fn chemins_modules_systeme(moteur: &str) -> String {
         .map(|p| p.to_string_lossy().to_string())
         .collect::<Vec<_>>()
         .join(";")
+}
+
+/// La configuration telle qu'elle s'ecrit dans le journal : les valeurs des cles
+/// qui ressemblent a un secret (`Password`, `Secret`, `Token`) sont masquees.
+/// Le journal reste sur le disque bien apres l'execution ; un mot de passe de
+/// sauvegarde n'a rien a y faire en clair.
+pub fn config_pour_journal(config: &BTreeMap<String, serde_json::Value>) -> String {
+    let masquee: BTreeMap<&String, serde_json::Value> = config
+        .iter()
+        .map(|(k, v)| {
+            let n = k.to_ascii_lowercase();
+            let secret = ["password", "passwd", "secret", "token"]
+                .iter()
+                .any(|s| n.contains(s));
+            let vide = v.as_str().is_some_and(str::is_empty);
+            (
+                k,
+                if secret && !vide {
+                    serde_json::Value::from("********")
+                } else {
+                    v.clone()
+                },
+            )
+        })
+        .collect();
+    serde_json::to_string(&masquee).unwrap_or_default()
 }
 
 /// Cherche la trappe de substitution dans le bloc d'override d'un script.
@@ -701,12 +693,11 @@ pub fn lancer(
         cible.chemin.display(),
         empreinte,
         chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-        config_json,
+        config_pour_journal(&config),
         "-".repeat(72)
     );
 
     // --- Lancement ---------------------------------------------------------
-    let dossier_script = cible.chemin.parent().unwrap_or(base).to_path_buf();
     let mut commande = Command::new(&exe);
     commande
         .arg("-NoProfile")
@@ -715,7 +706,17 @@ pub fn lancer(
         .arg(&politique)
         .arg("-File")
         .arg(&cible.chemin)
-        .current_dir(&dossier_script)
+        // System32, pas le dossier du script. Celui-ci est inscriptible sans
+        // elevation, et `cmd /c outil` comme `Process.Start("outil.exe")`
+        // cherchent l'executable dans le dossier courant avant le systeme : y
+        // deposer un `ipconfig.exe` l'aurait fait lancer en administrateur.
+        // Les scripts s'appuient sur `$PSScriptRoot`, jamais sur le dossier
+        // courant (verifie sur le catalogue).
+        .current_dir(systeme::emplacements().system32())
+        // Variables du systeme retablies depuis HKLM, dossiers de
+        // l'utilisateur ramenes dans son profil (systeme.rs). Avant les deux
+        // suivantes, qui priment.
+        .envs(systeme::environnement_enfants().iter().map(|(k, v)| (k, v)))
         .env("WINTOOL_CONFIG", &config_json)
         // `Import-Module Truc` cherche d'abord dans les dossiers de modules de
         // l'utilisateur, sous Documents, inscriptibles sans elevation : y
@@ -992,6 +993,8 @@ pub fn verifier_syntaxe(chemin: &Path) -> Result<CheckResult, String> {
         .arg("Bypass")
         .arg("-Command")
         .arg(PROGRAMME_ANALYSE)
+        .current_dir(systeme::emplacements().system32())
+        .envs(systeme::environnement_enfants().iter().map(|(k, v)| (k, v)))
         .env("WINTOOL_CHECK_PATH", chemin)
         .env("PSModulePath", chemins_modules_systeme(&nom_moteur))
         .stdin(Stdio::null())
@@ -1102,8 +1105,7 @@ fn tuer_arborescence(pid: u32) -> Result<(), String> {
         // droits administrateur. Il suffit alors d'un `taskkill.exe` depose
         // dans un dossier inscriptible du PATH pour obtenir une elevation au
         // moment ou l'utilisateur clique sur « Arreter ».
-        let sysroot = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".into());
-        let outil = PathBuf::from(sysroot).join("System32").join("taskkill.exe");
+        let outil = systeme::emplacements().system32().join("taskkill.exe");
         let mut c = Command::new(&outil);
         c.args(["/PID", &pid.to_string(), "/T", "/F"])
             .stdin(Stdio::null())
@@ -1296,6 +1298,34 @@ mod tests {
         assert!(dir.join("c.log").exists());
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn le_journal_ne_garde_pas_les_mots_de_passe() {
+        let config = BTreeMap::from([
+            ("Password".to_string(), serde_json::Value::from("hunter2")),
+            ("ApiToken".to_string(), serde_json::Value::from("abc")),
+            (
+                "ExportPath".to_string(),
+                serde_json::Value::from(r"C:\x.zip"),
+            ),
+            ("Vide".to_string(), serde_json::Value::from("")),
+        ]);
+        let j = config_pour_journal(&config);
+        assert!(!j.contains("hunter2") && !j.contains("abc"), "{j}");
+        assert!(j.contains("x.zip"));
+    }
+
+    #[test]
+    fn pas_d_interpreteur_hors_des_dossiers_systeme() {
+        let e = systeme::emplacements();
+        let m = engines();
+        if let Some(w) = &m.winps {
+            assert!(w.starts_with(&e.windows.display().to_string()), "{w}");
+        }
+        if let Some(p) = &m.pwsh {
+            assert!(p.starts_with(&e.program_files.display().to_string()), "{p}");
+        }
     }
 
     #[test]

@@ -1530,3 +1530,18 @@ body[data-simulation="activee"] .btn.primary.big.lancer { animation: none; box-s
   display: inline-flex; align-items: center; gap: 8px; margin-top: 16px;
   font-size: 12.5px; color: var(--text-2); cursor: pointer;
 }
+
+/* --- Emplacements proteges (Reglages, section Expert) ------------------------ */
+.box.proteges { display: flex; flex-direction: column; gap: 8px; margin: -2px 0 10px; }
+.proteges-liste {
+  margin: 0; padding: 8px 12px 8px 26px; font-size: 10.5px; line-height: 1.7;
+  color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 10px; overflow-wrap: anywhere;
+}
+#protegesAjouts {
+  width: 100%; resize: vertical; min-height: 60px; padding: 8px 10px; font-size: 11.5px;
+  color: var(--text); background: var(--surface); border: 1px solid var(--border-2);
+  border-radius: 10px;
+}
+#protegesAjouts:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+.proteges-actions { display: flex; align-items: center; gap: 10px; }
