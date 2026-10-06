@@ -1340,6 +1340,8 @@ function afficherProgressionCatalogue(texte) {
   document.getElementById('catPlusTard').hidden = true;
   const offre = document.getElementById('offreEtat');
   if (offre) offre.textContent = texte;
+  const visiteEtat = document.getElementById('onbCatalogueEtat');
+  if (visiteEtat) visiteEtat.textContent = texte;
   const etat = document.getElementById('catalogueEtat');
   if (etat) etat.textContent = texte;
 }
@@ -1347,7 +1349,7 @@ function afficherProgressionCatalogue(texte) {
 async function installerCatalogue() {
   if (catalogueInstallation || executionEnCours() || !etatCatalogue?.cle) return;
   catalogueInstallation = true;
-  document.querySelectorAll('[data-offre="installer"], #btnCatalogue').forEach((b) => { b.disabled = true; });
+  document.querySelectorAll('[data-offre="installer"], [data-onb="installer"], #btnCatalogue').forEach((b) => { b.disabled = true; });
   afficherProgressionCatalogue(t('cat.telechargement_debut'));
 
   const arreterEcoute = await ecouter('catalogue:progress', (ev) => {
@@ -1391,6 +1393,12 @@ async function installerCatalogue() {
   const offre = document.getElementById('offreEtat');
   if (offre) offre.textContent = erreur ? message : '';
   document.querySelectorAll('[data-offre="installer"]').forEach((b) => { b.disabled = false; });
+  // Lance depuis la visite : sa page montre le resultat.
+  if (!document.getElementById('onboarding').hidden) {
+    await rendreVisite();
+    const visiteEtat = document.getElementById('onbCatalogueEtat');
+    if (visiteEtat && erreur) visiteEtat.textContent = message;
+  }
 }
 
 /** Accueil sans aucun script (§16.6) : la liste des catalogues proposes, la
@@ -3290,14 +3298,9 @@ function rendreHistorique() {
 }
 
 function appliquerTraductionsReglages() {
-  document.getElementById('onbTitre').textContent = t('onb.titre');
-  document.getElementById('onbTexte').textContent = t('onb.texte');
-  document.getElementById('onbLangueLabel').textContent = t('onb.langue');
-  document.getElementById('onbThemeLabel').textContent = t('onb.theme');
-  document.querySelector('[data-onb-theme="light"]').textContent = t('onb.theme_clair');
-  document.querySelector('[data-onb-theme="dark"]').textContent = t('onb.theme_sombre');
-  document.querySelector('[data-onb-theme="system"]').textContent = t('onb.theme_systeme');
-  document.getElementById('btnCommencer').textContent = t('onb.commencer');
+  document.getElementById('setVisiteLabel').textContent = t('reglages.visite');
+  document.getElementById('btnRevoirVisite').textContent = t('reglages.visite_btn');
+  if (!document.getElementById('onboarding').hidden) rendreVisite();
 
   document.getElementById('setTitre').textContent = t('reglages.titre');
   document.getElementById('navGeneral').textContent = t('reglages.nav_general');
@@ -3483,27 +3486,201 @@ async function appliquerLangue(lang) {
 }
 
 function cablerOnboarding() {
-  document.querySelectorAll('#onbLangueSeg [data-onb-lang]').forEach((b) => {
-    b.onclick = () => {
-      document.querySelectorAll('#onbLangueSeg [data-onb-lang]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    };
+  const page = document.getElementById('onbPage');
+  // Delegation : le contenu de la page est rendu a chaque etape.
+  page.addEventListener('click', async (ev) => {
+    const langue = ev.target.closest('[data-onb-lang]');
+    if (langue) {
+      visite.lang = langue.dataset.onbLang;
+      setLang(visite.lang);
+      document.documentElement.lang = currentLang();
+      return void rendreVisite();
+    }
+    const theme = ev.target.closest('[data-onb-theme]');
+    if (theme) {
+      visite.theme = theme.dataset.onbTheme;
+      appliquerTheme(visite.theme, false);
+      return void rendreVisite();
+    }
+    if (ev.target.closest('[data-onb="installer"]')) return void installerCatalogue();
   });
-  document.querySelectorAll('#onbThemeSeg [data-onb-theme]').forEach((b) => {
-    b.onclick = () => {
-      document.querySelectorAll('#onbThemeSeg [data-onb-theme]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-      appliquerTheme(b.dataset.onbTheme, false);
-    };
-  });
-
-  document.getElementById('btnCommencer').onclick = async () => {
-    const lang = document.querySelector('#onbLangueSeg [aria-pressed="true"]')?.dataset.onbLang || 'fr';
-    const theme = document.querySelector('#onbThemeSeg [aria-pressed="true"]')?.dataset.onbTheme || 'system';
-    reglagesActuels = await invoke('complete_onboarding', { theme, lang });
-    await appliquerLangue(lang);
-    appliquerTheme(theme, false);
-    document.getElementById('onboarding').hidden = true;
-    proposerRappelCatalogue();
+  document.getElementById('btnOnbRetour').onclick = () => {
+    if (visite.etape > visite.premiere) {
+      visite.etape -= 1;
+      rendreVisite();
+    }
   };
+  document.getElementById('btnOnbSuivant').onclick = () => {
+    if (visite.etape < ETAPES_VISITE.length - 1) {
+      visite.etape += 1;
+      rendreVisite();
+    } else {
+      terminerVisite();
+    }
+  };
+  document.getElementById('btnOnbPasser').onclick = terminerVisite;
+  document.getElementById('btnRevoirVisite').onclick = () => {
+    document.getElementById('settingsOverlay').hidden = true;
+    ouvrirVisite({ depuisReglages: true });
+  };
+}
+
+/* -------------------------------------------------------------------------
+   Premier demarrage (specification §13)
+
+   Quatre pages, pour quelqu'un qui n'a jamais ouvert un terminal autant que
+   pour un habitue. Chaque page : une illustration animee, l'essentiel en trois
+   phrases tres courtes avec une icone chacune, puis « En savoir plus », replie,
+   pour le detail — toujours sans jargon.
+   ------------------------------------------------------------------------- */
+
+const ETAPES_VISITE = ['bienvenue', 'principe', 'entretiens', 'securite'];
+
+/** Etat de la visite. `premiere` : on ne revient pas avant (relancee depuis les
+ *  Reglages, elle commence apres la langue et l'apparence, deja reglees). */
+let visite = { etape: 0, premiere: 0, depuisReglages: false, lang: 'fr', theme: 'system' };
+
+function ouvrirVisite({ depuisReglages = false } = {}) {
+  const premiere = depuisReglages ? 1 : 0;
+  visite = {
+    etape: premiere,
+    premiere,
+    depuisReglages,
+    lang: reglagesActuels?.lang || currentLang(),
+    theme: reglagesActuels?.theme || 'system',
+  };
+  document.getElementById('onboarding').hidden = false;
+  rendreVisite();
+}
+
+async function terminerVisite() {
+  document.getElementById('onboarding').hidden = true;
+  if (visite.depuisReglages) return;
+  try {
+    reglagesActuels = await invoke('complete_onboarding', { theme: visite.theme, lang: visite.lang });
+  } catch (e) {
+    console.error('Fin de la visite :', e);
+  }
+  await appliquerLangue(visite.lang);
+  appliquerTheme(visite.theme, false);
+  proposerRappelCatalogue();
+}
+
+/** Les illustrations : du HTML et du CSS seulement, animes par styles.css. */
+function illustrationVisite(id, icones) {
+  if (id === 'principe') {
+    return `<div class="onb-illu illu-principe" aria-hidden="true">
+      <div class="mini mini-simple">
+        <span class="mini-titre">${esc(t('mode.simple'))}</span>
+        <span class="mini-bouton">${icones.sparkles}</span>
+        <span class="mini-vague"></span>
+      </div>
+      <div class="mini mini-expert">
+        <span class="mini-titre">${esc(t('mode.expert'))}</span>
+        <span class="mini-ligne"></span><span class="mini-ligne"></span><span class="mini-ligne"></span>
+        <span class="mini-terminal"><i></i><i></i><i></i></span>
+      </div>
+    </div>`;
+  }
+  if (id === 'entretiens') {
+    return `<div class="onb-illu illu-catalogue" aria-hidden="true">
+      <span class="illu-colis">${icones.package}</span>
+      <span class="illu-sceau">${icones['shield-check']}</span>
+      <span class="illu-ecran">${icones.monitor}</span>
+    </div>`;
+  }
+  return `<div class="onb-illu illu-securite" aria-hidden="true">
+    <span class="illu-doc"><i></i><i></i><i class="suspect"></i><i></i><i></i></span>
+    <span class="illu-loupe">${icones.search}</span>
+    <span class="illu-bouclier">${icones.shield}</span>
+  </div>`;
+}
+
+/** Trois phrases et leurs icones, puis le detail, pour chaque page de contenu. */
+const CONTENU_VISITE = {
+  principe: { icones: ['sparkles', 'mouse-pointer-click', 'sliders-horizontal'], details: 4 },
+  entretiens: { icones: ['package', 'mouse-pointer-click', 'folder-open'], details: 4 },
+  securite: { icones: ['triangle-alert', 'eye', 'shield'], details: 5 },
+};
+
+/** La ligne du catalogue, sur la page des entretiens : l'installer d'ici, ou
+ *  constater qu'il l'est deja. */
+function actionCatalogueVisite() {
+  if (!etatCatalogue?.cle) return '';
+  if (etatCatalogue.installe) {
+    const n = etatCatalogue.installe.scripts;
+    return `<p class="onb-action ok">${esc(t('onb.entretiens.installe', { n, s: n > 1 ? 's' : '' }))}</p>`;
+  }
+  return `<div class="onb-action">
+    <button class="btn primary" type="button" data-onb="installer"${catalogueInstallation ? ' disabled' : ''}>${esc(t('onb.entretiens.installer'))}</button>
+    <span class="muted">${esc(t('onb.entretiens.plus_tard'))}</span>
+    <p class="onb-etat" id="onbCatalogueEtat" aria-live="polite"></p>
+  </div>`;
+}
+
+async function rendreVisite() {
+  const id = ETAPES_VISITE[visite.etape];
+  const page = document.getElementById('onbPage');
+  const derniere = visite.etape === ETAPES_VISITE.length - 1;
+
+  // Points d'etape : ceux que cette visite parcourt reellement.
+  const pas = ETAPES_VISITE.slice(visite.premiere);
+  document.getElementById('onbPas').innerHTML = pas
+    .map((_, i) => `<span class="${i + visite.premiere === visite.etape ? 'actif' : ''}"></span>`)
+    .join('');
+  document.getElementById('onbPas').setAttribute(
+    'aria-label',
+    t('onb.etape', { n: visite.etape - visite.premiere + 1, total: pas.length }),
+  );
+
+  if (id === 'bienvenue') {
+    const choix = (attr, valeur, actuelle, libelle) =>
+      `<button type="button" data-${attr}="${valeur}" aria-pressed="${valeur === actuelle}">${esc(libelle)}</button>`;
+    page.innerHTML = `
+      <div class="onb-mark"><svg class="ico i28" aria-hidden="true"><use href="#logo" /></svg></div>
+      <h1 id="onbTitre">${esc(t('onb.titre'))}</h1>
+      <p class="onb-text">${esc(t('onb.texte'))}</p>
+      <div class="onb-choices">
+        <div class="grp">
+          <span class="lbl">${esc(t('onb.langue'))}</span>
+          <div class="seg">${choix('onb-lang', 'fr', visite.lang, 'Français')}${choix('onb-lang', 'en', visite.lang, 'English')}</div>
+        </div>
+        <div class="grp">
+          <span class="lbl">${esc(t('onb.theme'))}</span>
+          <div class="seg">${choix('onb-theme', 'light', visite.theme, t('onb.theme_clair'))}${choix('onb-theme', 'dark', visite.theme, t('onb.theme_sombre'))}${choix('onb-theme', 'system', visite.theme, t('onb.theme_systeme'))}</div>
+        </div>
+      </div>`;
+  } else {
+    const c = CONTENU_VISITE[id];
+    const noms = [...new Set([...c.icones, 'sparkles', 'package', 'shield-check', 'monitor', 'search', 'shield'])];
+    const icones = Object.fromEntries(await Promise.all(noms.map(async (n) => [n, (await iconeSVG(n)) || ''])));
+    const rapide = c.icones
+      .map((ic, i) => `<li><span class="onb-puce">${icones[ic]}</span><span>${esc(t(`onb.${id}.r${i + 1}`))}</span></li>`)
+      .join('');
+    const detail = Array.from({ length: c.details }, (_, i) => `<p>${esc(t(`onb.${id}.d${i + 1}`))}</p>`).join('');
+    page.innerHTML = `
+      ${illustrationVisite(id, icones)}
+      <h1 id="onbTitre">${esc(t(`onb.${id}.titre`))}</h1>
+      <ul class="onb-rapide">${rapide}</ul>
+      ${id === 'entretiens' ? actionCatalogueVisite() : ''}
+      <details class="onb-detail">
+        <summary>${esc(t('onb.en_savoir_plus'))}</summary>
+        ${detail}
+      </details>`;
+  }
+
+  const retour = document.getElementById('btnOnbRetour');
+  retour.textContent = t('onb.retour');
+  retour.hidden = visite.etape === visite.premiere;
+  const passer = document.getElementById('btnOnbPasser');
+  passer.textContent = t(visite.depuisReglages ? 'onb.fermer' : 'onb.passer');
+  passer.hidden = derniere;
+  document.getElementById('btnOnbSuivant').textContent = derniere
+    ? t(visite.depuisReglages ? 'onb.fermer' : 'onb.commencer')
+    : t('onb.suivant');
+  // Un lecteur d'ecran annonce la nouvelle page.
+  document.getElementById('onbTitre')?.setAttribute('tabindex', '-1');
+  document.getElementById('onbTitre')?.focus();
 }
 
 function cablerReglages() {
@@ -3861,7 +4038,7 @@ async function demarrer() {
   await chargerLots();
   basculerMode('simple');
 
-  if (!reglages.onboarded) document.getElementById('onboarding').hidden = false;
+  if (!reglages.onboarded) ouvrirVisite();
 
   // La fenetre est creee invisible pour eviter un flash blanc avant la peinture.
   await laFenetre.show();

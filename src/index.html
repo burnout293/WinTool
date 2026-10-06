@@ -260,30 +260,19 @@
 
   </div>
 
-  <!-- Premier lancement (specification §13) : bref, langue/theme, Commencer. -->
+  <!-- Premier demarrage (specification §13) : une visite en quatre pages,
+       relancable depuis les Reglages. Chaque page : une illustration animee,
+       l'essentiel en trois phrases, et le detail pour qui veut en savoir plus.
+       Le contenu est rendu par rendreVisite (main.js). -->
   <div class="backdrop" id="onboarding" hidden>
-    <div class="onb-card">
-      <div class="onb-mark"><svg class="ico i28" aria-hidden="true"><use href="#logo" /></svg></div>
-      <h1 id="onbTitre"></h1>
-      <p class="onb-text" id="onbTexte"></p>
-      <div class="onb-choices">
-        <div class="grp">
-          <span class="lbl" id="onbLangueLabel"></span>
-          <div class="seg" id="onbLangueSeg">
-            <button type="button" data-onb-lang="fr">Français</button>
-            <button type="button" data-onb-lang="en">English</button>
-          </div>
-        </div>
-        <div class="grp">
-          <span class="lbl" id="onbThemeLabel"></span>
-          <div class="seg" id="onbThemeSeg">
-            <button type="button" data-onb-theme="light"></button>
-            <button type="button" data-onb-theme="dark"></button>
-            <button type="button" data-onb-theme="system"></button>
-          </div>
-        </div>
+    <div class="onb-card onb-visite" role="dialog" aria-modal="true" aria-labelledby="onbTitre">
+      <div class="onb-pas" id="onbPas"></div>
+      <div class="onb-page" id="onbPage"></div>
+      <div class="onb-nav">
+        <button class="btn" type="button" id="btnOnbRetour"></button>
+        <button class="btn onb-passer" type="button" id="btnOnbPasser"></button>
+        <button class="btn primary big" type="button" id="btnOnbSuivant"></button>
       </div>
-      <button class="btn primary big" type="button" id="btnCommencer" style="width:100%;margin-top:22px"></button>
     </div>
   </div>
 
@@ -350,6 +339,10 @@
               <button class="btn compact" type="button" id="btnVerifierMaj"></button>
             </div>
             <p class="maj-etat" id="majEtat" aria-live="polite"></p>
+            <div class="setrow">
+              <span class="setrow-txt"><span class="num">1.6</span><span id="setVisiteLabel"></span></span>
+              <button class="btn compact" type="button" id="btnRevoirVisite"></button>
+            </div>
           </section>
 
           <!-- Catalogue d'entretiens (specification §16) : visible dans les deux

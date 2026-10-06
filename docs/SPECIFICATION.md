@@ -779,7 +779,7 @@ chemin identifié.
 | Lancement | Dossier courant = dossier du script, inscriptible : `cmd /c outil` et `Process.Start("outil.exe")` y cherchent l'exécutable avant le système | Dossier courant **System32**, et `NoDefaultCurrentDirectoryInExePath` (1.2) |
 | Environnement | Les variables de l'utilisateur (`HKCU\Environment`) sont héritées par le processus élevé : `COR_PROFILER_PATH` et `DOTNET_STARTUP_HOOKS` font charger du code dans PowerShell, `WEBVIEW2_BROWSER_EXECUTABLE_FOLDER` lance un autre moteur d'interface, `windir`, `SystemRoot` ou `TEMP` redéfinis font viser un autre dossier aux scripts | Familles `COR_`, `CORECLR_`, `COMPLUS_`, `DOTNET_`, `WEBVIEW2_` **retirées au démarrage** du processus de WinTool — l'environnement de l'utilisateur n'est pas modifié, et une version de développement les garde —, avec une alerte pour celles qui chargent du code ; variables du système **rétablies depuis `HKLM`** pour chaque script ; `TEMP`, `TMP`, `LOCALAPPDATA`, `APPDATA`, `USERPROFILE` ramenées dans le profil s'ils visent un emplacement protégé (1.2) |
 | Réglages | `settings.json` est inscriptible, et ses valeurs partent à un script élevé : écrire `C:\Windows` dans les dossiers à vider du nettoyage suffit | **Garde** : chaque valeur doit avoir le type et faire partie des choix déclarés ; un texte libre ne peut pas viser un **emplacement protégé** — chemins résolus avant comparaison ; liste modifiable par l'utilisateur, mais rangée dans `HKLM` et modifiable **en administrateur seulement** (1.2) |
-| Désinstallation | Le désinstalleur, administrateur, efface dans des dossiers inscriptibles par l'utilisateur : une jonction glissée à la place de `logs` lui ferait effacer le dossier visé | **Aucune suppression récursive** : fichiers nommés, puis dossiers seulement s'ils sont vides ; **rien du tout** si un dossier visé est une jonction ou un lien — éprouvé sur une vraie jonction (1.2) |
+| Désinstallation | Le désinstalleur, administrateur, efface dans des dossiers inscriptibles par l'utilisateur : une jonction glissée à la place de `logs` lui ferait effacer le dossier visé | **Jamais `RMDir /r`**, qui suit les jonctions — y compris là où le modèle de Tauri l'employait : effacement parcouru par WinTool, qui retire une jonction rencontrée **comme un lien**, sans descendre dedans ; **rien du tout** si le dossier de base est lui-même une jonction — éprouvé sur une arborescence piégée (1.2) |
 | Journal | Une valeur secrète (mot de passe de sauvegarde) écrite en clair dans le journal technique | Valeurs des clés `Password`, `Secret`, `Token` **masquées** (1.2) |
 | Bouton Arrêter | `taskkill` résolu par le `PATH`, exécuté en administrateur | **Chemin absolu**, lu dans `HKLM` |
 
@@ -825,14 +825,32 @@ retirer un emplacement ne vaut que si un programme sans droits ne peut pas l'exe
 place. Rangée dans `settings.json`, il lui aurait suffi de réécrire le fichier. Sans droits,
 la liste s'affiche, mais ne se modifie pas.
 
-**Désinstallation.** La case « Supprimer les données de l'application » du désinstalleur
-efface toutes les traces de WinTool : ses données dans le profil (réglages, historique,
-journaux, catalogue installé), celles de l'interface, le magasin d'approbations et la liste
-des emplacements protégés dans `HKLM`, l'ancien magasin de `ProgramData`. **Les scripts
-personnels de l'utilisateur sont conservés** : ce sont ses créations, pas des traces de
-WinTool ; leur dossier ne disparaît que s'il est vide. Une mise à jour n'efface jamais rien.
-Le crochet vit dans `src-tauri/installeur/crochets.nsh`. Il n'atteint que le profil du
-compte qui désinstalle : un autre compte du même PC garde ses propres réglages.
+**Désinstallation.** La page de désinstallation de WinTool remplace celle de Tauri :
+
+- **Garder mes données** (par défaut) — rien n'est effacé ;
+- **Tout effacer, sauf mes scripts personnels** ;
+- **Choisir** — réglages, historique, journaux, catalogue installé, scripts approuvés,
+  emplacements protégés, données de l'interface, scripts personnels. Effacer ses scripts
+  personnels se confirme : ce sont ses créations.
+
+Une mise à jour, une désinstallation silencieuse ou passive n'efface rien. Seul le profil du
+compte qui désinstalle est concerné : un autre compte du même PC garde ses données.
+
+**`RMDir /r` de NSIS suit les jonctions** — vérifié sur une vraie jonction, la cible a été
+vidée. Le désinstalleur tourne en administrateur alors que ces dossiers sont inscriptibles
+par l'utilisateur : une jonction glissée vers System32 l'aurait fait vider. Le modèle de
+Tauri efface ainsi les données de l'interface (`RmDir /r`). Aucun effacement de WinTool ne
+passe donc par `RMDir /r` : `WINTOOL_EFFACER_ARBRE` parcourt lui-même les dossiers et retire
+une jonction rencontrée comme un lien, sans jamais descendre dedans — éprouvé sur une
+arborescence piégée, la cible est restée intacte. Résidu : l'intervalle entre la
+vérification et l'effacement.
+
+**Le modèle de l'installeur est dérivé, pas recopié.** `tools/modele-installeur.mjs` relit le
+modèle NSIS dans la CLI de Tauri installée et n'y remplace que deux passages : la page de
+confirmation, et les deux `RmDir /r`. Chaque repère doit apparaître exactement une fois ; si
+Tauri change son modèle, la construction s'arrête avec un message au lieu de produire un
+désinstalleur bancal. Le reste des corrections de Tauri arrive ainsi sans recopie. Le
+crochet et la page vivent dans `src-tauri/installeur/crochets.nsh`.
 
 **Résidus assumés.**
 
@@ -864,16 +882,28 @@ le concernent plus.
 
 ## 13. Premier lancement
 
-Un écran d'accueil unique et court : ce que fait l'outil, le fait qu'il s'exécute en
-administrateur, le choix de la langue et du thème, un bouton « Commencer ». Puis l'étape 1
-de l'assistant, avec les catégories d'usine déjà en place.
+**Une visite en quatre pages**, à l'ouverture de la toute première session, et relançable à
+tout moment depuis les Réglages généraux (« Présentation de WinTool »), dans les deux modes.
 
-L'installation étant livrée **sans aucun script** (§16.1), cet écran enchaîne sur la
-proposition de sources décrite au §16.6 — proposition qu'il doit rester possible de
-refuser sans quitter l'application.
+| Page | Contenu |
+|---|---|
+| Bienvenue | La langue et l'apparence — sur cette page, et seulement elle, pour que la suite se lise dans la bonne langue |
+| Le principe | Ce que fait WinTool ; mode Simple et mode Expert ; la simulation |
+| Les entretiens | WinTool arrive vide, pourquoi (§16.1) ; le catalogue officiel, **installable depuis la page même** ; ses propres scripts |
+| Votre sécurité | Ce qu'un script peut faire ; n'approuver que ce dont on connaît l'origine, se faire expliquer un script — par un proche ou par une intelligence artificielle — avant de l'approuver ; l'antivirus qui peut se méfier de WinTool, et ne jamais le désactiver pour lui |
 
-Il pose le cadre — notamment pourquoi Windows a réclamé une élévation, après un
-avertissement SmartScreen — sans transformer le démarrage en formulaire.
+**Lisible à 9 ans comme à 80.** Chaque page se divise en deux :
+
+- **l'essentiel**, visible d'emblée : une illustration animée, un titre, trois phrases très
+  courtes, une icône par phrase. Aucun terme technique — « script » est expliqué dès la
+  première page (« une recette que l'ordinateur suit, étape par étape ») ;
+- **le détail**, replié derrière « En savoir plus », pour qui veut comprendre — toujours sans
+  jargon.
+
+Les illustrations sont faites en HTML et CSS, sans image : elles suivent le thème et la
+langue, et ne vieillissent pas comme une capture d'écran. Elles s'arrêtent quand la fenêtre
+n'est pas active et quand Windows demande moins d'animations (§15.3). La visite se passe à
+tout moment ; elle ne bloque rien.
 
 ---
 

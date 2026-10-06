@@ -1553,3 +1553,132 @@ body[data-simulation="activee"] .btn.primary.big.lancer { animation: none; box-s
 }
 #protegesAjouts:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
 .proteges-actions { display: flex; align-items: center; gap: 10px; }
+
+/* --- Premier demarrage : la visite (specification §13) ----------------------
+   Gros caracteres, phrases courtes, une icone par phrase : lisible a 9 ans comme
+   a 80. Les illustrations sont du HTML et du CSS ; elles s'arretent quand la
+   fenetre n'est pas active, et quand Windows demande moins d'animations. */
+.onb-visite { max-width: 640px; max-height: calc(92vh / var(--echelle, 1)); overflow-y: auto; text-align: left; }
+.onb-visite .onb-mark { margin: 6px auto 16px; }
+.onb-visite h1 { font-size: 23px; text-align: center; margin-top: 4px; outline: none; }
+.onb-visite .onb-text { font-size: 15px; text-align: center; }
+.onb-pas { display: flex; justify-content: center; gap: 8px; margin-bottom: 14px; }
+.onb-pas span { width: 9px; height: 9px; border-radius: 50%; background: var(--border-2); transition: background .2s, transform .2s; }
+.onb-pas span.actif { background: var(--acc); transform: scale(1.25); }
+.onb-rapide { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.onb-rapide li { display: flex; align-items: center; gap: 14px; font-size: 17px; line-height: 1.4; font-weight: 600; }
+.onb-puce {
+  flex: 0 0 auto; width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center;
+  color: var(--acc-on); background: color-mix(in srgb, var(--acc) 14%, transparent);
+}
+.onb-puce svg { width: 22px; height: 22px; }
+.onb-action { margin: 18px 0 0; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
+.onb-action.ok { font-size: 15px; font-weight: 650; color: var(--ok); }
+.onb-etat { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--text-2); min-height: 1em; }
+.onb-detail { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 12px; }
+.onb-detail summary {
+  cursor: pointer; font-size: 14px; font-weight: 700; color: var(--acc-on);
+  list-style: none; display: inline-flex; align-items: center; gap: 6px;
+}
+.onb-detail summary::before { content: '▸'; transition: transform .15s; }
+.onb-detail[open] summary::before { transform: rotate(90deg); }
+.onb-detail p { font-size: 14px; line-height: 1.6; color: var(--text-2); margin: 10px 0 0; }
+.onb-nav { display: flex; align-items: center; gap: 10px; margin-top: 24px; }
+.onb-nav .onb-passer { margin-left: auto; border-color: transparent; background: transparent; color: var(--text-3); }
+.onb-nav .btn.primary.big { min-width: 170px; }
+/* Sans « Passer » (derniere page), le bouton principal reste a droite. */
+.onb-nav .onb-passer[hidden] + .btn.primary { margin-left: auto; }
+
+/* Illustrations */
+.onb-illu {
+  position: relative; height: 150px; margin: 0 0 6px; border-radius: 18px; overflow: hidden;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--acc) 10%, transparent), transparent);
+  display: flex; align-items: center; justify-content: center; gap: 26px;
+}
+.onb-illu svg { width: 100%; height: 100%; }
+
+.illu-principe .mini {
+  position: relative; width: 150px; height: 112px; border-radius: 14px; overflow: hidden;
+  background: var(--surface); border: 1.5px solid var(--border-2); box-shadow: var(--sh);
+  display: flex; flex-direction: column; align-items: center; padding-top: 10px; gap: 7px;
+}
+.mini-titre { font-size: 11px; font-weight: 800; color: var(--text-2); letter-spacing: .3px; }
+.mini-bouton {
+  width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--ink);
+  background: linear-gradient(135deg, var(--acc), var(--acc-2)); animation: onb-pouls 2.4s ease-in-out infinite;
+}
+.mini-bouton svg { width: 22px; height: 22px; }
+.mini-vague {
+  position: absolute; left: -10%; right: -10%; bottom: -14px; height: 34px; border-radius: 50%;
+  background: color-mix(in srgb, var(--acc) 35%, transparent); animation: onb-vague 4s ease-in-out infinite;
+}
+.illu-principe .mini-expert { align-items: stretch; padding: 10px 12px 0; }
+.mini-expert .mini-titre { text-align: center; }
+.mini-ligne {
+  height: 8px; border-radius: 4px; background: var(--border-2);
+  animation: onb-ligne 3.6s ease-in-out infinite; transform-origin: left;
+}
+.mini-ligne:nth-of-type(2) { animation-delay: .25s; width: 85%; }
+.mini-ligne:nth-of-type(3) { animation-delay: .5s; width: 70%; }
+.mini-terminal {
+  margin: 4px -12px 0; flex: 1; background: var(--term-bg, #0b1512); padding: 6px 10px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.mini-terminal i { height: 4px; border-radius: 2px; background: color-mix(in srgb, var(--acc) 70%, transparent); animation: onb-frappe 3.6s steps(12) infinite; }
+.mini-terminal i:nth-child(2) { animation-delay: .6s; }
+.mini-terminal i:nth-child(3) { animation-delay: 1.2s; }
+
+.illu-catalogue span { display: grid; place-items: center; }
+.illu-ecran { width: 76px; height: 76px; color: var(--text-2); }
+.illu-colis {
+  position: absolute; left: calc(50% - 22px); top: 14px; width: 44px; height: 44px; color: var(--acc-on);
+  animation: onb-chute 3.6s ease-in infinite;
+}
+.illu-sceau {
+  position: absolute; left: calc(50% + 22px); top: 62px; width: 30px; height: 30px; color: var(--ok);
+  animation: onb-sceau 3.6s ease-out infinite;
+}
+
+.illu-doc {
+  width: 120px; height: 104px; border-radius: 10px; background: var(--surface); border: 1.5px solid var(--border-2);
+  box-shadow: var(--sh); display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 0 14px;
+}
+.illu-doc i { height: 6px; border-radius: 3px; background: var(--border-2); }
+.illu-doc i:nth-child(2) { width: 80%; }
+.illu-doc i:nth-child(4) { width: 65%; }
+.illu-doc i.suspect { animation: onb-suspect 4s ease-in-out infinite; }
+.illu-loupe {
+  position: absolute; top: 34px; left: calc(50% - 90px); width: 46px; height: 46px; color: var(--text);
+  animation: onb-loupe 4s ease-in-out infinite;
+}
+.illu-bouclier { width: 54px; height: 54px; color: var(--acc-on); animation: onb-pouls 4s ease-in-out infinite; }
+
+@keyframes onb-pouls { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+@keyframes onb-vague { 0%, 100% { transform: translateX(-4%); } 50% { transform: translateX(4%); } }
+@keyframes onb-ligne { 0%, 15% { transform: scaleX(0); } 45%, 100% { transform: scaleX(1); } }
+@keyframes onb-frappe { 0% { width: 0; } 40%, 100% { width: 100%; } }
+@keyframes onb-chute {
+  0% { transform: translateY(-60px); opacity: 0; }
+  15% { opacity: 1; }
+  45% { transform: translateY(42px); }
+  55% { transform: translateY(34px); }
+  65%, 100% { transform: translateY(42px); opacity: 1; }
+}
+@keyframes onb-sceau { 0%, 60% { transform: scale(0); opacity: 0; } 72% { transform: scale(1.25); opacity: 1; } 82%, 100% { transform: scale(1); opacity: 1; } }
+@keyframes onb-loupe { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(78px, 18px); } }
+@keyframes onb-suspect {
+  0%, 40% { background: var(--border-2); }
+  50%, 85% { background: var(--err); }
+  100% { background: var(--border-2); }
+}
+
+body.inactive .onb-illu * { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .onb-illu * { animation: none !important; }
+  .illu-colis { transform: translateY(42px); }
+  .illu-sceau { transform: scale(1); opacity: 1; }
+}
+@media (max-width: 560px) {
+  .illu-principe .mini { width: 120px; }
+  .onb-rapide li { font-size: 16px; }
+}

@@ -23,3 +23,6 @@ dist/
 # (%USERPROFILE%\.tauri) et dans les secrets GitHub, jamais ici. La cle
 # publique, elle, est dans tauri.conf.json.
 *.key
+
+# Modele NSIS derive a chaque construction par tools/modele-installeur.mjs.
+src-tauri/installeur/installer.nsi

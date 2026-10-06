@@ -10,9 +10,10 @@ d'un cran (1.1, 1.2…), une version de corrections seules prend un troisième c
 | **1.0.0** | Première version publiée | Publiée le 27/09/2026 |
 | **1.1** | Mise à jour automatique de WinTool | Publiée le 06/10/2026 |
 | **1.1.1** | Simulation réglable script par script, bouées posées sur la vague, rangées multiples — et premier test réel de la mise à jour automatique | Publiée le 06/10/2026 |
-| **1.2** | Les scripts quittent WinTool : catalogue officiel dans son propre dépôt (MIT), index signé, installation et mises à jour depuis l'application (§16) | Prête — à publier **après** le catalogue |
+| **1.2** | Les scripts quittent WinTool : catalogue officiel dans son propre dépôt (MIT), index signé, installation et mises à jour depuis l'application (§16) ; durcissement (§12.4) ; visite du premier démarrage (§13) ; désinstallation au choix | Prête — le catalogue est publié |
 | **1.3** | Analyser → cocher → nettoyer (§17) | Contrat script prêt, interface à faire |
 | **1.4** | Catégories distinctes des lots, onglets Scripts / Lots en Expert | À faire |
+| **1.5** | Témoin des changements sensibles (voir ci-dessous) | À faire |
 | plus tard | Sources tierces (§16.2, §16.8) | Spécifié |
 | en continu | Améliorations graphiques et d'organisation | Glissées dans chaque version |
 
@@ -61,17 +62,25 @@ PowerShell téléchargé auprès de n'importe qui, exécuté en administrateur.
   mais tel script — « vérifier les fichiers de Windows » — a le droit de recevoir
   `C:\Windows`, sans ouvrir la porte aux autres. Même rangement que la liste (`HKLM`,
   administrateur), rattaché à l'identifiant du script.
-- **Témoin des changements sensibles.** Aucun bac à sable n'est possible pour un script
-  administrateur (§12) : WinTool ne peut pas l'*empêcher* de toucher aux tâches planifiées
-  ou aux variables d'environnement. Il peut en revanche **relever, avant et après chaque
-  script**, ce qu'un logiciel malveillant modifie pour s'installer durablement — tâches
-  planifiées, services, clés de démarrage automatique, variables d'environnement du
-  système, exclusions de l'antivirus, fichier `hosts`, certificats racine, règles du
-  pare-feu — et **le dire dans le bilan** : « ce script a créé la tâche planifiée X ».
-  Presque tout se lit dans `HKLM` ou sur le disque, sans PowerShell, donc vite. En
-  simulation, tout changement relevé trahirait un script qui ne simule pas vraiment. Les
-  points d'attention de l'écran d'approbation (§12.2) s'étendraient aux mêmes gestes
-  (`Register-ScheduledTask`, `Add-MpPreference -ExclusionPath`…).
-- **Faux positifs des antivirus.** Signer l'exécutable (certificat payant) ; soumettre
-  chaque version à l'analyse de Microsoft ; envisager `RemoteSigned` comme politique par
-  défaut, `Bypass` étant un signal que les antivirus d'entreprise surveillent.
+- **Témoin des changements sensibles — retenu pour la 1.5.** Aucun bac à sable n'est
+  possible pour un script administrateur (§12) : WinTool ne peut pas l'*empêcher* de
+  toucher aux tâches planifiées ou aux variables d'environnement. Il peut en revanche
+  **relever, avant et après chaque script**, ce qu'un logiciel malveillant modifie pour
+  s'installer durablement — tâches planifiées, services, clés de démarrage automatique,
+  variables d'environnement du système, exclusions de l'antivirus, fichier `hosts`,
+  certificats racine, règles du pare-feu — et **le dire dans le bilan** : « ce script a
+  créé la tâche planifiée X ». Presque tout se lit dans `HKLM` ou sur le disque, sans
+  PowerShell, donc vite. En simulation, tout changement relevé trahirait un script qui ne
+  simule pas vraiment. Les points d'attention de l'écran d'approbation (§12.2)
+  s'étendraient aux mêmes gestes (`Register-ScheduledTask`,
+  `Add-MpPreference -ExclusionPath`…).
+- **Signer l'exécutable.** C'est ce qui fait taire SmartScreen avec le temps et réduit les
+  faux positifs. Ni Microsoft (Azure Artifact Signing) ni les certificats « open source »
+  ne s'offrent simplement à un particulier français au moment d'écrire : à trancher
+  (statut d'indépendant, certificat OV, signature hors de GitHub Actions).
+- **Faux positifs des antivirus.** Soumettre chaque version à l'analyse de Microsoft ;
+  envisager `RemoteSigned` comme politique par défaut, `Bypass` étant un signal que les
+  antivirus d'entreprise surveillent. Le script d'export des données de navigateur
+  ressemble, par construction, à un voleur d'identifiants : le plus exposé.
+- **Signaler à Tauri** que son modèle NSIS efface les données de l'interface avec
+  `RmDir /r`, qui suit les jonctions, depuis un désinstalleur administrateur.

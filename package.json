@@ -7,7 +7,8 @@
   "scripts": {
     "tauri": "tauri",
     "dev": "tauri dev",
-    "build": "tauri build",
+    "build": "node ./tools/modele-installeur.mjs && tauri build",
+    "installeur": "node ./tools/modele-installeur.mjs",
     "lint:scripts": "powershell -NoProfile -ExecutionPolicy Bypass -File ./tools/lint-scripts.ps1 -Path ../WinTool-Catalogue/scripts -Strict",
     "icons:sync": "node ./tools/sync-icons.mjs",
     "clean": "cargo clean --manifest-path src-tauri/Cargo.toml"

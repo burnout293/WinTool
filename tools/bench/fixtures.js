@@ -407,6 +407,12 @@
       garde.ajouts = propres;
       return null;
     },
+    complete_onboarding: (a) => {
+      reglages.onboarded = true;
+      reglages.theme = a.theme;
+      reglages.lang = a.lang;
+      return JSON.parse(JSON.stringify(reglages));
+    },
     set_catalogue_source: (a) => { reglages.catalogue_source = a.source; return JSON.parse(JSON.stringify(reglages)); },
     set_catalogue_check: (a) => { reglages.catalogue_check = a.policy; return JSON.parse(JSON.stringify(reglages)); },
     hide_catalogue_reminder: () => { reglages.catalogue_reminder_hidden = true; return JSON.parse(JSON.stringify(reglages)); },

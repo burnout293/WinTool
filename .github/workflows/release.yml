@@ -35,6 +35,11 @@ jobs:
       - run: npm ci
       - run: npm run icons:sync
 
+      # Le modele NSIS derive de celui de Tauri (page de desinstallation de
+      # WinTool, effacement sur) : tauri-action ne passe pas par `npm run build`.
+      - name: Preparer le modele de l'installeur
+        run: node tools/modele-installeur.mjs
+
       # Sans elle, build.rs compile une cle vide : l'application refuserait tout
       # catalogue, et une installation neuve ne saurait rien faire. On ne publie
       # pas une telle version.

@@ -68,10 +68,13 @@ alors disponible.
 
 ### Désinstaller
 
-Depuis les **Paramètres de Windows → Applications**. Cochez **« Supprimer les données de
-l'application »** pour effacer toutes les traces de WinTool : réglages, historique,
-journaux, catalogue installé, et ce qu'il range dans la base de registre. **Vos scripts
-personnels sont conservés** : ce sont les vôtres, pas des traces de WinTool.
+Depuis les **Paramètres de Windows → Applications**. Le désinstalleur vous demande ce qui
+doit rester :
+
+- **garder vos données**, pour une réinstallation par exemple ;
+- **tout effacer, sauf vos scripts personnels** ;
+- ou **choisir** : réglages, historique, journaux, catalogue, scripts approuvés,
+  emplacements protégés, données de l'interface, scripts personnels.
 
 ---
 

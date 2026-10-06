@@ -35,7 +35,9 @@
     "windows": {
       "nsis": {
         "installMode": "perMachine",
-        "installerHooks": "installeur/crochets.nsh"
+        "installerHooks": "installeur/crochets.nsh",
+        "template": "installeur/installer.nsi",
+        "languages": ["English", "French"]
       }
     },
     "resources": {
