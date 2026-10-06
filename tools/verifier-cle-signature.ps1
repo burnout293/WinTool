@@ -135,8 +135,14 @@ if ($code -ne 0 -or -not (Test-Path -LiteralPath "$essai.sig")) {
     # Le titre se deduit de la cause, pas du seul fait que la signature a
     # echoue : la premiere version de ce script annoncait "mot de passe refuse"
     # pour une cle mal collee.
+    # Un echec de dechiffrement dit seulement que la PAIRE ne va pas ensemble :
+    # mauvais mot de passe, ou bon mot de passe face a une autre cle. Le script
+    # ne peut pas trancher : l'identifiant d'une cle privee est chiffre avec
+    # elle. Il nomme donc les deux causes : apres un changement de cle, un seul
+    # des deux secrets avait ete remplace, et le premier message accusait le
+    # mot de passe, qui etait bon.
     if ($detail -match 'password') {
-        Echec 'Mot de passe refuse' "Le mot de passe de TAURI_SIGNING_PRIVATE_KEY_PASSWORD n'ouvre pas cette cle. Detail : $detail"
+        Echec 'Cle et mot de passe ne vont pas ensemble' "Le mot de passe de TAURI_SIGNING_PRIVATE_KEY_PASSWORD n'ouvre pas la cle de TAURI_SIGNING_PRIVATE_KEY. Soit le mot de passe est faux, soit la cle n'est pas celle de ce mot de passe : apres un changement de cle, les DEUX secrets doivent etre remplaces (colonne Last updated). Detail : $detail"
     }
     if ($detail -match 'base64|decode') {
         Echec 'Cle illisible' "TAURI_SIGNING_PRIVATE_KEY ne se decode pas : le contenu de wintool.key a probablement ete coupe ou altere. Detail : $detail"
