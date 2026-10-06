@@ -107,7 +107,7 @@ jobs:
             Add-Content -Path empreintes.txt -Value "$($f.Name)  SHA256  $h"
           }
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: empreintes
           path: empreintes.txt
