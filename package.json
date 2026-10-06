@@ -1,7 +1,7 @@
 {
   "name": "wintool",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Outil de maintenance Windows - interface Tauri, scripts PowerShell",
   "type": "module",
   "scripts": {
