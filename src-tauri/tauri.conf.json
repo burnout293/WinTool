@@ -52,7 +52,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIwQUM5OTlFOUZGMDhGRkUKUldUK2ovQ2ZucG1zc00yT05aejNLZG9RZy9aTFcxc29LbkdLSjVsUEQ1WStjamNRdkdYR2dwMHcK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYxMTIyNzNGNDQ3RjY5RDAKUldUUWFYOUVQeWNTWVFxWEFOcjhYMVJjZmJsQmZ2K1N2TGdHUk05ZUdvbkk3VTdiczJmNlZQdlAK",
       "endpoints": [
         "https://github.com/burnout293/WinTool/releases/latest/download/latest.json"
       ],
