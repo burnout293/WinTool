@@ -58,6 +58,10 @@ PowerShell téléchargé auprès de n'importe qui, exécuté en administrateur.
 
 ## Idées pour plus tard
 
+- **Refaire le réglage 3.5 (emplacements protégés).** 602 px de haut, quatre étiquettes
+  orange, une zone de texte et un bouton « Enregistrer » quand tout le reste s'applique
+  seul. Quatre propositions dans `docs/mockups/emplacements-proteges.html` ; choix à
+  faire.
 - **Exceptions par script aux emplacements protégés.** La liste reste la même pour tous,
   mais tel script — « vérifier les fichiers de Windows » — a le droit de recevoir
   `C:\Windows`, sans ouvrir la porte aux autres. Même rangement que la liste (`HKLM`,
