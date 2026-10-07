@@ -14,7 +14,7 @@ d'un cran (1.1, 1.2…), une version de corrections seules prend un troisième c
 | **1.2.1** | Réglages en page entière, une section par page, recherche, Simple / Expert sans les quitter (§8) ; emplacements protégés : résumé et plan du disque ; écran « Choisir » : le champ de bouées défile au lieu de se défaire, « Continuer » collé en bas (§15.2) | Prête |
 | **1.4** | Publiée d'un seul tenant, avec ce que prévoyait la 1.3 : | |
 | | — catalogues multiples : ajouter, modifier, retirer, activer ; consulter et choisir ses actions (§16) ; présentation modifiable sans code (`src/presentation.json`, §13) ; « action » au lieu d'« entretien » (§3) | Fait |
-| | — analyser → cocher → nettoyer (§17) | Contrat script prêt, interface à faire |
+| | — analyser → cocher → nettoyer (§17), avec une norme qui laisse les scripts composer l'écran : listes d'éléments, arborescences, confiance, mesures, notes (`docs/mockups/analyse.html`) | Maquette faite, choix de disposition à faire |
 | | — catégories distinctes des lots, onglets Scripts / Lots en Expert | À faire |
 | **1.5** | Témoin des changements sensibles (voir ci-dessous) | À faire |
 | en continu | Améliorations graphiques et d'organisation | Glissées dans chaque version |

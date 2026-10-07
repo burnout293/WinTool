@@ -1,0 +1,1273 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Écran d'analyse — propositions</title>
+<!--
+  Maquette de l'ecran d'analyse (specification §17) et de la norme qui permet
+  aux scripts de le composer. Les ecrans ne sont PAS dessines a la main : chaque
+  exemple est decrit par les lignes que son script ecrirait ([FIND], [ITEM],
+  [METRIC], [NOTE], [STEP]…), et un petit lecteur, ici, en fait l'interface. On
+  peut modifier ces lignes dans l'onglet Exemples et voir l'ecran suivre.
+  Jetons de couleur repris de src/styles.css.
+-->
+<style>
+:root {
+  --bg: #F3F6F9; --surface: #FFFFFF; --surface-2: #EDF2F6; --surface-3: #E0E8EF;
+  --border: #DDE5EC; --border-2: #C3D0DA;
+  --text: #0F1A24; --text-2: #4E6172; --text-3: #54697A; --ink: #06121A;
+  --ok: #14915C; --warn: #9A650F; --err: #B8382F;
+  --ok-s: #E6F5EC; --warn-s: #FBF3E2; --err-s: #FBEBEA;
+  --acc: #22D39A; --acc-2: #35C8E8; --acc-on: #0B7D59;
+  --surface-soft: #F7FAFC; --acc-soft: #EAFAF4;
+  --sh: 0 1px 2px rgba(15, 26, 36, .05), 0 6px 18px rgba(15, 26, 36, .05);
+  --sh-2: 0 10px 34px rgba(15, 26, 36, .10);
+  --ui: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'Cascadia Mono', Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0A0C10; --surface: #13171E; --surface-2: #1B212A; --surface-3: #242C38;
+    --border: #232B36; --border-2: #333D4B;
+    --text: #F2F6FA; --text-2: #9BA9B9; --text-3: #8397A6;
+    --ok: #22D39A; --warn: #FFB340; --err: #FF6B6B;
+    --ok-s: #0E2A22; --warn-s: #2C2113; --err-s: #2E1717;
+    --acc-on: #4BE8B8; --surface-soft: #171C24; --acc-soft: #12241F;
+    --sh: 0 2px 10px rgba(0, 0, 0, .35); --sh-2: 0 16px 46px rgba(0, 0, 0, .55);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0A0C10; --surface: #13171E; --surface-2: #1B212A; --surface-3: #242C38;
+  --border: #232B36; --border-2: #333D4B;
+  --text: #F2F6FA; --text-2: #9BA9B9; --text-3: #8397A6;
+  --ok: #22D39A; --warn: #FFB340; --err: #FF6B6B;
+  --ok-s: #0E2A22; --warn-s: #2C2113; --err-s: #2E1717;
+  --acc-on: #4BE8B8; --surface-soft: #171C24; --acc-soft: #12241F;
+  --sh: 0 2px 10px rgba(0, 0, 0, .35); --sh-2: 0 16px 46px rgba(0, 0, 0, .55);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--ui); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.ico { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor;
+       stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.i14 { width: 14px; height: 14px; } .i20 { width: 20px; height: 20px; }
+.muted { color: var(--text-3); }
+.mono { font-family: var(--mono); }
+input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; margin: 0; flex-shrink: 0; accent-color: var(--acc); cursor: pointer; }
+input:disabled { cursor: not-allowed; }
+
+/* --- La page de la maquette ------------------------------------------- */
+.page { max-width: 1240px; margin: 0 auto; padding: 28px 16px 64px; }
+.page-h h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: -.4px; }
+.page-h p { margin: 0 0 6px; color: var(--text-2); max-width: 820px; }
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); flex-wrap: wrap; }
+.seg button { border: none; background: none; padding: 6px 13px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: var(--text-2); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--sh); }
+.barre-outils { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; margin: 16px 0; }
+.barre-outils label { font-size: 12px; font-weight: 700; color: var(--text-3); margin-right: 8px; }
+.onglets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.onglets button { height: 40px; padding: 0 18px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); font-size: 13.5px; font-weight: 700; color: var(--text-2); }
+.onglets button[aria-pressed="true"] { color: var(--ink); border-color: transparent; background: linear-gradient(135deg, var(--acc), var(--acc-2)); }
+.explication { margin: 16px 0; padding: 16px 20px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); color: var(--text-2); }
+.explication h2 { margin: 0 0 6px; font-size: 17px; color: var(--text); }
+.explication p { margin: 0 0 6px; }
+.explication b { color: var(--text); }
+.pour, .contre { margin: 4px 0 0; padding: 0; list-style: none; }
+.pour li::before { content: "+ "; font-weight: 800; color: var(--ok); }
+.contre li::before { content: "− "; font-weight: 800; color: var(--warn); }
+.choix { margin-top: 22px; padding: 16px 20px; border-radius: 16px; background: var(--acc-soft); border: 1px solid color-mix(in srgb, var(--acc) 45%, transparent); color: var(--text-2); }
+.choix h2 { margin: 0 0 6px; font-size: 15px; color: var(--text); }
+.choix p { margin: 0 0 6px; }
+.choix b { color: var(--text); }
+
+/* --- Fenetre simulee ------------------------------------------------- */
+.ecran { position: relative; width: 100%; }
+.fen { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; overflow: hidden; width: 1180px; height: 760px;
+  background: var(--bg); border: 1px solid var(--border-2); border-radius: 10px; box-shadow: var(--sh-2); transform-origin: 0 0; }
+.tb { height: 54px; flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding-left: 18px; }
+.brand-mark { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; color: var(--ink); background: linear-gradient(135deg, var(--acc), var(--acc-2)); }
+.brand-name { font-size: 15.5px; font-weight: 800; letter-spacing: -.4px; }
+.crumb { display: flex; align-items: center; gap: 9px; margin-left: 10px; font-size: 12.5px; font-weight: 700; color: var(--text-3); }
+.crumb .on { color: var(--text); }
+.crumb i { width: 9px; height: 9px; border-radius: 50%; background: var(--border-2); display: inline-block; }
+.crumb i.fait { background: var(--ok); } .crumb i.actif { background: var(--acc); }
+.tb-droite { margin-left: auto; display: flex; align-items: center; gap: 9px; height: 100%; }
+.winctl { display: flex; height: 100%; }
+.winctl span { width: 44px; display: grid; place-items: center; color: var(--text-3); }
+.winctl .ico { width: 11px; height: 11px; }
+.scene { flex: 1; position: relative; min-height: 0; }
+.defile { position: absolute; inset: 0; overflow-y: auto; display: flex; flex-direction: column; scrollbar-gutter: stable; }
+.defile > * { flex-shrink: 0; }
+.contenu { width: 100%; max-width: 1040px; margin: 0 auto; padding: 22px 28px 0; }
+.s-head { text-align: center; margin-bottom: 18px; }
+.s-head h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -.8px; }
+.s-head p { margin: 8px auto 0; color: var(--text-2); max-width: 560px; }
+.barre-bas { position: sticky; bottom: 0; z-index: 5; margin-top: auto; display: flex; align-items: center; gap: 16px; padding: 14px 28px 16px;
+  background: color-mix(in srgb, var(--bg) 92%, transparent); border-top: 1px solid var(--border); }
+.barre-bas .resume { flex: 1; font-size: 13.5px; color: var(--text-2); }
+.barre-bas .resume b { color: var(--text); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; font-size: 12.5px; font-weight: 700; padding: 0 14px;
+  border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); background: var(--surface); white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn.compact { height: 30px; padding: 0 12px; }
+.btn.primary { border: none; color: var(--ink); background: linear-gradient(135deg, var(--acc), var(--acc-2)); }
+.btn.big { height: 52px; padding: 0 28px; font-size: 15px; box-shadow: 0 10px 28px color-mix(in srgb, var(--acc) 30%, transparent); }
+.btn.danger { color: var(--err); border-color: color-mix(in srgb, var(--err) 40%, transparent); background: var(--err-s); }
+
+/* --- Etiquettes -------------------------------------------------------- */
+.badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--text-2); background: var(--surface-2); white-space: nowrap; }
+.badge .ico { width: 11px; height: 11px; }
+.badge.low { color: var(--ok); background: var(--ok-s); border-color: color-mix(in srgb, var(--ok) 34%, transparent); }
+.badge.med { color: var(--warn); background: var(--warn-s); border-color: color-mix(in srgb, var(--warn) 34%, transparent); }
+.badge.high { color: var(--err); background: var(--err-s); border-color: color-mix(in srgb, var(--err) 34%, transparent); }
+.badge.acc { color: var(--acc-on); background: color-mix(in srgb, var(--acc) 12%, transparent); border-color: color-mix(in srgb, var(--acc) 38%, transparent); }
+
+/* --- Carte d'une action analysee (la brique de base) ------------------- */
+.sc { border-radius: 18px; background: var(--surface); border: 1px solid var(--border); overflow: hidden; }
+.sc + .sc { margin-top: 12px; }
+.sc-h { display: flex; align-items: center; gap: 14px; padding: 14px 16px; }
+.sc-h.cliquable { cursor: pointer; }
+.sc-i { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; flex-shrink: 0; color: var(--ink); background: linear-gradient(135deg, var(--acc), var(--acc-2)); }
+.sc-t { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.sc-t b { font-size: 15px; }
+.sc-t span { font-size: 12.5px; color: var(--text-3); }
+.sc-total { text-align: right; font-size: 12.5px; color: var(--text-3); }
+.sc-total b { display: block; font-size: 17px; color: var(--text); font-variant-numeric: tabular-nums; }
+.sc-b { padding: 2px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+.chev { transition: transform .2s; color: var(--text-3); }
+.sc.plie .chev { transform: rotate(-90deg); }
+.sc.plie .sc-b { display: none; }
+
+.bloc { border: 1px solid var(--border); border-radius: 14px; background: var(--surface-soft); }
+.bloc-h { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 10px 12px 8px; font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+.bh-t { flex: 1 1 180px; min-width: 0; }
+.bloc-h .lien, .bloc-h .total, .filtres { white-space: nowrap; }
+.bloc-h .total { font-weight: 600; color: var(--text-3); }
+.bloc-h .lien { border: none; background: none; padding: 0; color: var(--acc-on); font-weight: 700; font-size: 12px; }
+.ligne { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-top: 1px solid var(--border); cursor: pointer; }
+.ligne:first-of-type { border-top: none; }
+.ligne.inactive { cursor: default; opacity: .62; }
+.ligne.decoche .l-t b { color: var(--text-2); }
+.l-ico { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex-shrink: 0; background: var(--surface-2); color: var(--text-2); }
+.l-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.l-t b { font-size: 13.5px; font-weight: 650; overflow-wrap: anywhere; }
+.l-t .chemin { font-family: var(--mono); font-size: 11px; color: var(--text-3); overflow-wrap: anywhere; }
+.l-badges { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.l-badges .pub { font-size: 11.5px; color: var(--text-3); }
+.l-v { text-align: right; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 72px; }
+.l-v small { display: block; font-weight: 500; font-size: 11px; color: var(--text-3); }
+/* La barre de proportion : 10 Mo face a 1 Go se voit avant de se lire. */
+.jauge { height: 5px; border-radius: 3px; background: var(--surface-3); margin-top: 5px; overflow: hidden; }
+.jauge i { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--acc), var(--acc-2)); }
+.ligne.decoche .jauge i { background: var(--border-2); }
+.enfants { margin-left: 30px; border-left: 2px solid var(--border); }
+.enfants .ligne { border-top: 1px dashed var(--border); }
+.plier { border: none; background: none; padding: 0; color: var(--text-3); display: grid; place-items: center; }
+.filtres { display: flex; gap: 6px; }
+.filtres button { border: 1px solid var(--border); background: var(--surface); border-radius: 999px; padding: 2px 10px; font-size: 11.5px; font-weight: 700; color: var(--text-2); }
+.filtres button[aria-pressed="true"] { border-color: var(--acc); color: var(--acc-on); background: var(--acc-soft); }
+.garder { border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-size: 11.5px; font-weight: 700; background: var(--surface); color: var(--text-2); }
+.garder.oui { color: var(--ink); border-color: transparent; background: linear-gradient(135deg, var(--acc), var(--acc-2)); }
+.groupe-doublons + .groupe-doublons { border-top: 1px solid var(--border); }
+.groupe-doublons .gd-h { padding: 8px 12px 0; font-size: 12px; font-weight: 700; color: var(--text-2); }
+.note { display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; border-radius: 12px; font-size: 12.5px; }
+.note.info { background: var(--surface-2); color: var(--text-2); }
+.note.warn { background: var(--warn-s); color: var(--warn); }
+.note .ico { margin-top: 2px; }
+.bloc .note { margin: 4px 12px 10px; }
+.metriques { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; padding: 0 12px 12px; }
+.metrique { padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.metrique span { display: block; font-size: 11.5px; color: var(--text-3); }
+.metrique b { font-size: 19px; font-variant-numeric: tabular-nums; }
+.metrique .pastille { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: 2px; }
+.pastille.ok { background: var(--ok); } .pastille.warn { background: var(--warn); } .pastille.crit { background: var(--err); }
+.metrique .jauge i.ok { background: var(--ok); } .metrique .jauge i.warn { background: var(--warn); } .metrique .jauge i.crit { background: var(--err); }
+.params { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); font-size: 12.5px; }
+.params label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-2); }
+.params input, .params select { height: 30px; border-radius: 8px; border: 1px solid var(--border-2); background: var(--surface); padding: 0 8px; }
+.params input { width: 80px; }
+.params .btn { margin-left: auto; }
+.anomalie { font-size: 12px; color: var(--err); padding: 0 4px; }
+.vide { padding: 14px; text-align: center; color: var(--text-3); font-size: 13px; }
+
+/* Progression pendant l'analyse */
+.prog { display: flex; flex-direction: column; gap: 6px; padding: 0 16px 16px; }
+.prog-barre { height: 8px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
+.prog-barre i { display: block; height: 100%; background: linear-gradient(90deg, var(--acc), var(--acc-2)); transition: width .25s; }
+.prog-t { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-3); }
+.prog-t b { color: var(--text-2); }
+.attente { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border-2); border-top-color: var(--acc); animation: tourne .8s linear infinite; }
+@keyframes tourne { to { transform: rotate(360deg); } }
+
+/* --- Dispositions ----------------------------------------------------- */
+.tuiles-resume { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.tuile-r { padding: 12px 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); }
+.tuile-r span { display: block; font-size: 12px; color: var(--text-3); }
+.tuile-r b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.tuile-r.acc { background: var(--acc-soft); border-color: color-mix(in srgb, var(--acc) 40%, transparent); }
+.md { display: grid; grid-template-columns: 300px 1fr; gap: 14px; align-items: start; }
+.md-nav { display: flex; flex-direction: column; gap: 6px; position: sticky; top: 0; }
+.md-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); text-align: left; }
+.md-item[aria-current="true"] { border-color: var(--acc); background: var(--acc-soft); }
+.md-item .sc-i { width: 32px; height: 32px; border-radius: 10px; }
+.md-item .t { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 12.5px; }
+.md-item .t b { font-size: 13px; }
+.md-item .t span { color: var(--text-3); }
+.espace { padding: 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border); margin-bottom: 14px; }
+.espace-h { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.espace-h b { font-size: 22px; }
+.espace-h span { color: var(--text-3); font-size: 13px; }
+.pile { display: flex; height: 34px; border-radius: 10px; overflow: hidden; background: var(--surface-3); }
+.pile i { display: block; height: 100%; transition: opacity .2s, flex-grow .2s; border-right: 2px solid var(--surface); }
+.pile i.off { opacity: .22; }
+.legende { margin-top: 12px; display: flex; flex-direction: column; }
+.legende .ligne { padding: 7px 4px; }
+.legende .pt { width: 12px; height: 12px; border-radius: 4px; flex-shrink: 0; }
+.legende .src { font-size: 11.5px; color: var(--text-3); }
+.sous-titre { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); margin: 18px 0 8px; }
+
+/* --- Exemples ---------------------------------------------------------- */
+.ex { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 18px; margin-top: 18px; padding: 18px; border-radius: 20px;
+  background: var(--surface-soft); border: 1px solid var(--border); }
+@media (max-width: 980px) { .ex { grid-template-columns: minmax(0, 1fr); } }
+.ex-h { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.ex-h h3 { margin: 0; font-size: 17px; }
+.ex-h p { margin: 0; flex-basis: 100%; color: var(--text-2); font-size: 13px; }
+.briques { display: flex; flex-wrap: wrap; gap: 5px; }
+.code { display: flex; flex-direction: column; gap: 6px; }
+.code span { font-size: 11.5px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .04em; }
+.code pre, .code textarea { margin: 0; padding: 10px 12px; border-radius: 12px; background: #0A2A33; color: #C7D9DE; font: 11.5px/1.55 var(--mono);
+  white-space: pre; overflow: auto; border: 1px solid var(--border-2); }
+.code textarea { min-height: 230px; resize: vertical; width: 100%; }
+.code pre { max-height: 220px; }
+
+/* --- Reference ---------------------------------------------------------- */
+.ref { margin-top: 16px; padding: 18px 22px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); }
+.ref h2 { margin: 0 0 8px; font-size: 16px; }
+.ref p { color: var(--text-2); margin: 0 0 8px; }
+.ref table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ref th, .ref td { text-align: left; padding: 7px 8px; border-top: 1px solid var(--border); vertical-align: top; }
+.ref th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); border-top: none; }
+.ref code { font-family: var(--mono); font-size: 12px; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
+@media (prefers-reduced-motion: reduce) { .attente { animation: none; } .prog-barre i, .pile i, .chev { transition: none; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="page-h">
+    <h1>L'écran d'analyse, et la norme qui le compose</h1>
+    <p>WinTool examine le PC, montre ce qu'il a trouvé, on coche, et seulement ensuite il agit.
+      Ce que l'écran affiche, <b>ce sont les scripts qui le décrivent</b>, ligne par ligne :
+      une barre de progression, des éléments trouvés, des cases, des mesures, des notes.
+      Rien de ce qui suit n'est dessiné à la main : chaque écran est fabriqué à partir des lignes
+      que le script écrirait.</p>
+  </header>
+  <div class="barre-outils">
+    <span><label>Thème</label><span class="seg"><button type="button" data-theme-btn="light">Clair</button><button type="button" data-theme-btn="dark">Sombre</button></span></span>
+  </div>
+  <nav class="onglets">
+    <button type="button" data-onglet="dispositions">1 · Dispositions de l'écran</button>
+    <button type="button" data-onglet="exemples">2 · 14 exemples</button>
+    <button type="button" data-onglet="norme">3 · La norme</button>
+  </nav>
+
+  <section id="vue-dispositions">
+    <div class="barre-outils">
+      <span><label>Disposition</label><span class="seg" id="segDispo"></span></span>
+      <span><label>Moment</label><span class="seg" id="segMoment"></span></span>
+      <button class="btn compact" type="button" data-rejouer>Rejouer l'analyse</button>
+    </div>
+    <div class="explication" id="explicationDispo"></div>
+    <div class="ecran" id="ecran"><div class="fen" id="fen"></div></div>
+    <section class="choix">
+      <h2>Mon conseil : C, la barre d'espace, pour le mode Simple ; B pour l'Expert</h2>
+      <p>En mode Simple, la question est « qu'est-ce qui prend de la place, et qu'est-ce que je
+        libère ? ». <b>La barre répond d'un coup d'œil</b> : 10 Mo de fichiers temporaires à côté
+        d'1,1 Go de cache de Windows Update, ça se voit avant de se lire. Le détail reste dessous
+        pour qui veut décocher un reste de programme mal reconnu.</p>
+      <p>En mode Expert, une action à la fois, avec tout le détail : <b>B</b>.</p>
+    </section>
+  </section>
+
+  <section id="vue-exemples" hidden>
+    <div class="explication">
+      <h2>Quatorze actions, toutes les briques</h2>
+      <p>Chaque exemple montre à gauche l'écran, à droite <b>ce que le script déclare</b> (dans son
+        entête) et <b>ce qu'il écrit</b> pendant l'analyse. <b>Modifiez ces lignes</b> : l'écran
+        suit. Essayez de passer une taille à 0, d'ajouter <code class="mono">checked=false</code>,
+        ou une ligne <code class="mono">[ITEM]</code> de plus.</p>
+    </div>
+    <div class="barre-outils"><button class="btn compact" type="button" data-rejouer-ex>Rejouer l'analyse de tous les exemples</button></div>
+    <div id="listeExemples"></div>
+  </section>
+
+  <section id="vue-norme" hidden>
+    <div id="reference"></div>
+  </section>
+</div>
+
+<script>
+// --- Icones Lucide (ISC) ---------------------------------------------------------
+const IC = {
+  waves: '<path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>',
+  trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  'package-x': '<path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="m7.5 4.27 9 5.15"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/><path d="m17 13 5 5m-5 0 5-5"/>',
+  package: '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  'file-search': '<path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M4.268 21a2 2 0 0 0 1.727 1H18a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="m9 18-1.5-1.5"/><circle cx="5" cy="14" r="3"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  power: '<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  gauge: '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
+  'hard-drive': '<line x1="22" x2="2" y1="12" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/>',
+  'package-minus': '<path d="M16 16h6"/><path d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"/><path d="m7.5 4.27 9 5.15"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/>',
+  cpu: '<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>',
+  'calendar-clock': '<path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><path d="M17.5 17.5 16 16.3V14"/><circle cx="16" cy="16" r="6"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  battery: '<rect width="16" height="10" x="2" y="7" rx="2" ry="2"/><line x1="22" x2="22" y1="11" y2="13"/><line x1="6" x2="6" y1="11" y2="13"/><line x1="10" x2="10" y1="11" y2="13"/>',
+  folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
+  database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+  cog: '<path d="M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"/><path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="M12 2v2"/><path d="M12 22v-2"/><path d="m17 20.66-1-1.73"/><path d="M11 10.27 7 3.34"/><path d="m20.66 17-1.73-1"/><path d="m3.34 7 1.73 1"/><path d="M14 12h8"/><path d="M2 12h2"/><path d="m20.66 7-1.73 1"/><path d="m3.34 17 1.73-1"/><path d="m17 3.34-1 1.73"/><path d="m11 13.73-4 6.93"/>',
+  lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  alerte: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  'chevron-down': '<path d="m6 9 6 6 6-6"/>',
+  'arrow-right': '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  'arrow-left': '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+  sliders: '<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>',
+  minus: '<path d="M5 12h14"/>', square: '<rect width="18" height="18" x="3" y="3" rx="2"/>', x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+};
+const ico = (n, c = '') => `<svg class="ico ${c}" viewBox="0 0 24 24" aria-hidden="true">${IC[n] || IC.file}</svg>`;
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// --- Ce que l'interface traduit : les jetons de la norme -------------------------
+// Le script n'ecrit jamais de phrase (sa sortie est en anglais, l'interface est
+// bilingue) : il ecrit des nombres, des noms (de programmes, de fichiers) et des
+// jetons. C'est ici que les jetons deviennent des mots.
+const JETONS = {
+  confidence: { high: ['Sûr', 'low'], medium: ['Probable', ''], low: ['À vérifier', 'med'] },
+  impact: { high: ['Impact élevé', 'high'], medium: ['Impact moyen', 'med'], low: ['Impact faible', ''] },
+  risk: { high: ['Suspect', 'high'], medium: ['Inhabituel', 'med'] },
+  locked: { open: 'Programme ouvert — fermez-le d’abord', system: 'Nécessaire à Windows', protected: 'Emplacement protégé', inuse: 'En cours d’utilisation' },
+  health: { ok: ['Bon', 'ok'], warn: ['À surveiller', 'warn'], crit: ['Critique', 'crit'] },
+  kind: { folder: 'folder', file: 'file', registry: 'database', app: 'package', startup: 'power', service: 'cog', task: 'calendar-clock', driver: 'cpu', browser: 'globe' },
+};
+const UNITES = { celsius: (v) => `${v} °C`, pct: (v) => `${v} %`, hours: (v) => `${Number(v).toLocaleString('fr-FR')} h`, days: (v) => `${v} jours`, s: (v) => `${v} s`, count: (v) => Number(v).toLocaleString('fr-FR'), cycles: (v) => `${v} cycles` };
+
+function taille(octets) {
+  const n = Number(octets) || 0;
+  if (n < 1024) return `${n} octets`;
+  const u = ['ko', 'Mo', 'Go', 'To'];
+  let v = n / 1024, i = 0;
+  while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+  return `${v.toLocaleString('fr-FR', { maximumFractionDigits: v < 10 && i >= 2 ? 1 : 0 })} ${u[i]}`;
+}
+const dateLongue = (iso) => { const d = new Date(`${iso}T00:00:00`); return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }); };
+const pluriel = (n, un, plus) => `${n.toLocaleString('fr-FR')} ${n > 1 ? plus : un}`;
+
+// --- Les quatorze exemples ------------------------------------------------------------
+// `options`, `libelles`, `notes` : ce que le script declare dans son entete (et
+// traduit dans son bloc LANG). `sortie` : ce qu'il ecrit pendant l'analyse.
+const EXEMPLES = [
+  {
+    id: 'temp', titre: 'Nettoyer les fichiers temporaires', icone: 'trash',
+    texte: 'Plusieurs choix, chacun mesuré : la barre de proportion fait voir que le cache de Windows Update pèse cent fois plus que vos fichiers temporaires. Le script le laisse décoché (checked=false) et y attache une note.',
+    options: {
+      Targets: { type: 'multi', label: 'Ce qu’il faut nettoyer', choix: { user: 'Vos fichiers temporaires', windows: 'Fichiers temporaires de Windows', update: 'Cache de Windows Update', thumbs: 'Miniatures des images', logs: 'Journaux d’erreurs', dumps: 'Rapports de plantage' } },
+      RecycleBin: { type: 'bool', label: 'Vider la corbeille' },
+    },
+    notes: { WuNote: ['warn', 'Les mises à jour déjà installées ne pourront plus être désinstallées.'] },
+    sortie: `[STEP] 1/3 Measuring temporary folders
+[FIND] Targets.user size=10485760 count=214
+[FIND] Targets.windows size=125829120 count=1840
+[STEP] 2/3 Measuring Windows Update cache
+[FIND] Targets.update size=1181116006 count=96 checked=false
+[NOTE] WuNote Targets.update
+[FIND] Targets.thumbs size=89128960 count=5012
+[FIND] Targets.logs size=41943040 count=388
+[FIND] Targets.dumps size=0 count=0
+[STEP] 3/3 Measuring the recycle bin
+[FIND] RecycleBin size=278921216 count=57`,
+  },
+  {
+    id: 'restes', titre: 'Retirer les restes de programmes désinstallés', icone: 'package-x',
+    texte: 'Des éléments trouvés à la volée, rangés par programme (parent=). Chacun dit sa confiance : « À vérifier » n’est pas coché d’office. Un reste mal reconnu se décoche avant de lancer — tout un programme d’un clic, ou un dossier seul.',
+    options: { Leftovers: { type: 'items', label: 'Restes de programmes désinstallés' } },
+    notes: { LowConfidence: ['info', 'Les éléments « À vérifier » servent peut-être encore à un autre programme : ils ne sont pas cochés.'] },
+    sortie: `[STEP] 1/2 Listing uninstalled programs
+[STEP] 2/2 Looking for leftovers
+[ITEM] Leftovers id=adobe name="Adobe Acrobat Reader DC" kind=app
+[ITEM] Leftovers id=adobe-1 parent=adobe kind=folder name="ARM" path="C:\\ProgramData\\Adobe\\ARM" size=48234496 confidence=high
+[ITEM] Leftovers id=adobe-2 parent=adobe kind=registry name="Acrobat Reader" path="HKLM\\SOFTWARE\\Adobe\\Acrobat Reader" confidence=high
+[ITEM] Leftovers id=steam name="Steam" kind=app
+[ITEM] Leftovers id=steam-1 parent=steam kind=folder name="steamapps" path="C:\\Program Files (x86)\\Steam\\steamapps" size=734003200 confidence=low
+[ITEM] Leftovers id=steam-2 parent=steam kind=folder name="Steam" path="C:\\Users\\Buly\\AppData\\Local\\Steam" size=12582912 confidence=high
+[ITEM] Leftovers id=vlc name="VLC media player" kind=app
+[ITEM] Leftovers id=vlc-1 parent=vlc kind=folder name="vlc" path="C:\\Users\\Buly\\AppData\\Roaming\\vlc" size=1048576 confidence=medium
+[ITEM] Leftovers id=vc name="Microsoft Visual C++ 2015" kind=app
+[ITEM] Leftovers id=vc-1 parent=vc kind=folder name="Package Cache" path="C:\\ProgramData\\Package Cache\\{e46eca4f}" size=24117248 confidence=low
+[NOTE] LowConfidence Leftovers`,
+  },
+  {
+    id: 'doublons', titre: 'Trouver les fichiers en double', icone: 'copy',
+    texte: 'Une liste « en garder un » : les exemplaires d’un même fichier sont regroupés (group=), un seul est gardé, les autres partent. Le script peut proposer lequel garder (keep=true) ; un clic en garde un autre.',
+    options: { Duplicates: { type: 'items', mode: 'garder-un', label: 'Fichiers en double' } },
+    sortie: `[STEP] 1/2 Indexing your files
+[PROGRESS] 60
+[STEP] 2/2 Comparing contents
+[ITEM] Duplicates id=d1 group=g1 name="vacances-2024-001.jpg" path="C:\\Users\\Buly\\Pictures\\Vacances" size=4404019 date=2024-08-12 keep=true
+[ITEM] Duplicates id=d2 group=g1 name="vacances-2024-001.jpg" path="C:\\Users\\Buly\\Downloads" size=4404019 date=2024-08-20
+[ITEM] Duplicates id=d3 group=g1 name="vacances-2024-001 (1).jpg" path="C:\\Users\\Buly\\Desktop" size=4404019 date=2025-01-03
+[ITEM] Duplicates id=d4 group=g2 name="Facture-EDF-2025.pdf" path="C:\\Users\\Buly\\Documents" size=245760 date=2025-03-02 keep=true
+[ITEM] Duplicates id=d5 group=g2 name="Facture-EDF-2025.pdf" path="C:\\Users\\Buly\\Downloads" size=245760 date=2025-03-02
+[ITEM] Duplicates id=d6 group=g3 name="setup_jeu.iso" path="D:\\Archives" size=4294967296 date=2023-11-05 keep=true
+[ITEM] Duplicates id=d7 group=g3 name="setup_jeu.iso" path="C:\\Users\\Buly\\Downloads" size=4294967296 date=2024-02-10`,
+  },
+  {
+    id: 'gros', titre: 'Retrouver les gros fichiers oubliés', icone: 'file-search',
+    texte: 'Des réglages qui changent l’analyse elle-même (scan=true) : ils s’affichent au-dessus des résultats, avec « Relancer l’analyse ». Rien n’est coché d’office, et un fichier de Windows apparaît verrouillé, avec la raison.',
+    options: {
+      MinSize: { type: 'number', scan: true, label: 'Plus gros que', unite: 'Mo', valeur: 500 },
+      Unused: { type: 'select', scan: true, label: 'Pas ouverts depuis', choix: { m3: '3 mois', m6: '6 mois', y1: '1 an' }, valeur: 'm6' },
+      BigFiles: { type: 'items', label: 'Gros fichiers' },
+    },
+    notes: { UserChoice: ['info', 'Rien n’est coché d’office : ce sont peut-être des fichiers auxquels vous tenez.'] },
+    sortie: `[STEP] 1/1 Looking for large files
+[ITEM] BigFiles id=b1 kind=file name="Windows10_old.iso" path="C:\\Users\\Buly\\Downloads" size=5368709120 date=2023-02-14 checked=false
+[ITEM] BigFiles id=b2 kind=file name="Montage-video-final-v3.mp4" path="C:\\Users\\Buly\\Videos" size=2147483648 date=2024-09-01 checked=false
+[ITEM] BigFiles id=b3 kind=file name="backup_telephone.zip" path="D:\\" size=1073741824 date=2022-12-24 checked=false
+[ITEM] BigFiles id=b4 kind=file name="ancien_projet.7z" path="C:\\Users\\Buly\\Documents" size=681574400 date=2023-06-30 checked=false
+[ITEM] BigFiles id=b5 kind=file name="hiberfil.sys" path="C:\\" size=6442450944 locked=system
+[NOTE] UserChoice BigFiles`,
+  },
+  {
+    id: 'navigateurs', titre: 'Nettoyer les navigateurs', icone: 'globe',
+    texte: 'Une arborescence navigateur → type de donnée. Les types (cache, cookies…) ne sont pas des noms propres : le script les nomme par un jeton (label=) que l’entête traduit. Edge est ouvert : verrouillé, avec la raison.',
+    options: { Browsers: { type: 'items', label: 'Données des navigateurs' } },
+    libelles: { Cache: 'Fichiers en cache', Cookies: 'Cookies', History: 'Historique de navigation' },
+    notes: { Cookies: ['warn', 'Effacer les cookies vous déconnecte de vos sites : ils ne sont pas cochés.'] },
+    sortie: `[ITEM] Browsers id=chrome name="Google Chrome" kind=browser
+[ITEM] Browsers id=chrome-c parent=chrome label=Cache size=335544320
+[ITEM] Browsers id=chrome-k parent=chrome label=Cookies count=1240 checked=false
+[ITEM] Browsers id=chrome-h parent=chrome label=History count=8620 checked=false
+[ITEM] Browsers id=firefox name="Mozilla Firefox" kind=browser
+[ITEM] Browsers id=firefox-c parent=firefox label=Cache size=183500800
+[ITEM] Browsers id=firefox-k parent=firefox label=Cookies count=512 checked=false
+[ITEM] Browsers id=edge name="Microsoft Edge" kind=browser locked=open
+[ITEM] Browsers id=edge-c parent=edge label=Cache size=94371840 locked=open
+[NOTE] Cookies Browsers`,
+  },
+  {
+    id: 'demarrage', titre: 'Accélérer le démarrage', icone: 'power',
+    texte: 'Des éléments sans taille, mais avec un impact, un éditeur, et une mesure globale ([METRIC]) : la durée du dernier démarrage. Sécurité Windows est verrouillé.',
+    options: { Startup: { type: 'items', label: 'Programmes lancés au démarrage' } },
+    libelles: { BootTime: 'Durée du dernier démarrage' },
+    sortie: `[METRIC] BootTime value=48 unit=s health=warn
+[ITEM] Startup id=s1 kind=startup name="Spotify" publisher="Spotify AB" impact=high
+[ITEM] Startup id=s2 kind=startup name="Microsoft Teams" publisher="Microsoft Corporation" impact=high
+[ITEM] Startup id=s3 kind=startup name="Adobe Updater" publisher="Adobe Inc." impact=medium
+[ITEM] Startup id=s4 kind=startup name="OneDrive" publisher="Microsoft Corporation" impact=medium checked=false
+[ITEM] Startup id=s5 kind=startup name="Realtek Audio" publisher="Realtek" impact=low checked=false
+[ITEM] Startup id=s6 kind=startup name="Sécurité Windows" publisher="Microsoft Corporation" impact=low locked=system`,
+  },
+  {
+    id: 'vie-privee', titre: 'Protéger ma vie privée', icone: 'shield',
+    texte: 'Des réglages, pas des fichiers : chacun dit s’il est « à faire » ou « déjà en place » (state=). Ce qui est déjà fait ne se coche pas.',
+    options: {
+      Telemetry: { type: 'bool', label: 'Limiter ce que Windows envoie à Microsoft' },
+      AdId: { type: 'bool', label: 'Désactiver l’identifiant publicitaire' },
+      Activity: { type: 'bool', label: 'Ne pas garder l’historique d’activité' },
+      Suggestions: { type: 'bool', label: 'Retirer les suggestions du menu Démarrer' },
+      Location: { type: 'bool', label: 'Couper la localisation' },
+    },
+    sortie: `[FIND] Telemetry state=todo
+[FIND] AdId state=ok
+[FIND] Activity state=todo
+[FIND] Suggestions state=todo
+[FIND] Location state=ok`,
+  },
+  {
+    id: 'dns', titre: 'Utiliser un Internet plus rapide', icone: 'gauge',
+    texte: 'Un choix unique, mesuré : le script chronomètre chaque serveur (ms=), dit lequel est l’actuel et lequel il recommande. On en choisit un.',
+    options: { Dns: { type: 'select', label: 'Serveur pour trouver les sites', choix: { isp: 'Celui de votre fournisseur', cloudflare: 'Cloudflare', google: 'Google', quad9: 'Quad9' } } },
+    sortie: `[STEP] 1/1 Measuring response times
+[FIND] Dns.isp ms=41 current=true
+[FIND] Dns.cloudflare ms=12 recommended=true
+[FIND] Dns.google ms=18
+[FIND] Dns.quad9 ms=25`,
+  },
+  {
+    id: 'disques', titre: 'Vérifier la santé des disques', icone: 'hard-drive',
+    texte: 'Rien à cocher : un diagnostic. Des mesures ([METRIC]) regroupées par disque (group=), chacune avec son état ; une jauge quand le script donne un maximum.',
+    options: {},
+    libelles: { Health: 'État général', Temperature: 'Température', Wear: 'Usure', Hours: 'Heures d’utilisation', Reallocated: 'Secteurs réalloués' },
+    notes: { Backup: ['warn', 'Un disque « à surveiller » peut lâcher sans prévenir : sauvegardez ce qui compte.'] },
+    sortie: `[METRIC] Health value=ok health=ok group="C: — Samsung SSD 980, 1 To"
+[METRIC] Temperature value=38 unit=celsius health=ok max=70 group="C: — Samsung SSD 980, 1 To"
+[METRIC] Wear value=12 unit=pct health=ok max=100 group="C: — Samsung SSD 980, 1 To"
+[METRIC] Hours value=8412 unit=hours group="C: — Samsung SSD 980, 1 To"
+[METRIC] Health value=warn health=warn group="D: — WD Blue, 2 To"
+[METRIC] Temperature value=58 unit=celsius health=warn max=70 group="D: — WD Blue, 2 To"
+[METRIC] Reallocated value=24 unit=count health=warn group="D: — WD Blue, 2 To"
+[NOTE] Backup`,
+  },
+  {
+    id: 'applis', titre: 'Retirer les applications inutiles', icone: 'package-minus',
+    texte: 'Une liste plate, avec éditeur et taille. Le script coche ce qui est sûrement inutile, laisse décoché ce qui peut servir, et verrouille ce que Windows ne laisse pas retirer.',
+    options: { Apps: { type: 'items', label: 'Applications installées avec Windows' } },
+    sortie: `[ITEM] Apps id=candy kind=app name="Candy Crush Saga" publisher="King" size=157286400
+[ITEM] Apps id=tiktok kind=app name="TikTok" publisher="TikTok Pte. Ltd." size=94371840
+[ITEM] Apps id=news kind=app name="Microsoft Actualités" publisher="Microsoft" size=31457280
+[ITEM] Apps id=xbox kind=app name="Xbox Game Bar" publisher="Microsoft" size=52428800 checked=false
+[ITEM] Apps id=solitaire kind=app name="Microsoft Solitaire Collection" publisher="Microsoft" size=73400320 checked=false
+[ITEM] Apps id=store kind=app name="Microsoft Store" publisher="Microsoft" locked=system`,
+  },
+  {
+    id: 'pilotes', titre: 'Mettre à jour les pilotes', icone: 'cpu',
+    texte: 'Une version actuelle et une version proposée (version= → to=). Un pilote déjà à jour (state=ok) reste visible, sans case.',
+    options: { Drivers: { type: 'items', label: 'Pilotes' } },
+    sortie: `[ITEM] Drivers id=gpu kind=driver name="NVIDIA GeForce RTX 3060" version="31.0.15.3699" to="32.0.15.6094" date=2023-08-01
+[ITEM] Drivers id=wifi kind=driver name="Intel Wi-Fi 6 AX201" version="22.150.0.3" to="23.60.1.2" date=2023-02-10
+[ITEM] Drivers id=audio kind=driver name="Realtek High Definition Audio" version="6.0.9381.1" state=ok`,
+  },
+  {
+    id: 'taches', titre: 'Inspecter les tâches planifiées', icone: 'calendar-clock',
+    texte: 'Un tri par méfiance (risk=) : une tâche lancée depuis un dossier temporaire, d’un éditeur inconnu, est signalée « Suspect » et cochée pour être désactivée ; les tâches connues restent décochées.',
+    options: { Tasks: { type: 'items', label: 'Tâches planifiées' } },
+    notes: { Suspicious: ['warn', 'Une tâche « Suspecte » est lancée depuis un emplacement inhabituel. La désactiver ne supprime rien : elle se réactive en un clic.'] },
+    sortie: `[ITEM] Tasks id=t1 kind=task name="Updater_x64" path="C:\\Users\\Buly\\AppData\\Local\\Temp\\upd.exe" publisher="(inconnu)" risk=high
+[ITEM] Tasks id=t2 kind=task name="SyncHelper" path="C:\\Users\\Buly\\AppData\\Roaming\\sync\\helper.exe" publisher="(inconnu)" risk=medium checked=false
+[ITEM] Tasks id=t3 kind=task name="GoogleUpdateTaskMachineUA" publisher="Google LLC" checked=false
+[ITEM] Tasks id=t4 kind=task name="OneDrive Standalone Update" publisher="Microsoft Corporation" checked=false
+[NOTE] Suspicious Tasks`,
+  },
+  {
+    id: 'maj', titre: 'Mettre Windows à jour', icone: 'refresh',
+    texte: 'Une mesure qui alerte (dernière recherche il y a 34 jours) et une seule case, qui dit combien d’éléments elle traite (count=).',
+    options: { Install: { type: 'bool', label: 'Installer les mises à jour en attente' } },
+    libelles: { LastCheck: 'Dernière recherche de mises à jour', Pending: 'Mises à jour en attente' },
+    sortie: `[METRIC] LastCheck value=34 unit=days health=warn
+[METRIC] Pending value=3 unit=count health=warn
+[FIND] Install count=3`,
+  },
+  {
+    id: 'batterie', titre: 'Vérifier la batterie', icone: 'battery',
+    texte: 'Un diagnostic seul, avec jauge : la capacité restante par rapport à l’origine.',
+    options: {},
+    libelles: { Capacity: 'Capacité restante', Cycles: 'Cycles de charge' },
+    sortie: `[METRIC] Capacity value=78 unit=pct health=warn max=100
+[METRIC] Cycles value=412 unit=cycles health=ok`,
+  },
+];
+const PAR_ID = Object.fromEntries(EXEMPLES.map((e) => [e.id, e]));
+
+// --- Le lecteur de la norme -------------------------------------------------------------
+/** Une ligne `[ITEM] Opt id=a name="B C" size=3` : la tete, puis les champs. */
+function lireChamps(reste) {
+  const champs = {};
+  const nus = [];
+  for (const m of reste.matchAll(/(\w+)=("([^"]*)"|\S+)|(\S+)/g)) {
+    if (m[4] !== undefined) nus.push(m[4]);
+    else champs[m[1]] = m[3] !== undefined ? m[3] : m[2];
+  }
+  return { tete: nus[0] || '', second: nus[1], champs };
+}
+
+function analyser(ex, sortie = ex.sortie) {
+  const m = { options: {}, metriques: [], notes: [], etapes: [], anomalies: [] };
+  for (const [cle, def] of Object.entries(ex.options)) m.options[cle] = { def, find: null, finds: {}, items: [] };
+  for (const brute of sortie.split('\n')) {
+    const l = brute.trim();
+    const mt = /^\[([A-Z]+)\]\s*(.*)$/.exec(l);
+    if (!mt) continue;
+    const [, marque, reste] = mt;
+    const { tete, second, champs } = lireChamps(reste);
+    // Une mesure illisible est ignoree et relevee, jamais interpretee au mieux.
+    for (const k of ['size', 'count', 'ms', 'value']) {
+      if (champs[k] !== undefined && k !== 'value' && !/^\d+$/.test(champs[k])) {
+        m.anomalies.push(`${marque} ${tete} : ${k}=${champs[k]} n’est pas un nombre — ignoré`);
+        delete champs[k];
+      }
+    }
+    if (marque === 'STEP') m.etapes.push(reste.replace(/^\d+\/\d+\s*/, ''));
+    else if (marque === 'FIND') {
+      const [opt, choix] = tete.split('.');
+      const o = m.options[opt];
+      if (!o) { m.anomalies.push(`[FIND] vise « ${opt} », que le script ne déclare pas — ignoré`); continue; }
+      if (choix) o.finds[choix] = champs; else o.find = champs;
+    } else if (marque === 'ITEM') {
+      const o = m.options[tete];
+      if (!o || o.def.type !== 'items') { m.anomalies.push(`[ITEM] vise « ${tete} », qui n’est pas une liste déclarée — ignoré`); continue; }
+      if (!champs.id) { m.anomalies.push('[ITEM] sans id — ignoré'); continue; }
+      o.items.push(champs);
+    } else if (marque === 'METRIC') m.metriques.push({ cle: tete, ...champs });
+    else if (marque === 'NOTE') {
+      if (!ex.notes?.[tete]) { m.anomalies.push(`[NOTE] « ${tete} » n’est pas déclarée dans l’entête — ignorée`); continue; }
+      m.notes.push({ cle: tete, cible: second || null });
+    }
+  }
+  // Les parametres de l'analyse filtrent, dans la maquette, ce que le script aurait trouve.
+  if (ex.id === 'gros') {
+    const p = parametres(ex);
+    const mois = { m3: 3, m6: 6, y1: 12 }[p.Unused] || 6;
+    const limite = new Date(2026, 9, 7); limite.setMonth(limite.getMonth() - mois);
+    m.options.BigFiles.items = m.options.BigFiles.items.filter((it) =>
+      it.locked || (Number(it.size) >= p.MinSize * 1048576 && new Date(it.date) <= limite));
+  }
+  return m;
+}
+
+// --- La selection : ce qui repartira vers le script --------------------------------------
+const SEL = {};
+const PARAMS = {};
+function parametres(ex) {
+  if (!PARAMS[ex.id]) {
+    PARAMS[ex.id] = {};
+    for (const [k, d] of Object.entries(ex.options)) if (d.scan) PARAMS[ex.id][k] = d.valeur;
+  }
+  return PARAMS[ex.id];
+}
+const coche = (c) => (c.checked !== undefined ? c.checked === 'true'
+  : c.state === 'todo' || (c.state !== 'ok' && (Number(c.size) > 0 || Number(c.count) > 0)));
+const cocheItem = (it) => (it.checked !== undefined ? it.checked === 'true' && !it.locked
+  : !it.locked && it.state !== 'ok' && it.confidence !== 'low');
+
+/** L'etat de selection d'un exemple, complete pour ce que le modele contient
+ *  (une ligne ajoutee a la main prend sa valeur par defaut). */
+function selection(ex, m) {
+  const s = SEL[ex.id] || (SEL[ex.id] = { bool: {}, choix: {}, select: {}, items: {}, garder: {}, filtre: {}, plie: {} });
+  for (const [k, o] of Object.entries(m.options)) {
+    const t = o.def.type;
+    if (t === 'bool' && o.find && s.bool[k] === undefined) s.bool[k] = coche(o.find) && o.find.state !== 'ok';
+    if (t === 'multi') {
+      s.choix[k] = s.choix[k] || {};
+      for (const [c, f] of Object.entries(o.finds)) if (s.choix[k][c] === undefined) s.choix[k][c] = coche(f);
+    }
+    if (t === 'select' && !o.def.scan && s.select[k] === undefined) {
+      const e = Object.entries(o.finds);
+      s.select[k] = (e.find(([, f]) => f.recommended === 'true') || e.find(([, f]) => f.current === 'true') || e[0] || [])[0];
+    }
+    if (t === 'items') {
+      s.items[k] = s.items[k] || {};
+      for (const it of o.items) if (s.items[k][it.id] === undefined) s.items[k][it.id] = cocheItem(it);
+      if (o.def.mode === 'garder-un') {
+        // Par groupe : l'exemplaire que le script propose (keep=true), sinon le premier.
+        s.garder[k] = s.garder[k] || {};
+        for (const g of new Set(o.items.map((it) => it.group || it.id))) {
+          if (o.items.some((x) => x.id === s.garder[k][g])) continue;
+          const membres = o.items.filter((it) => (it.group || it.id) === g);
+          s.garder[k][g] = (membres.find((it) => it.keep === 'true') || membres[0]).id;
+        }
+      }
+    }
+  }
+  return s;
+}
+
+/** Enfants, parents : une arborescence se lit par `parent=`. */
+function enfantsDe(o, id) { return o.items.filter((it) => it.parent === id); }
+function etatParent(s, k, o, id) {
+  const e = enfantsDe(o, id).filter((it) => !it.locked && it.state !== 'ok');
+  if (!e.length) return { coche: !!s.items[k][id], partiel: false, vide: true };
+  const n = e.filter((it) => s.items[k][it.id]).length;
+  return { coche: n === e.length, partiel: n > 0 && n < e.length, vide: false };
+}
+
+/** Totaux d'une action : trouve, selectionne (octets), et elements sans taille. */
+function totaux(ex, m) {
+  const s = selection(ex, m);
+  let trouve = 0, choisi = 0, elements = 0, reglages = 0;
+  for (const [k, o] of Object.entries(m.options)) {
+    const t = o.def.type;
+    if (t === 'bool' && o.find) {
+      const v = Number(o.find.size) || 0;
+      if (o.find.state !== 'ok') trouve += v;
+      if (s.bool[k]) { choisi += v; if (!v) (o.find.state === 'todo' ? reglages++ : elements += Number(o.find.count) || 1); }
+    }
+    if (t === 'multi') for (const [c, f] of Object.entries(o.finds)) {
+      const v = Number(f.size) || 0; trouve += v; if (s.choix[k][c]) choisi += v;
+    }
+    if (t === 'select' && !o.def.scan && Object.keys(o.finds).length) {
+      const actuel = Object.entries(o.finds).find(([, f]) => f.current === 'true')?.[0];
+      if (s.select[k] && s.select[k] !== actuel) reglages++;
+    }
+    if (t === 'items') {
+      if (o.def.mode === 'garder-un') {
+        for (const it of o.items) {
+          const v = Number(it.size) || 0;
+          if (s.garder[k][it.group || it.id] !== it.id) { trouve += v; choisi += v; }
+        }
+      } else {
+        for (const it of o.items) {
+          if (enfantsDe(o, it.id).length || it.locked || it.state === 'ok') continue;
+          const v = Number(it.size) || 0;
+          trouve += v;
+          if (s.items[k][it.id]) { if (v) choisi += v; else elements++; }
+        }
+      }
+    }
+  }
+  return { trouve, choisi, elements, reglages };
+}
+
+// --- Les briques, rendues ------------------------------------------------------------------
+function badgeJeton(type, v) {
+  const j = JETONS[type]?.[v];
+  if (!j) return '';
+  return `<span class="badge ${j[1]}">${esc(j[0])}</span>`;
+}
+function noteHtml(ex, n) {
+  const [niveau, texte] = ex.notes[n.cle];
+  return `<div class="note ${niveau}">${ico(niveau === 'warn' ? 'alerte' : 'info', 'i14')}<span>${esc(texte)}</span></div>`;
+}
+function notesPour(ex, m, cible) {
+  return m.notes.filter((n) => n.cible === cible).map((n) => noteHtml(ex, n)).join('');
+}
+function attrs(ex, k, extra = '') { return `data-ex="${ex.id}" data-opt="${k}" ${extra}`; }
+
+function brique(ex, m, k) {
+  const o = m.options[k];
+  const s = selection(ex, m);
+  const d = o.def;
+  if (d.scan) return '';
+  if (d.type === 'bool') {
+    if (!o.find) return '';
+    const f = o.find;
+    const fait = f.state === 'ok';
+    const etat = f.state === 'todo' ? '<span class="badge acc">À faire</span>' : fait ? '<span class="badge low">Déjà en place</span>' : '';
+    const meta = f.count && !f.state ? `<span class="muted">${pluriel(Number(f.count), 'élément', 'éléments')}</span>` : '';
+    return `<label class="ligne${fait ? ' inactive' : ''}${s.bool[k] ? '' : ' decoche'}">
+      <input type="checkbox" ${attrs(ex, k, 'data-k="bool"')}${s.bool[k] ? ' checked' : ''}${fait ? ' disabled' : ''}>
+      <span class="l-t"><b>${esc(d.label)}</b><span class="l-badges">${etat}${meta}</span></span>
+      <span class="l-v">${f.size ? taille(f.size) : ''}</span></label>${notesPour(ex, m, k)}`;
+  }
+  if (d.type === 'multi') {
+    const entrees = Object.entries(o.finds).sort((a, b) => (Number(b[1].size) || 0) - (Number(a[1].size) || 0));
+    const max = Math.max(1, ...entrees.map(([, f]) => Number(f.size) || 0));
+    const total = entrees.reduce((n, [c, f]) => n + (s.choix[k][c] ? Number(f.size) || 0 : 0), 0);
+    const lignes = entrees.map(([c, f]) => {
+      const vide = !(Number(f.size) > 0) && !(Number(f.count) > 0);
+      return `<label class="ligne${vide ? ' inactive' : ''}${s.choix[k][c] ? '' : ' decoche'}">
+        <input type="checkbox" ${attrs(ex, k, `data-k="choix" data-choix="${c}"`)}${s.choix[k][c] ? ' checked' : ''}${vide ? ' disabled' : ''}>
+        <span class="l-t"><b>${esc(d.choix[c] || c)}</b>
+          ${vide ? '<span class="muted">Rien à nettoyer</span>' : `<span class="jauge"><i style="width:${Math.max(1.5, (Number(f.size) / max) * 100)}%"></i></span>`}
+        </span>
+        <span class="l-v">${vide ? '' : taille(f.size)}${f.count && !vide ? `<small>${pluriel(Number(f.count), 'fichier', 'fichiers')}</small>` : ''}</span>
+      </label>${notesPour(ex, m, `${k}.${c}`)}`;
+    }).join('');
+    return `<div class="bloc"><div class="bloc-h"><span class="bh-t">${esc(d.label)}</span>
+      <button class="lien" type="button" ${attrs(ex, k, 'data-tout="multi"')}>Tout cocher</button>
+      <span class="total">${taille(total)} cochés</span></div>${lignes}</div>`;
+  }
+  if (d.type === 'select') {
+    const entrees = Object.entries(o.finds);
+    if (!entrees.length) return '';
+    const max = Math.max(1, ...entrees.map(([, f]) => Number(f.ms) || 0));
+    const lignes = entrees.sort((a, b) => (Number(a[1].ms) || 0) - (Number(b[1].ms) || 0)).map(([c, f]) => `
+      <label class="ligne${s.select[k] === c ? '' : ' decoche'}">
+        <input type="radio" name="sel-${ex.id}-${k}" ${attrs(ex, k, `data-k="select" data-choix="${c}"`)}${s.select[k] === c ? ' checked' : ''}>
+        <span class="l-t"><b>${esc(d.choix[c] || c)}</b>
+          <span class="l-badges">${f.current === 'true' ? '<span class="badge">Actuel</span>' : ''}${f.recommended === 'true' ? '<span class="badge acc">Le plus rapide</span>' : ''}</span>
+          ${f.ms ? `<span class="jauge"><i style="width:${(Number(f.ms) / max) * 100}%"></i></span>` : ''}</span>
+        <span class="l-v">${f.ms ? `${f.ms} ms` : ''}</span></label>`).join('');
+    return `<div class="bloc"><div class="bloc-h"><span class="bh-t">${esc(d.label)}</span><span class="total">plus court = plus rapide</span></div>${lignes}</div>`;
+  }
+  if (d.type === 'items') return d.mode === 'garder-un' ? briqueGarder(ex, m, k) : briqueListe(ex, m, k);
+  return '';
+}
+
+function ligneItem(ex, m, k, it, { enfant = false } = {}) {
+  const o = m.options[k];
+  const s = selection(ex, m);
+  const enfants = enfantsDe(o, it.id);
+  const verrou = !!it.locked;
+  const fait = it.state === 'ok';
+  let cochee = !!s.items[k][it.id];
+  let partiel = false;
+  if (enfants.length) { const e = etatParent(s, k, o, it.id); cochee = e.coche; partiel = e.partiel; }
+  const nom = it.label ? (ex.libelles?.[it.label] || it.label) : it.name || it.id;
+  const icone = JETONS.kind[it.kind] || (enfant ? 'file' : 'file');
+  const sousTotal = enfants.length ? enfants.reduce((n, e) => n + (Number(e.size) || 0), 0) : Number(it.size) || 0;
+  const badges = [
+    badgeJeton('confidence', it.confidence), badgeJeton('impact', it.impact), badgeJeton('risk', it.risk),
+    it.to ? `<span class="badge acc">${esc(it.version)} → ${esc(it.to)}</span>` : it.version ? `<span class="badge">${esc(it.version)}</span>` : '',
+    fait ? '<span class="badge low">À jour</span>' : '',
+    verrou ? `<span class="badge">${ico('lock')}${esc(JETONS.locked[it.locked] || it.locked)}</span>` : '',
+    it.date ? `<span class="pub">${it.to ? 'pilote du' : 'ouvert le'} ${dateLongue(it.date)}</span>` : '',
+    it.publisher ? `<span class="pub">${esc(it.publisher)}</span>` : '',
+    it.count && !it.size ? `<span class="pub">${pluriel(Number(it.count), 'élément', 'éléments')}</span>` : '',
+  ].join('');
+  const plie = s.plie[`${k}/${it.id}`];
+  return `<label class="ligne${verrou || fait ? ' inactive' : ''}${cochee ? '' : ' decoche'}">
+      <input type="checkbox" ${attrs(ex, k, `data-k="item" data-item="${esc(it.id)}"`)}${cochee ? ' checked' : ''}${partiel ? ' data-partiel="1"' : ''}${verrou || fait ? ' disabled' : ''}>
+      <span class="l-ico">${ico(icone, 'i14')}</span>
+      <span class="l-t"><b>${esc(nom)}</b>${it.path ? `<span class="chemin">${esc(it.path)}</span>` : ''}<span class="l-badges">${badges}</span></span>
+      <span class="l-v">${sousTotal ? taille(sousTotal) : ''}${enfants.length ? `<small>${pluriel(enfants.length, 'élément', 'éléments')}</small>` : ''}</span>
+      ${enfants.length ? `<button class="plier" type="button" ${attrs(ex, k, `data-plier="${esc(it.id)}"`)} aria-label="Plier">${ico('chevron-down', `i14${plie ? '' : ''}`)}</button>` : ''}
+    </label>${enfants.length && !plie ? `<div class="enfants">${enfants.map((e) => ligneItem(ex, m, k, e, { enfant: true })).join('')}</div>` : ''}`;
+}
+
+function briqueListe(ex, m, k) {
+  const o = m.options[k];
+  const s = selection(ex, m);
+  const racines = o.items.filter((it) => !it.parent || !o.items.some((x) => x.id === it.parent));
+  const feuilles = o.items.filter((it) => !enfantsDe(o, it.id).length && !it.locked && it.state !== 'ok');
+  const aVerifier = feuilles.filter((it) => it.confidence === 'low' || it.risk).length;
+  const filtre = s.filtre[k] || 'tout';
+  const visibles = filtre === 'verifier'
+    ? racines.filter((r) => r.confidence === 'low' || r.risk || enfantsDe(o, r.id).some((e) => e.confidence === 'low' || e.risk))
+    : racines;
+  const n = feuilles.filter((it) => s.items[k][it.id]).length;
+  const filtres = aVerifier
+    ? `<span class="filtres"><button type="button" ${attrs(ex, k, 'data-filtre="tout"')} aria-pressed="${filtre === 'tout'}">Tout</button><button type="button" ${attrs(ex, k, 'data-filtre="verifier"')} aria-pressed="${filtre === 'verifier'}">À vérifier (${aVerifier})</button></span>`
+    : '<span class="total"></span>';
+  return `<div class="bloc"><div class="bloc-h"><span class="bh-t">${esc(o.def.label)}</span>
+      <button class="lien" type="button" ${attrs(ex, k, 'data-tout="items"')}>Tout cocher</button>
+      <button class="lien" type="button" ${attrs(ex, k, 'data-rien="items"')}>Tout décocher</button>
+      ${filtres}<span class="total">${n} sur ${feuilles.length} cochés</span></div>
+    ${visibles.map((it) => ligneItem(ex, m, k, it)).join('') || '<div class="vide">Rien trouvé avec ces réglages.</div>'}
+    ${notesPour(ex, m, k)}</div>`;
+}
+
+function briqueGarder(ex, m, k) {
+  const o = m.options[k];
+  const s = selection(ex, m);
+  const groupes = [...new Set(o.items.map((it) => it.group || it.id))];
+  const html = groupes.map((g) => {
+    const membres = o.items.filter((it) => (it.group || it.id) === g);
+    const t = Number(membres[0].size) || 0;
+    return `<div class="groupe-doublons"><div class="gd-h">${esc(membres[0].name)} — ${membres.length} exemplaires de ${taille(t)} · ${taille(t * (membres.length - 1))} à libérer</div>
+      ${membres.map((it) => {
+        const garde = s.garder[k][g] === it.id;
+        return `<div class="ligne${garde ? ' decoche' : ''}">
+          <button class="garder${garde ? ' oui' : ''}" type="button" ${attrs(ex, k, `data-garder="${esc(g)}" data-item="${esc(it.id)}"`)}>${garde ? 'Gardé' : 'Garder'}</button>
+          <span class="l-t"><b>${esc(it.name)}</b><span class="chemin">${esc(it.path)}</span><span class="l-badges"><span class="pub">du ${dateLongue(it.date)}</span>${garde ? '' : '<span class="badge med">Sera supprimé</span>'}</span></span>
+          <span class="l-v">${taille(it.size)}</span></div>`;
+      }).join('')}</div>`;
+  }).join('');
+  return `<div class="bloc"><div class="bloc-h"><span class="bh-t">${esc(o.def.label)}</span><span class="total">un exemplaire gardé par fichier</span></div>${html}</div>`;
+}
+
+function metriquesHtml(ex, m) {
+  if (!m.metriques.length) return '';
+  const groupes = [...new Set(m.metriques.map((x) => x.group || ''))];
+  return groupes.map((g) => `<div class="bloc">${g ? `<div class="bloc-h">${ico('hard-drive', 'i14')} ${esc(g)}</div>` : '<div class="bloc-h">Mesures</div>'}
+    <div class="metriques">${m.metriques.filter((x) => (x.group || '') === g).map((x) => {
+      const h = JETONS.health[x.health];
+      const valeur = x.cle === 'Health' ? (JETONS.health[x.value]?.[0] || x.value) : (UNITES[x.unit] || ((v) => v))(x.value);
+      const jauge = x.max ? `<span class="jauge"><i class="${x.health || ''}" style="width:${Math.min(100, (Number(x.value) / Number(x.max)) * 100)}%"></i></span>` : '';
+      return `<div class="metrique"><span>${esc(ex.libelles?.[x.cle] || x.cle)}</span><b>${h ? `<i class="pastille ${h[1]}"></i>` : ''}${esc(valeur)}</b>${h && x.cle !== 'Health' ? `<span>${h[0]}</span>` : ''}${jauge}</div>`;
+    }).join('')}</div></div>`).join('');
+}
+
+function paramsHtml(ex) {
+  const scan = Object.entries(ex.options).filter(([, d]) => d.scan);
+  if (!scan.length) return '';
+  const p = parametres(ex);
+  return `<div class="params">${ico('sliders', 'i14')}${scan.map(([k, d]) => d.type === 'number'
+    ? `<label>${esc(d.label)} <input type="number" min="0" step="100" value="${p[k]}" data-ex="${ex.id}" data-param="${k}"> ${esc(d.unite || '')}</label>`
+    : `<label>${esc(d.label)} <select data-ex="${ex.id}" data-param="${k}">${Object.entries(d.choix).map(([v, l]) => `<option value="${v}"${p[k] === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`).join('')}
+    <button class="btn compact" type="button" data-relancer="${ex.id}">Relancer l’analyse</button></div>`;
+}
+
+/** Le corps d'une action : ses briques, dans l'ordre de l'entete. */
+function corps(ex, m) {
+  const globales = m.notes.filter((n) => !n.cible).map((n) => noteHtml(ex, n)).join('');
+  const briques = Object.keys(m.options).map((k) => brique(ex, m, k)).join('');
+  const anomalies = m.anomalies.map((a) => `<div class="anomalie">${ico('alerte', 'i14')} ${esc(a)}</div>`).join('');
+  return `${paramsHtml(ex)}${metriquesHtml(ex, m)}${briques}${globales}${anomalies}`;
+}
+
+function resumeAction(t, m) {
+  const morceaux = [];
+  if (t.trouve) morceaux.push(`${taille(t.choisi)} cochés sur ${taille(t.trouve)}`);
+  if (t.reglages) morceaux.push(pluriel(t.reglages, 'réglage à appliquer', 'réglages à appliquer'));
+  if (t.elements) morceaux.push(pluriel(t.elements, 'élément coché', 'éléments cochés'));
+  if (!morceaux.length) return m.metriques.length ? 'Pour information : rien à cocher' : 'Rien à faire';
+  return morceaux.join(' · ');
+}
+
+/** Une carte d'action, en cours d'analyse ou terminee. */
+function carte(ex, { progression = null, pliable = false, plie = false } = {}) {
+  const m = modeles[ex.id];
+  const t = totaux(ex, m);
+  const tete = `<div class="sc-h${pliable ? ' cliquable' : ''}"${pliable ? ` data-plier-carte="${ex.id}"` : ''}>
+      <span class="sc-i">${ico(ex.icone, 'i20')}</span>
+      <span class="sc-t"><b>${esc(ex.titre)}</b><span>${progression !== null && progression < 1 ? 'Analyse en cours…' : esc(resumeAction(t, m))}</span></span>
+      ${progression !== null && progression < 1 ? '<span class="attente"></span>' : `<span class="sc-total"><b>${t.trouve ? taille(t.choisi) : ''}</b></span>`}
+      ${pliable ? ico('chevron-down', 'chev') : ''}</div>`;
+  if (progression !== null && progression < 1) {
+    // Le texte de [STEP] est en anglais : il ne s'affiche qu'en Expert. Ici,
+    // seulement le rang de l'etape.
+    const n = m.etapes.length;
+    const etape = n > 1 ? `Étape ${Math.min(n, Math.floor(progression * n) + 1)} sur ${n}` : '';
+    return `<div class="sc">${tete}<div class="prog"><div class="prog-barre"><i style="width:${Math.round(progression * 100)}%"></i></div>
+      <div class="prog-t"><span>${t.trouve ? `<b>${taille(t.trouve * progression)}</b> trouvés jusqu’ici` : 'Examen…'}</span><span>${etape}</span><span>${Math.round(progression * 100)} %</span></div></div></div>`;
+  }
+  return `<div class="sc${plie ? ' plie' : ''}" id="carte-${ex.id}">${tete}<div class="sc-b">${corps(ex, m)}</div></div>`;
+}
+
+// --- Modeles (relus quand on modifie les lignes) -------------------------------------------
+const SORTIES = Object.fromEntries(EXEMPLES.map((e) => [e.id, e.sortie]));
+const modeles = {};
+function relire(id) { modeles[id] = analyser(PAR_ID[id], SORTIES[id]); }
+EXEMPLES.forEach((e) => relire(e.id));
+
+// --- Onglet 1 : les dispositions ------------------------------------------------------------
+const LOT = ['temp', 'restes', 'doublons', 'gros', 'navigateurs', 'applis'];
+const DISPO = { v: 'C', moment: 'resultats', detail: 'temp', plies: new Set(), progression: {} };
+const PALETTE = ['#22D39A', '#35C8E8', '#8B7CF6', '#F5A524', '#F472B6', '#60A5FA', '#A3E635', '#FB7185', '#2DD4BF', '#C084FC', '#FBBF24', '#94A3B8'];
+const TEXTES_DISPO = {
+  A: ['A · Une carte par action', 'Les actions du lot l’une sous l’autre, chacune avec ses briques. Trois chiffres en tête : ce qui est coché, ce qui a été trouvé, et combien d’actions.', ['Le plus simple : tout est là, on fait défiler.', 'Chaque action garde sa forme, quelle que soit la norme qu’elle emploie.'], ['Avec six actions, la page est longue : le gros lot se cache parfois loin en bas.']],
+  B: ['B · Sommaire et détail', 'À gauche, les actions et ce que chacune a coché ; à droite, le détail de celle qu’on regarde. Pendant l’analyse, le sommaire montre l’avancement de chacune.', ['Une action à la fois : le détail a toute la place.', 'Le sommaire reste visible, avec les totaux.'], ['Un clic de plus pour passer d’une action à l’autre ; moins naturel pour un débutant.']],
+  C: ['C · La barre d’espace', 'D’abord, ce qui prend de la place : une barre découpée par poste, du plus gros au plus petit, chacun cochable. Le détail, action par action, reste dessous, replié.', ['10 Mo face à 1,1 Go se voit avant de se lire : on coche le bon poste.', 'Une décision en un écran pour qui veut « faire de la place ».'], ['Ce qui n’a pas de taille (réglages, démarrage) n’est pas dans la barre : il est dans le détail.']],
+};
+
+function postes() {
+  const liste = [];
+  for (const id of LOT) {
+    const ex = PAR_ID[id];
+    const m = modeles[id];
+    const s = selection(ex, m);
+    for (const [k, o] of Object.entries(m.options)) {
+      const d = o.def;
+      if (d.type === 'multi') for (const [c, f] of Object.entries(o.finds)) {
+        if (Number(f.size) > 0) liste.push({ ex: id, k, c, label: d.choix[c], taille: Number(f.size), coche: !!s.choix[k][c], partiel: false });
+      }
+      if (d.type === 'bool' && o.find && Number(o.find.size) > 0) liste.push({ ex: id, k, label: d.label, taille: Number(o.find.size), coche: !!s.bool[k] });
+      if (d.type === 'items') {
+        if (d.mode === 'garder-un') {
+          const tot = o.items.reduce((n, it) => n + (s.garder[k][it.group || it.id] !== it.id ? Number(it.size) || 0 : 0), 0);
+          if (tot) liste.push({ ex: id, k, label: d.label, taille: tot, coche: true, garder: true });
+        } else {
+          const f = o.items.filter((it) => !enfantsDe(o, it.id).length && !it.locked && it.state !== 'ok' && Number(it.size) > 0);
+          const tot = f.reduce((n, it) => n + Number(it.size), 0);
+          const nc = f.filter((it) => s.items[k][it.id]).length;
+          if (tot) liste.push({ ex: id, k, label: d.label, taille: tot, coche: nc === f.length, partiel: nc > 0 && nc < f.length, items: true, choisi: f.filter((it) => s.items[k][it.id]).reduce((n, it) => n + Number(it.size), 0) });
+        }
+      }
+    }
+  }
+  return liste.sort((a, b) => b.taille - a.taille);
+}
+
+function totauxLot() {
+  return LOT.reduce((acc, id) => { const t = totaux(PAR_ID[id], modeles[id]); acc.trouve += t.trouve; acc.choisi += t.choisi; acc.elements += t.elements; acc.reglages += t.reglages; return acc; }, { trouve: 0, choisi: 0, elements: 0, reglages: 0 });
+}
+
+function rendreDispositions() {
+  const fen = document.getElementById('fen');
+  const avant = fen.querySelector('.defile')?.scrollTop || 0;
+  const enCours = DISPO.moment === 'analyse';
+  const tl = totauxLot();
+  const prog = (id) => (enCours ? DISPO.progression[id] ?? 0 : null);
+  let corpsHtml = '';
+  if (DISPO.v === 'A') {
+    const avance = LOT.reduce((n, id) => n + totaux(PAR_ID[id], modeles[id]).trouve * (prog(id) ?? 1), 0);
+    corpsHtml = `<div class="tuiles-resume">
+        <div class="tuile-r acc"><span>Coché pour l’entretien</span><b>${enCours ? '—' : taille(tl.choisi)}</b></div>
+        <div class="tuile-r"><span>${enCours ? 'Trouvé jusqu’ici' : 'Trouvé en tout'}</span><b>${taille(enCours ? avance : tl.trouve)}</b></div>
+        <div class="tuile-r"><span>Actions examinées</span><b>${LOT.length}</b></div></div>
+      ${LOT.map((id) => carte(PAR_ID[id], { progression: prog(id), pliable: true, plie: DISPO.plies.has(id) })).join('')}`;
+  } else if (DISPO.v === 'B') {
+    const nav = LOT.map((id) => {
+      const t = totaux(PAR_ID[id], modeles[id]);
+      const p = prog(id);
+      return `<button class="md-item" type="button" data-detail="${id}" aria-current="${DISPO.detail === id}">
+        <span class="sc-i">${ico(PAR_ID[id].icone, 'i14')}</span>
+        <span class="t"><b>${esc(PAR_ID[id].titre)}</b><span>${p !== null && p < 1 ? `${Math.round(p * 100)} %` : esc(t.trouve ? `${taille(t.choisi)} / ${taille(t.trouve)}` : resumeAction(t, modeles[id]))}</span></span>
+        ${p !== null && p < 1 ? '<span class="attente"></span>' : ''}</button>`;
+    }).join('');
+    corpsHtml = `<div class="md"><div class="md-nav">${nav}</div><div>${carte(PAR_ID[DISPO.detail], { progression: prog(DISPO.detail) })}</div></div>`;
+  } else {
+    const ps = postes();
+    const total = ps.reduce((n, p) => n + p.taille, 0) || 1;
+    const couleurs = new Map(ps.map((p, i) => [`${p.ex}/${p.k}/${p.c || ''}`, PALETTE[i % PALETTE.length]]));
+    const pfin = LOT.reduce((n, id) => n + (prog(id) ?? 1), 0) / LOT.length;
+    const pile = ps.map((p) => `<i class="${p.coche || p.partiel ? '' : 'off'}" style="flex-grow:${p.taille};background:${couleurs.get(`${p.ex}/${p.k}/${p.c || ''}`)}" title="${esc(p.label)} — ${taille(p.taille)}"></i>`).join('');
+    const legende = ps.map((p) => `<label class="ligne${p.coche || p.partiel ? '' : ' decoche'}">
+        <input type="checkbox" data-poste="${p.ex}|${p.k}|${p.c || ''}"${p.coche ? ' checked' : ''}${p.partiel ? ' data-partiel="1"' : ''}${p.garder ? ' disabled' : ''}>
+        <span class="pt" style="background:${couleurs.get(`${p.ex}/${p.k}/${p.c || ''}`)}"></span>
+        <span class="l-t"><b>${esc(p.label)}</b><span class="src">${esc(PAR_ID[p.ex].titre)}${p.partiel ? ` — ${taille(p.choisi)} cochés` : ''}${p.garder ? ' — selon les exemplaires gardés' : ''}</span></span>
+        <span class="l-v">${taille(p.taille)}</span></label>`).join('');
+    corpsHtml = `<div class="espace">
+        <div class="espace-h"><b>${enCours ? taille(tl.trouve * pfin) : taille(tl.choisi)}</b><span>${enCours ? `trouvés jusqu’ici — analyse à ${Math.round(pfin * 100)} %` : `cochés sur ${taille(tl.trouve)} trouvés`}</span></div>
+        <div class="pile">${pile}</div>
+        ${enCours ? '' : `<div class="legende">${legende}</div>`}</div>
+      <div class="sous-titre">Le détail, action par action</div>
+      ${LOT.map((id) => carte(PAR_ID[id], { progression: prog(id), pliable: true, plie: !DISPO.plies.has(`ouvert-${id}`) })).join('')}`;
+  }
+  const resume = enCours
+    ? 'J’examine votre PC. <b>Rien n’est modifié</b> pendant l’analyse.'
+    : `Coché : <b>${taille(tl.choisi)}</b>${tl.elements ? ` · ${pluriel(tl.elements, 'élément', 'éléments')}` : ''}${tl.reglages ? ` · ${pluriel(tl.reglages, 'réglage', 'réglages')}` : ''}`;
+  fen.innerHTML = `<div class="tb"><span class="brand-mark">${ico('waves')}</span><span class="brand-name">WinTool</span>
+      <span class="crumb"><span>Choisir</span><i class="fait"></i><span class="on">Analyser</span><i class="actif"></i><span>Entretien</span><i></i></span>
+      <span class="tb-droite"><span class="winctl"><span>${ico('minus')}</span><span>${ico('square')}</span><span>${ico('x')}</span></span></span></div>
+    <div class="scene"><div class="defile">
+      <div class="contenu">
+        <div class="s-head"><h1>${enCours ? 'J’examine votre PC…' : 'Voici ce que j’ai trouvé'}</h1>
+          <p>${enCours ? 'Cela prend quelques instants. Vous pourrez tout choisir ensuite.' : 'Cochez ce que vous voulez traiter. Rien n’a encore été modifié.'}</p></div>
+        ${corpsHtml}
+        <div style="height:24px"></div>
+      </div>
+      <div class="barre-bas"><span class="resume">${resume}</span>
+        <button class="btn" type="button">${ico('arrow-left', 'i14')} Retour</button>
+        ${enCours ? '<button class="btn danger" type="button">Arrêter l’analyse</button>' : `<button class="btn primary big" type="button">Lancer l’entretien ${ico('arrow-right')}</button>`}</div>
+    </div></div>`;
+  const defile = fen.querySelector('.defile');
+  defile.scrollTop = avant;
+  fen.querySelectorAll('[data-partiel="1"]').forEach((c) => { c.indeterminate = true; });
+  const [titre, texte, pour, contre] = TEXTES_DISPO[DISPO.v];
+  document.getElementById('explicationDispo').innerHTML = `<h2>${titre}</h2><p>${texte}</p>
+    <ul class="pour">${pour.map((x) => `<li>${x}</li>`).join('')}</ul><ul class="contre">${contre.map((x) => `<li>${x}</li>`).join('')}</ul>`;
+  document.querySelectorAll('[data-dispo]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.dispo === DISPO.v));
+  document.querySelectorAll('[data-moment]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.moment === DISPO.moment));
+  ajuster();
+}
+
+function ajuster() {
+  const boite = document.getElementById('ecran');
+  const fen = document.getElementById('fen');
+  const k = Math.min(1, boite.clientWidth / 1180);
+  fen.style.transform = `scale(${k})`;
+  boite.style.height = `${Math.ceil(760 * k)}px`;
+}
+
+let minuterie = null;
+function rejouer(cibles, rendre) {
+  clearInterval(minuterie);
+  const vitesse = Object.fromEntries(cibles.map((id, i) => [id, 0.025 + ((i * 7) % 5) * 0.01]));
+  const etat = Object.fromEntries(cibles.map((id) => [id, 0]));
+  minuterie = setInterval(() => {
+    let fini = true;
+    for (const id of cibles) { etat[id] = Math.min(1, etat[id] + vitesse[id]); if (etat[id] < 1) fini = false; }
+    rendre(etat, fini);
+    if (fini) clearInterval(minuterie);
+  }, 120);
+}
+
+// --- Onglet 2 : les exemples ----------------------------------------------------------------
+function briquesDe(ex, m) {
+  const b = new Set();
+  for (const o of Object.values(m.options)) {
+    const d = o.def;
+    if (d.scan) b.add('réglages d’analyse');
+    else if (d.type === 'bool') b.add(o.find?.state ? 'réglage à faire / déjà en place' : 'case simple');
+    else if (d.type === 'multi') b.add('choix multiples mesurés');
+    else if (d.type === 'select') b.add('choix unique mesuré');
+    else if (d.type === 'items') {
+      b.add(d.mode === 'garder-un' ? 'garder un exemplaire' : 'liste d’éléments');
+      if (o.items.some((it) => it.parent)) b.add('arborescence');
+      if (o.items.some((it) => it.confidence)) b.add('confiance');
+      if (o.items.some((it) => it.locked)) b.add('verrouillé');
+      if (o.items.some((it) => it.impact || it.risk)) b.add('impact / méfiance');
+      if (o.items.some((it) => it.to)) b.add('version → version');
+      if (o.items.some((it) => it.label)) b.add('libellés traduits');
+    }
+  }
+  if (m.metriques.length) b.add('mesures');
+  if (m.notes.length) b.add('notes');
+  if (m.etapes.length) b.add('progression');
+  return [...b];
+}
+
+function entete(ex) {
+  const l = ['## WINTOOL:OPTIONS'];
+  for (const [k, d] of Object.entries(ex.options)) {
+    const type = d.type === 'items' && d.mode ? `items:${d.mode === 'garder-un' ? 'keep-one' : d.mode}` : d.type;
+    l.push(`## ${k.padEnd(11)}: [${type}]${d.scan ? ' [scan]' : ''} ${d.label}`);
+    if (d.choix) for (const [c, v] of Object.entries(d.choix)) l.push(`##   ${c.padEnd(9)}: ${v}`);
+  }
+  l.push('## WINTOOL:END');
+  if (ex.libelles || ex.notes) {
+    l.push('', '## WINTOOL:REPORT');
+    for (const [k, v] of Object.entries(ex.libelles || {})) l.push(`## ${k.padEnd(11)}: ${v}`);
+    for (const [k, [n, v]] of Object.entries(ex.notes || {})) l.push(`## ${k.padEnd(11)}: [note:${n}] ${v}`);
+    l.push('## WINTOOL:END');
+  }
+  return l.join('\n');
+}
+
+const PROG_EX = {};
+function rendreExemple(id) {
+  const ex = PAR_ID[id];
+  const zone = document.getElementById(`ui-${id}`);
+  if (!zone) return;
+  zone.innerHTML = carte(ex, { progression: PROG_EX[id] ?? null });
+  zone.querySelectorAll('[data-partiel="1"]').forEach((c) => { c.indeterminate = true; });
+  document.getElementById(`briques-${id}`).innerHTML = briquesDe(ex, modeles[id]).map((b) => `<span class="badge acc">${esc(b)}</span>`).join('');
+}
+function rendreExemples() {
+  document.getElementById('listeExemples').innerHTML = EXEMPLES.map((ex, i) => `
+    <article class="ex" id="ex-${ex.id}">
+      <div class="ex-h"><h3>${i + 1}. ${esc(ex.titre)}</h3><span class="briques" id="briques-${ex.id}"></span><p>${esc(ex.texte)}</p></div>
+      <div id="ui-${ex.id}"></div>
+      <div class="code">
+        <span>Ce que le script déclare (entête)</span><pre>${esc(entete(ex))}</pre>
+        <span>Ce qu’il écrit pendant l’analyse — modifiable</span>
+        <textarea spellcheck="false" data-sortie="${ex.id}">${esc(SORTIES[ex.id])}</textarea>
+      </div>
+    </article>`).join('');
+  EXEMPLES.forEach((ex) => rendreExemple(ex.id));
+}
+
+// --- Onglet 3 : la norme --------------------------------------------------------------------
+function rendreReference() {
+  document.getElementById('reference').innerHTML = `
+  <div class="ref"><h2>Le principe, en une phrase</h2>
+    <p>Le script <b>décrit</b> ce qu'il a trouvé ; WinTool <b>dessine</b> l'écran et <b>renvoie</b> au script ce que l'utilisateur a coché, par <code>$CONFIG</code>, comme n'importe quel réglage. Le script n'écrit jamais de phrase : sa sortie est en anglais et l'interface bilingue. Il écrit des nombres, des noms (de programmes, de fichiers, de disques) et des jetons ; les libellés viennent de son entête, déjà traduite.</p></div>
+  <div class="ref"><h2>Dans l'entête</h2><table>
+    <tr><th>Déclaration</th><th>Devient</th><th>Revient au script dans <code>$CONFIG</code></th></tr>
+    <tr><td><code>[bool]</code></td><td>une case simple, mesurée ou « à faire / déjà en place »</td><td><code>$true</code> / <code>$false</code></td></tr>
+    <tr><td><code>[multi]</code> + choix</td><td>un bloc de choix, chacun mesuré, triés du plus gros au plus petit, avec la barre de proportion</td><td>la liste des choix cochés</td></tr>
+    <tr><td><code>[select]</code> + choix</td><td>un choix unique, chacun mesuré (<code>ms=</code>), « actuel », « le plus rapide »</td><td>le choix retenu</td></tr>
+    <tr><td><code>[items]</code> <span class="badge acc">nouveau</span></td><td>une liste d'éléments trouvés à la volée, à plat ou en arborescence, filtrable</td><td>la liste des <code>id</code> cochés</td></tr>
+    <tr><td><code>[items:keep-one]</code> <span class="badge acc">nouveau</span></td><td>des groupes dont on garde un exemplaire</td><td>la liste des <code>id</code> à supprimer</td></tr>
+    <tr><td><code>[scan]</code> sur une option <span class="badge acc">nouveau</span></td><td>un réglage de l'analyse elle-même, au-dessus des résultats, avec « Relancer l'analyse »</td><td>sa valeur, dès l'analyse</td></tr>
+    <tr><td>bloc <code>WINTOOL:REPORT</code> <span class="badge acc">nouveau</span></td><td>les libellés des mesures et des jetons <code>label=</code>, et les notes (<code>[note:info]</code>, <code>[note:warn]</code>) — traduits dans le bloc <code>LANG</code></td><td>—</td></tr>
+  </table></div>
+  <div class="ref"><h2>Pendant l'analyse : les lignes</h2><table>
+    <tr><th>Ligne</th><th>Rôle</th></tr>
+    <tr><td><code>[STEP] 2/4 …</code></td><td>l'étape en cours, et la progression ; le texte (anglais) ne s'affiche qu'en Expert</td></tr>
+    <tr><td><code>[PROGRESS] 60</code> <span class="badge acc">nouveau</span></td><td>l'avancement, en pour cent, dans une étape longue</td></tr>
+    <tr><td><code>[FIND] Option[.choix] …</code></td><td>une mesure pour une case ou un choix déclarés</td></tr>
+    <tr><td><code>[ITEM] Option id=… …</code> <span class="badge acc">nouveau</span></td><td>un élément d'une liste <code>[items]</code></td></tr>
+    <tr><td><code>[METRIC] Clé value=… …</code> <span class="badge acc">nouveau</span></td><td>une mesure à lire, sans case : température, durée, capacité…</td></tr>
+    <tr><td><code>[NOTE] Clé [Option[.choix]]</code> <span class="badge acc">nouveau</span></td><td>affiche une note déclarée, sous l'option visée ou en tête</td></tr>
+  </table></div>
+  <div class="ref"><h2>Les champs</h2><table>
+    <tr><th>Champ</th><th>Valeur</th><th>Sens</th></tr>
+    <tr><td><code>size=</code></td><td>octets</td><td>espace en jeu — affiché « 1,1 Go »</td></tr>
+    <tr><td><code>count=</code></td><td>entier</td><td>nombre d'éléments</td></tr>
+    <tr><td><code>state=</code></td><td><code>todo</code> · <code>ok</code></td><td>à faire · déjà en place (ne se coche pas)</td></tr>
+    <tr><td><code>checked=</code> <span class="badge acc">nouveau</span></td><td><code>true</code> · <code>false</code></td><td>l'avis du script ; sans lui, WinTool coche ce qui pèse et ce qui est à faire</td></tr>
+    <tr><td><code>ms=</code> · <code>current=</code> · <code>recommended=</code></td><td>entier · booléens</td><td>pour un choix unique mesuré</td></tr>
+    <tr><td><code>id=</code> · <code>parent=</code> · <code>group=</code></td><td>jetons</td><td>identité d'un élément ; arborescence ; groupe « garder un »</td></tr>
+    <tr><td><code>name=</code> · <code>path=</code> · <code>publisher=</code></td><td>texte entre guillemets</td><td>des noms, pas des phrases : affichés tels quels</td></tr>
+    <tr><td><code>label=</code></td><td>clé du bloc REPORT</td><td>un nom à traduire (« Cache », « Cookies »…)</td></tr>
+    <tr><td><code>kind=</code></td><td><code>folder file registry app startup service task driver browser</code></td><td>l'icône de l'élément</td></tr>
+    <tr><td><code>confidence=</code></td><td><code>high medium low</code></td><td>Sûr · Probable · À vérifier (pas coché d'office)</td></tr>
+    <tr><td><code>impact=</code> · <code>risk=</code></td><td><code>high medium low</code></td><td>Impact élevé… · Suspect, Inhabituel</td></tr>
+    <tr><td><code>locked=</code></td><td><code>open system protected inuse</code></td><td>visible mais pas cochable, avec la raison</td></tr>
+    <tr><td><code>version=</code> · <code>to=</code> · <code>date=</code> · <code>keep=</code></td><td>texte · AAAA-MM-JJ · booléen</td><td>version actuelle → proposée ; date ; exemplaire proposé à garder</td></tr>
+    <tr><td><code>value=</code> · <code>unit=</code> · <code>health=</code> · <code>max=</code></td><td>nombre · <code>celsius pct hours days s count cycles</code> · <code>ok warn crit</code> · nombre</td><td>une mesure, son état, sa jauge</td></tr>
+  </table></div>
+  <div class="ref"><h2>Ce qui ne change pas</h2>
+    <p>Un script sans <code>scan: true</code> fonctionne comme avant. Analyser, c'est exécuter : l'approbation, le lanceur durci et l'arrêt s'appliquent (§17.4). Une ligne qui vise une option non déclarée, une mesure illisible, une note inconnue sont <b>ignorées et relevées</b> — l'onglet Exemples le montre si on en tape une. Et un script ne peut parler que de ses propres cases : jamais faire apparaître une case au nom d'un autre.</p></div>`;
+}
+
+// --- Evenements ------------------------------------------------------------------------------
+function rafraichir(id) {
+  if (!document.getElementById('vue-dispositions').hidden) rendreDispositions();
+  if (!document.getElementById('vue-exemples').hidden) rendreExemple(id);
+}
+
+document.addEventListener('change', (ev) => {
+  const c = ev.target;
+  if (c.matches('[data-sortie]')) return;
+  if (c.dataset.param) {
+    parametres(PAR_ID[c.dataset.ex])[c.dataset.param] = c.type === 'number' ? Number(c.value) : c.value;
+    return;
+  }
+  if (c.dataset.poste) {
+    const [id, k, choix] = c.dataset.poste.split('|');
+    const ex = PAR_ID[id], m = modeles[id], s = selection(ex, m), o = m.options[k];
+    if (choix) s.choix[k][choix] = c.checked;
+    else if (o.def.type === 'bool') s.bool[k] = c.checked;
+    else for (const it of o.items) if (!it.locked && it.state !== 'ok') s.items[k][it.id] = c.checked;
+    return void rendreDispositions();
+  }
+  const { ex: id, opt: k, k: genre } = c.dataset;
+  if (!id || !genre) return;
+  const ex = PAR_ID[id], m = modeles[id], s = selection(ex, m), o = m.options[k];
+  if (genre === 'bool') s.bool[k] = c.checked;
+  if (genre === 'choix') s.choix[k][c.dataset.choix] = c.checked;
+  if (genre === 'select') s.select[k] = c.dataset.choix;
+  if (genre === 'item') {
+    const enfants = enfantsDe(o, c.dataset.item);
+    if (enfants.length) for (const e of enfants) { if (!e.locked && e.state !== 'ok') s.items[k][e.id] = c.checked; }
+    else s.items[k][c.dataset.item] = c.checked;
+  }
+  rafraichir(id);
+});
+
+document.addEventListener('input', (ev) => {
+  const t = ev.target.closest('[data-sortie]');
+  if (!t) return;
+  SORTIES[t.dataset.sortie] = t.value;
+  relire(t.dataset.sortie);
+  rendreExemple(t.dataset.sortie);
+});
+
+document.addEventListener('click', (ev) => {
+  const b = ev.target.closest('button, [data-plier-carte]');
+  if (!b) return;
+  const d = b.dataset;
+  if (d.onglet) {
+    for (const v of ['dispositions', 'exemples', 'norme']) document.getElementById(`vue-${v}`).hidden = v !== d.onglet;
+    document.querySelectorAll('[data-onglet]').forEach((x) => x.setAttribute('aria-pressed', x.dataset.onglet === d.onglet));
+    if (d.onglet === 'dispositions') rendreDispositions();
+    return;
+  }
+  if (d.themeBtn) { document.documentElement.dataset.theme = d.themeBtn; return void marquerTheme(); }
+  if (d.dispo) { DISPO.v = d.dispo; return void rendreDispositions(); }
+  if (d.moment) { DISPO.moment = d.moment; DISPO.progression = Object.fromEntries(LOT.map((id, i) => [id, [0.95, 0.4, 0.2, 0.7, 1, 0.55][i]])); return void rendreDispositions(); }
+  if (d.rejouer !== undefined) {
+    DISPO.moment = 'analyse';
+    return void rejouer(LOT, (etat, fini) => { DISPO.progression = etat; if (fini) DISPO.moment = 'resultats'; rendreDispositions(); });
+  }
+  if (d.rejouerEx !== undefined) {
+    const ids = EXEMPLES.map((e) => e.id);
+    return void rejouer(ids, (etat, fini) => { for (const id of ids) { PROG_EX[id] = fini ? null : etat[id]; rendreExemple(id); } });
+  }
+  if (d.detail) { DISPO.detail = d.detail; return void rendreDispositions(); }
+  if (d.plierCarte) {
+    ev.preventDefault();
+    const cle = DISPO.v === 'C' ? `ouvert-${d.plierCarte}` : d.plierCarte;
+    DISPO.plies.has(cle) ? DISPO.plies.delete(cle) : DISPO.plies.add(cle);
+    return void rendreDispositions();
+  }
+  if (d.relancer) {
+    const id = d.relancer;
+    relire(id);
+    return void rejouer([id], (etat, fini) => { PROG_EX[id] = fini ? null : etat[id]; DISPO.progression[id] = etat[id]; rafraichir(id); });
+  }
+  const id = d.ex, k = d.opt;
+  if (!id) return;
+  ev.preventDefault();
+  const ex = PAR_ID[id], m = modeles[id], s = selection(ex, m), o = m.options[k];
+  if (d.tout === 'multi') for (const [c, f] of Object.entries(o.finds)) { if (Number(f.size) > 0 || Number(f.count) > 0) s.choix[k][c] = true; }
+  if (d.tout === 'items') for (const it of o.items) { if (!it.locked && it.state !== 'ok') s.items[k][it.id] = true; }
+  if (d.rien === 'items') for (const it of o.items) s.items[k][it.id] = false;
+  if (d.filtre) s.filtre[k] = d.filtre;
+  if (d.plier) s.plie[`${k}/${d.plier}`] = !s.plie[`${k}/${d.plier}`];
+  if (d.garder) s.garder[k][d.garder] = d.item;
+  rafraichir(id);
+});
+
+const sombre = matchMedia('(prefers-color-scheme: dark)');
+function marquerTheme() {
+  const t = document.documentElement.dataset.theme || (sombre.matches ? 'dark' : 'light');
+  document.querySelectorAll('[data-theme-btn]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.themeBtn === t));
+}
+sombre.addEventListener('change', marquerTheme);
+addEventListener('resize', ajuster);
+
+document.getElementById('segDispo').innerHTML = ['A', 'B', 'C'].map((v) => `<button type="button" data-dispo="${v}">${TEXTES_DISPO[v][0]}</button>`).join('');
+document.getElementById('segMoment').innerHTML = '<button type="button" data-moment="analyse">Analyse en cours</button><button type="button" data-moment="resultats">Résultats</button>';
+document.querySelector('[data-onglet="dispositions"]').setAttribute('aria-pressed', 'true');
+marquerTheme();
+rendreExemples();
+rendreReference();
+rendreDispositions();
+</script>
+</body>
+</html>
