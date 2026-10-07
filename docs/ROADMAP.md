@@ -58,10 +58,18 @@ PowerShell téléchargé auprès de n'importe qui, exécuté en administrateur.
 
 ## Idées pour plus tard
 
-- **Refaire le réglage 3.5 (emplacements protégés).** 602 px de haut, quatre étiquettes
-  orange, une zone de texte et un bouton « Enregistrer » quand tout le reste s'applique
-  seul. Quatre propositions dans `docs/mockups/emplacements-proteges.html` ; choix à
-  faire.
+- **Réglages en pleine page.** Une page de WinTool comme Simple et Expert, une page par
+  section, une recherche ; la barre de titre reste active, donc Simple / Expert se change
+  sans fermer les réglages. Deux dispositions dans `docs/mockups/reglages-page.html`
+  (barre latérale ou accueil en tuiles) ; choix à faire.
+- **Refaire le réglage 3.5 (emplacements protégés) — choix : A + D.** Une ligne de résumé
+  dans les réglages, le plan du disque dans sa propre page
+  (`docs/mockups/emplacements-proteges.html`). Plus de zone de texte ni de bouton
+  « Enregistrer ».
+- **Les lots quand la place manque.** À partir d'une douzaine de lots, l'écran « Choisir »
+  repasse en rangées ordinaires derrière une vague restée en bas de la fenêtre : désordre
+  dès la taille d'ouverture. Quatre propositions, toutes avec « Continuer » collé en bas,
+  dans `docs/mockups/lots-ecrans-reduits.html` ; choix à faire.
 - **Exceptions par script aux emplacements protégés.** La liste reste la même pour tous,
   mais tel script — « vérifier les fichiers de Windows » — a le droit de recevoir
   `C:\Windows`, sans ouvrir la porte aux autres. Même rangement que la liste (`HKLM`,

@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lots sur petit écran — propositions</title>
+<!--
+  Maquette de l'etape « Choisir » du mode Simple quand la place manque.
+  Une seule dimension varie : la disposition des lots. Jetons, bouees, carte
+  recommandee et barre de titre reprennent src/styles.css. La fenetre simulee
+  a la taille reelle (1180 x 760 par defaut, 920 x 640 au minimum), reduite a
+  l'affichage pour tenir dans la page ; on y defile comme dans l'application.
+-->
+<style>
+:root {
+  --bg: #F3F6F9; --surface: #FFFFFF; --surface-2: #EDF2F6; --surface-3: #E0E8EF;
+  --border: #DDE5EC; --border-2: #C3D0DA;
+  --text: #0F1A24; --text-2: #4E6172; --text-3: #54697A; --ink: #06121A;
+  --ok: #14915C; --warn: #9A650F; --err: #B8382F;
+  --ok-s: #E6F5EC; --warn-s: #FBF3E2; --err-s: #FBEBEA;
+  --acc: #22D39A; --acc-2: #35C8E8; --acc-on: #0B7D59;
+  --surface-soft: #F7FAFC; --acc-soft: #EAFAF4; --knob-off: #7C8FA0;
+  --sh: 0 1px 2px rgba(15, 26, 36, .05), 0 6px 18px rgba(15, 26, 36, .05);
+  --sh-2: 0 10px 34px rgba(15, 26, 36, .10);
+  --ui: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'Cascadia Mono', Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0A0C10; --surface: #13171E; --surface-2: #1B212A; --surface-3: #242C38;
+    --border: #232B36; --border-2: #333D4B;
+    --text: #F2F6FA; --text-2: #9BA9B9; --text-3: #8397A6;
+    --ok: #22D39A; --warn: #FFB340; --err: #FF6B6B;
+    --ok-s: #0E2A22; --warn-s: #2C2113; --err-s: #2E1717;
+    --acc-on: #4BE8B8; --surface-soft: #171C24; --acc-soft: #12241F; --knob-off: #5B6C7C;
+    --sh: 0 2px 10px rgba(0, 0, 0, .35); --sh-2: 0 16px 46px rgba(0, 0, 0, .55);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0A0C10; --surface: #13171E; --surface-2: #1B212A; --surface-3: #242C38;
+  --border: #232B36; --border-2: #333D4B;
+  --text: #F2F6FA; --text-2: #9BA9B9; --text-3: #8397A6;
+  --ok: #22D39A; --warn: #FFB340; --err: #FF6B6B;
+  --ok-s: #0E2A22; --warn-s: #2C2113; --err-s: #2E1717;
+  --acc-on: #4BE8B8; --surface-soft: #171C24; --acc-soft: #12241F; --knob-off: #5B6C7C;
+  --sh: 0 2px 10px rgba(0, 0, 0, .35); --sh-2: 0 16px 46px rgba(0, 0, 0, .55);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--ui); }
+button { font: inherit; color: inherit; cursor: pointer; }
+.ico { width: 16px; height: 16px; flex-shrink: 0; fill: none; stroke: currentColor;
+       stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.i14 { width: 14px; height: 14px; }
+
+/* --- La page de la maquette ---------------------------------------------- */
+.page { max-width: 1240px; margin: 0 auto; padding: 28px 16px 64px; }
+.page-h h1 { margin: 0 0 4px; font-size: 24px; letter-spacing: -.4px; }
+.page-h p { margin: 0; color: var(--text-2); max-width: 760px; }
+.reglages { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; margin-top: 18px; }
+.reglages label { font-size: 12px; font-weight: 700; color: var(--text-3); margin-right: 8px; }
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--surface-2);
+  border: 1px solid var(--border); }
+.seg button { border: none; background: none; padding: 6px 13px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 700; color: var(--text-2); white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--sh); }
+.onglets { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 0; }
+.onglets button { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--surface);
+  font-size: 13px; font-weight: 700; color: var(--text-2); }
+.onglets button[aria-pressed="true"] { color: var(--ink); border-color: transparent;
+  background: linear-gradient(135deg, var(--acc), var(--acc-2)); }
+.onglets .n { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 7px;
+  font-size: 12px; background: var(--surface-2); color: var(--text-2); }
+.onglets button[aria-pressed="true"] .n { background: rgba(255, 255, 255, .35); color: var(--ink); }
+
+.explication { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 8px 32px;
+  margin: 18px 0 16px; padding: 18px 22px; border-radius: 16px; background: var(--surface);
+  border: 1px solid var(--border); }
+@media (max-width: 820px) { .explication { grid-template-columns: minmax(0, 1fr); } }
+.explication h2 { grid-column: 1 / -1; margin: 0; font-size: 19px; letter-spacing: -.3px; }
+.explication p { margin: 0; color: var(--text-2); }
+.pour, .contre { margin: 0; padding: 0; list-style: none; color: var(--text-2); }
+.pour li, .contre li { display: flex; gap: 8px; align-items: baseline; }
+.pour li::before { content: "+"; font-weight: 800; color: var(--ok); }
+.contre li::before { content: "−"; font-weight: 800; color: var(--warn); }
+.essai { grid-column: 1 / -1; font-size: 12.5px; color: var(--text-3); font-style: italic; }
+
+.ecran { position: relative; width: 100%; }
+.legende { margin: 8px 0 0; font-size: 12px; color: var(--text-3); }
+
+.communs, .choix { margin-top: 26px; padding: 18px 22px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--border); }
+.choix { border-color: color-mix(in srgb, var(--acc) 45%, transparent); background: var(--acc-soft); }
+.communs h2, .choix h2 { margin: 0 0 8px; font-size: 15px; }
+.communs ul { margin: 0; padding-left: 20px; color: var(--text-2); }
+.communs li + li { margin-top: 4px; }
+.communs b, .choix b { color: var(--text); }
+.choix p { margin: 0 0 6px; color: var(--text-2); }
+
+/* --- La fenetre simulee : barre de titre, scene ------------------------- */
+.fen { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--bg); border: 1px solid var(--border-2); border-radius: 10px;
+  box-shadow: var(--sh-2); transform-origin: 0 0; }
+.tb { height: 54px; flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding-left: 18px;
+  position: relative; z-index: 10; }
+.brand-mark { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center;
+  color: var(--ink); background: linear-gradient(135deg, var(--acc), var(--acc-2)); }
+.brand-name { font-size: 15.5px; font-weight: 800; letter-spacing: -.4px; }
+.brand-ver { font-family: var(--mono); font-size: 10px; color: var(--text-3); }
+.crumb { display: flex; align-items: center; gap: 9px; margin-left: 6px; font-size: 12.5px; font-weight: 700; }
+.crumb i { width: 9px; height: 9px; border-radius: 50%; background: var(--border-2); }
+.crumb i.on { background: var(--acc); }
+.tb-droite { margin-left: auto; display: flex; align-items: center; gap: 9px; height: 100%; }
+.tb .seg button { padding: 6px 16px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 650;
+  padding: 5px 11px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-3);
+  background: var(--surface-2); white-space: nowrap; }
+.pill.warn { color: var(--warn); background: var(--warn-s);
+  border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.iconbtn { width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center;
+  color: var(--text-2); border: 1px solid var(--border); }
+.winctl { display: flex; height: 100%; }
+.winctl span { width: 44px; display: grid; place-items: center; color: var(--text-3); }
+.winctl .ico { width: 11px; height: 11px; }
+
+.scene { flex: 1; position: relative; overflow: hidden; min-height: 0; }
+.defile { position: absolute; inset: 0; z-index: 1; overflow-y: auto; display: flex; flex-direction: column;
+  scrollbar-gutter: stable; }
+.defile > * { flex-shrink: 0; }
+.defile::-webkit-scrollbar { width: 9px; }
+.defile::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 5px; }
+.contenu { width: 100%; max-width: 1000px; margin: 0 auto; padding: 30px 24px 0; }
+.s-head { text-align: center; margin-bottom: 26px; }
+.s-head h1 { margin: 0; font-size: 31px; font-weight: 800; letter-spacing: -1px; line-height: 1.18; }
+.s-head p { font-size: 14.5px; color: var(--text-2); margin: 11px auto 0; max-width: 500px; }
+.reco-zone { display: flex; justify-content: center; }
+.reco { display: flex; align-items: center; gap: 18px; text-align: left; background: var(--surface);
+  border: 2.5px solid var(--border); border-radius: 26px; padding: 17px 32px 17px 22px; box-shadow: var(--sh); }
+.reco[aria-current="true"] { border-color: var(--acc);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--acc) 22%, transparent); }
+.reco .ri { width: 54px; height: 54px; border-radius: 18px; flex-shrink: 0; color: var(--ink);
+  display: grid; place-items: center; background: linear-gradient(135deg, var(--acc), var(--acc-2)); }
+.reco .ri .ico { width: 27px; height: 27px; }
+.reco .rt { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 800; letter-spacing: -.35px; }
+.reco .rd { display: block; font-size: 13.5px; color: var(--text-2); margin-top: 4px; }
+.badge { display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; padding: 3px 10px;
+  border-radius: 999px; color: var(--acc-on); background: color-mix(in srgb, var(--acc) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--acc) 38%, transparent); letter-spacing: 0; }
+.sect { margin: 26px 0 6px; font-size: 12.5px; font-weight: 700; color: var(--text-3); text-align: center; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px;
+  font-size: 12.5px; font-weight: 700; padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--text-2); background: var(--surface); }
+.btn.primary { border: none; color: var(--ink); background: linear-gradient(135deg, var(--acc), var(--acc-2)); }
+.btn.big { height: 58px; padding: 0 36px; font-size: 16px; gap: 11px;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--acc) 34%, transparent); }
+.btn.big .ico { width: 22px; height: 22px; }
+
+/* Bouee : le flotteur, et son etiquette qui pend dessous. */
+.buoy { width: 162px; display: block; text-align: center; background: none; border: none; padding: 0; }
+.buoy .bi { width: 58px; height: 58px; margin: 0 auto; border-radius: 50%; display: grid; place-items: center;
+  color: var(--text-2); background: var(--surface); border: 2px solid var(--border);
+  box-shadow: 0 6px 18px rgba(15, 26, 36, .08); }
+.buoy .bi .ico { width: 24px; height: 24px; }
+.buoy .blabel { display: inline-block; margin-top: 10px; padding: 7px 13px; border-radius: 14px;
+  background: var(--surface); border: 1px solid var(--border); }
+.buoy .bt { display: block; font-size: 13px; font-weight: 700; color: var(--text); }
+.buoy .bd { display: block; font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.buoy:hover .bi, .buoy[aria-current="true"] .bi { border-color: var(--acc); color: var(--acc-on); }
+.buoy[aria-current="true"] .blabel { border-color: var(--acc); }
+.buoy.plus .bi { border-style: dashed; border-color: var(--border-2); }
+
+/* La barre « Continuer », collee en bas de la fenetre. */
+.barre-cont { position: sticky; bottom: 0; z-index: 20; margin-top: auto; display: flex; align-items: center;
+  justify-content: center; gap: 22px; padding: 14px 24px 16px;
+  background: color-mix(in srgb, var(--bg) 84%, transparent); backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border); }
+.choisi { font-size: 13.5px; color: var(--text-2); }
+.choisi b { color: var(--text); }
+
+/* --- Aujourd'hui : l'eau ancree en bas, les bouees dans le flux --------- */
+.eau-fixe { position: absolute; left: 0; bottom: 0; z-index: 0; pointer-events: none; }
+.actuel .contenu { min-height: 100%; display: flex; flex-direction: column; padding-bottom: 48px; }
+.buoys-flux { display: flex; flex-wrap: wrap; justify-content: center; gap: 22px 12px; padding-top: 34px; }
+.actuel .s-nav { margin-top: auto; padding-top: 34px; display: flex; justify-content: center; }
+
+/* --- 1 : la mer s'agrandit ------------------------------------------------ */
+.mer { position: relative; width: 100%; }
+.mer > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+.mer .buoy { position: absolute; width: 150px; margin-left: -75px;
+  animation: flotte 3.4s ease-in-out infinite alternate; animation-delay: var(--d, 0s); }
+@keyframes flotte { from { transform: translateY(-4px); } to { transform: translateY(4px); } }
+
+/* --- 2 : grandes tuiles dans l'eau ------------------------------------- */
+.eau { flex: 1 0 auto; display: flex; flex-direction: column; margin-top: 18px; }
+.eau .crete { display: block; width: 100%; height: 44px; }
+.eau-corps { flex: 1 0 auto; background: linear-gradient(135deg,
+  color-mix(in srgb, var(--acc) 22%, transparent), color-mix(in srgb, var(--acc-2) 22%, transparent)); }
+.tuiles { max-width: 1000px; margin: 0 auto; padding: 18px 24px 34px; display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+.tuile { position: relative; display: flex; align-items: center; gap: 14px; min-height: 82px; padding: 14px 18px;
+  text-align: left; border-radius: 22px; background: var(--surface); border: 2px solid var(--border);
+  box-shadow: var(--sh); }
+.tuile .ti { width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
+  color: var(--text-2); background: var(--surface-2); }
+.tuile .ti .ico { width: 23px; height: 23px; }
+.tuile .tt { display: flex; flex-direction: column; min-width: 0; }
+.tuile .tt b { font-size: 15px; }
+.tuile .tt span { font-size: 12.5px; color: var(--text-3); }
+.tuile[aria-current="true"] { border-color: var(--acc); }
+.tuile[aria-current="true"] .ti { color: var(--ink); background: linear-gradient(135deg, var(--acc), var(--acc-2)); }
+
+/* --- 3 : l'essentiel sur l'eau ------------------------------------------ */
+.tous { max-width: 1000px; margin: 0 auto; padding: 4px 24px 34px; }
+.tous h3 { margin: 0 0 12px; font-size: 13px; font-weight: 700; color: var(--text-2); text-align: center; }
+.tous .grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.tous .tuile { min-height: 64px; padding: 10px 14px; border-radius: 18px; }
+.tous .tuile .ti { width: 40px; height: 40px; }
+.tous .tuile .ti .ico { width: 19px; height: 19px; }
+.tous .tuile .tt b { font-size: 14px; }
+
+/* --- 4 : une liste ------------------------------------------------------- */
+.liste { max-width: 780px; margin: 10px auto 0; padding: 0 24px; display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 10px; }
+.ligne-lot { display: flex; align-items: center; gap: 14px; min-height: 66px; padding: 10px 16px 10px 12px;
+  text-align: left; border-radius: 18px; background: var(--surface); border: 2px solid var(--border); }
+.ligne-lot .li { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; flex-shrink: 0;
+  color: var(--text-2); background: var(--surface-2); }
+.ligne-lot .li .ico { width: 21px; height: 21px; }
+.ligne-lot b { flex: 1; font-size: 15px; }
+.ligne-lot .ld { font-size: 12.5px; color: var(--text-3); }
+.ligne-lot .radio { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border-2); flex-shrink: 0; }
+.ligne-lot[aria-current="true"] { border-color: var(--acc); }
+.ligne-lot[aria-current="true"] .radio { border: 7px solid var(--acc); }
+.vague-deco { display: block; width: 100%; height: 120px; margin-top: 26px; }
+
+@media (prefers-reduced-motion: reduce) { .mer .buoy { animation: none; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="eau" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="var(--acc)" />
+      <stop offset="1" stop-color="var(--acc-2)" />
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="page">
+  <header class="page-h">
+    <h1>Écran « Choisir » — les lots quand la place manque</h1>
+    <p>La fenêtre ci-dessous a la vraie taille de WinTool, réduite pour tenir dans la page :
+      on y fait défiler et on y choisit comme dans l'application. Changez la taille de la
+      fenêtre et le nombre de lots pour mettre chaque proposition à l'épreuve.</p>
+  </header>
+
+  <div class="reglages">
+    <span><label>Fenêtre</label><span class="seg" id="segTaille"></span></span>
+    <span><label>Lots</label><span class="seg" id="segN"></span></span>
+    <span><label>Thème</label><span class="seg">
+      <button type="button" data-theme-btn="light">Clair</button>
+      <button type="button" data-theme-btn="dark">Sombre</button></span></span>
+  </div>
+
+  <nav class="onglets" id="onglets"></nav>
+  <section class="explication" id="explication"></section>
+
+  <div class="ecran" id="ecran"><div class="fen" id="fen"></div></div>
+  <p class="legende" id="legende"></p>
+
+  <section class="choix">
+    <h2>Mon conseil : 1, la mer s'agrandit</h2>
+    <p>C'est la seule qui garde ce qui fait WinTool — les bouées sur l'eau — à toutes les
+      tailles. Ce qui casse aujourd'hui, ce n'est pas l'idée de la mer : c'est de vouloir la
+      faire tenir dans la fenêtre. <b>Si tu as souvent plus de 12 lots, la 3</b> : le débutant
+      voit moins de choix d'un coup, et l'ordre que tu fixes en Expert décide lesquels.</p>
+  </section>
+
+  <section class="communs">
+    <h2>Pour toutes les propositions</h2>
+    <ul>
+      <li><b>« Continuer » toujours visible</b>, dans une barre collée en bas, qui rappelle ce qui est choisi (« Choisi : Vie privée · 4 min »). Aujourd'hui, il passe sous le bas de la fenêtre dès que les lots sont nombreux.</li>
+      <li><b>Une seule disposition, qui défile quand il faut.</b> Plus de bascule entre « posé sur l'eau » et « en rangées ordinaires » selon la hauteur de la fenêtre : c'est cette bascule qui produit le désordre d'aujourd'hui.</li>
+      <li><b>Les cibles gardent leur taille</b> : on fait défiler plutôt que de rétrécir.</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+// --- Icones Lucide (ISC) ------------------------------------------------------------
+const IC = {
+  waves: '<path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  settings: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+  minus: '<path d="M5 12h14"/>',
+  square: '<rect width="18" height="18" x="3" y="3" rx="2"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  'arrow-right': '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  sparkles: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
+  zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+  'app-window': '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/>',
+  wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+  megaphone: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>',
+  paintbrush: '<path d="m14.622 17.897-10.68-2.913"/><path d="M18.376 2.622a1 1 0 1 1 3.002 3.002L17.36 9.643a.5.5 0 0 0 0 .707l.944.944a2.41 2.41 0 0 1 0 3.408l-.944.944a.5.5 0 0 1-.707 0L8.354 7.348a.5.5 0 0 1 0-.707l.944-.944a2.41 2.41 0 0 1 3.408 0l.944.944a.5.5 0 0 0 .707 0z"/><path d="M9 8c-1.804 2.71-3.97 3.46-6.583 3.948a.507.507 0 0 0-.302.819l7.32 8.883a1 1 0 0 0 1.185.204C12.735 20.405 16 16.792 16 15"/>',
+  activity: '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
+  wifi: '<path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/>',
+  power: '<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.77.04"/>',
+  gamepad: '<line x1="6" x2="10" y1="11" y2="11"/><line x1="8" x2="8" y1="9" y2="13"/><line x1="15" x2="15.01" y1="12" y2="12"/><line x1="18" x2="18.01" y1="10" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258A4 4 0 0 0 17.32 5z"/>',
+  archive: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+  volume: '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/>',
+  monitor: '<rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/>',
+  printer: '<path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/>',
+  keyboard: '<path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/>',
+  battery: '<rect width="16" height="10" x="2" y="7" rx="2" ry="2"/><line x1="22" x2="22" y1="11" y2="13"/>',
+};
+const ico = (n, c = '') => `<svg class="ico ${c}" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// --- Donnees -------------------------------------------------------------------------
+const LOTS = [
+  ['Performance', 'zap', 2], ['Vie privée', 'shield', 4], ['Applications', 'app-window', 2],
+  ['Outillage', 'wrench', 8], ['Navigateurs', 'globe', 4], ['Pubs', 'megaphone', 3],
+  ['Faire le ménage', 'paintbrush', 5], ['Vérifier le PC', 'activity', 6], ['Réseau', 'wifi', 1],
+  ['Démarrage', 'power', 1], ['Jeux', 'gamepad', 2], ['Sauvegarde', 'archive', 3],
+  ['Mises à jour', 'refresh', 4], ['Sons', 'volume', 1], ['Écran', 'monitor', 1],
+  ['Imprimantes', 'printer', 2], ['Clavier', 'keyboard', 1], ['Batterie', 'battery', 1],
+];
+const TAILLES = {
+  defaut: [1180, 760, 'Par défaut', '1180 × 760, la taille d’ouverture de WinTool'],
+  minimum: [920, 640, 'Minimum', '920 × 640, la plus petite fenêtre permise'],
+  zoom: [708, 492, 'Minimum à 130 %', '920 × 640 avec l’affichage à 130 % : il reste la place de 708 × 492'],
+};
+const ETAT = { taille: 'defaut', n: 12, prop: 'actuel', choix: 'reco', tous: false };
+
+// --- Textes des propositions -------------------------------------------------------
+const PROPS = {
+  actuel: { n: '', nom: 'Aujourd’hui',
+    texte: '<p>Quand tout ne tient pas sur l’eau, les bouées repassent en rangées ordinaires, et la vague, restée ancrée en bas de la fenêtre, passe au hasard derrière elles. Avec 12 lots, c’est déjà le cas à la taille d’ouverture.</p>',
+    pour: [], contre: ['Des bouées coupées par la ligne d’eau, d’autres en plein ciel.', '« Continuer » passe sous le bas de la fenêtre.', 'En descendant, on ne voit plus ce qu’on a choisi.'],
+    essai: 'Passez à 18 lots, ou à la fenêtre minimum.' },
+  mer: { n: '1', nom: 'La mer s’agrandit',
+    texte: '<p>Les bouées restent sur l’eau, mais la mer n’a plus à tenir dans la fenêtre : chaque rangée a sa vague, avec un vrai espace entre elles, et la page défile. Plus on descend, plus l’eau est profonde.</p>',
+    pour: ['Garde l’identité de WinTool à toutes les tailles.', 'Jamais de bouée coupée ni recouverte.'],
+    contre: ['Beaucoup de lots = un long défilement.'],
+    essai: 'Essayez la fenêtre « Minimum à 130 % » avec 18 lots.' },
+  tuiles: { n: '2', nom: 'Grandes tuiles dans l’eau',
+    texte: '<p>Une seule vague, et sous elle de grandes tuiles alignées : deux à quatre par ligne selon la largeur. Les tuiles flottent dans l’eau au lieu d’y être posées une à une.</p>',
+    pour: ['Les plus grosses cibles, alignées comme un tableau.', 'Le plus compact à nombre de lots égal.'],
+    contre: ['Les bouées disparaissent : l’eau n’est plus qu’un fond.'],
+    essai: 'Comparez avec la 1 à 18 lots : même nombre de lots, moitié moins de hauteur.' },
+  essentiel: { n: '3', nom: 'L’essentiel sur l’eau',
+    texte: '<p>Les premiers lots — ceux que vous placez en tête en mode Expert — flottent sur la vague. Les autres attendent derrière une bouée « N autres », qui les déplie dessous.</p>',
+    pour: ['Un débutant voit peu de choix d’un coup : il choisit plus vite.', 'La vague reste belle à toutes les tailles.'],
+    contre: ['Un clic de plus pour les lots du bas de la liste.', 'L’ordre des lots devient important.'],
+    essai: 'Cliquez sur la bouée « autres ».' },
+  liste: { n: '4', nom: 'Une liste',
+    texte: '<p>De grandes lignes, comme un menu : une icône, le nom, la durée, et un rond qui se coche. Une ou deux colonnes selon la largeur ; la vague ne reste qu’en décor, en bas.</p>',
+    pour: ['Le plus lisible : rien à deviner.', 'Le choix se voit au rond coché.'],
+    contre: ['Le moins « WinTool » : la mer devient un décor.'],
+    essai: 'Passez à la fenêtre « Minimum à 130 % ».' },
+};
+
+// --- Vagues ---------------------------------------------------------------------------
+// Meme dessin que la nappe de l'application : demi-periodes de Bezier dont les points
+// de controle sont a A / 0,75 — d'ou une crete d'exactement A. Periode = largeur / 2.
+function vague(W, y, A, phase = 0) {
+  const lam = Math.max(280, W / 2), h = lam / 2, d = A / 0.75;
+  let x = -((phase % lam) + lam), k = 0;
+  let s = `M${x.toFixed(1)},${y}`;
+  while (x < W + lam) {
+    const yc = (y + (k % 2 ? 1 : -1) * d).toFixed(1);
+    s += ` C${(x + h / 3).toFixed(1)},${yc} ${(x + 2 * h / 3).toFixed(1)},${yc} ${(x + h).toFixed(1)},${y}`;
+    x += h; k++;
+  }
+  return s;
+}
+// Hauteur de cette courbe en x : sur chaque demi-periode, 3 d t (1 - t).
+function ecartVague(xp, W, A, phase = 0) {
+  const lam = Math.max(280, W / 2), h = lam / 2, d = A / 0.75;
+  const u = (xp + (phase % lam) + lam) / h;
+  const k = Math.floor(u), t = u - k;
+  return (k % 2 ? 1 : -1) * 3 * d * t * (1 - t);
+}
+function repartir(n, capacite) {
+  const rangees = Math.max(1, Math.ceil(n / capacite));
+  const base = Math.floor(n / rangees), reste = n % rangees;
+  return Array.from({ length: rangees }, (_, k) => base + (k < reste ? 1 : 0));
+}
+
+// --- Morceaux communs -----------------------------------------------------------------
+const choisi = (i) => String(ETAT.choix) === String(i);
+function tete() {
+  return `<div class="s-head"><h1>Que souhaitez-vous faire ?</h1>
+      <p>Choisissez une option. Vous pourrez revenir en arrière à tout moment.</p></div>
+    <div class="reco-zone"><button class="reco" type="button" data-lot="reco" aria-current="${choisi('reco')}">
+      <span class="ri">${ico('sparkles')}</span>
+      <span><span class="rt">Entretien automatique <span class="badge">Recommandé</span></span>
+      <span class="rd">On s’occupe de tout — environ 10 minutes</span></span></button></div>
+    <div class="sect">Ou choisissez un domaine précis</div>`;
+}
+function bouee(i, style = '') {
+  const [nom, icone, min] = LOTS[i];
+  return `<button class="buoy" type="button" data-lot="${i}" aria-current="${choisi(i)}" style="${style}">
+    <span class="bi">${ico(icone)}</span><span class="blabel"><span class="bt">${esc(nom)}</span><span class="bd">${min} min</span></span></button>`;
+}
+function tuile(i) {
+  const [nom, icone, min] = LOTS[i];
+  return `<button class="tuile" type="button" data-lot="${i}" aria-current="${choisi(i)}">
+    <span class="ti">${ico(icone)}</span><span class="tt"><b>${esc(nom)}</b><span>${min} min</span></span></button>`;
+}
+function barre() {
+  const [nom, min] = ETAT.choix === 'reco' ? ['Entretien automatique', 10] : [LOTS[ETAT.choix][0], LOTS[ETAT.choix][2]];
+  return `<div class="barre-cont"><span class="choisi">Choisi : <b>${esc(nom)}</b> · ${min} min</span>
+    <button class="btn primary big" type="button">Continuer ${ico('arrow-right')}</button></div>`;
+}
+function barreTitre(W) {
+  return `<div class="tb"><span class="brand-mark">${ico('waves')}</span><span class="brand-name">WinTool</span>
+    <span class="brand-ver">1.2.0</span>
+    <span class="crumb">Choisir <i class="on"></i><i></i><i></i></span>
+    <span class="tb-droite">
+      <span class="seg"><button type="button" aria-pressed="true">Simple</button><button type="button">Expert</button></span>
+      ${W >= 900 ? `<span class="pill">${ico('shield', 'i14')} Simulation</span><span class="pill warn">${ico('shield', 'i14')} Droits limités</span>` : ''}
+      <span class="iconbtn">${ico('sun')}</span><span class="iconbtn">${ico('settings')}</span>
+      <span class="winctl"><span>${ico('minus')}</span><span>${ico('square')}</span><span>${ico('x')}</span></span>
+    </span></div>`;
+}
+const indices = () => Array.from({ length: ETAT.n }, (_, i) => i);
+
+// --- Aujourd'hui -------------------------------------------------------------------------
+function rendreActuel(W) {
+  // L'eau de l'application : 760 px de haut, ancree en bas, ligne d'eau a 452.
+  const eau = `<svg class="eau-fixe" width="${W}" height="760" viewBox="0 0 ${W} 760" aria-hidden="true">
+      <path d="${vague(W, 486, 37.5, W / 8)} L${W},760 L0,760 Z" fill="url(#eau)" opacity=".16"/>
+      <path d="${vague(W, 452, 37.5)} L${W},760 L0,760 Z" fill="url(#eau)" opacity=".26"/>
+      <path d="${vague(W, 452, 37.5)}" fill="none" stroke="var(--acc)" stroke-width="2.5" opacity=".55"/></svg>`;
+  return `${eau}<div class="defile actuel"><div class="contenu">${tete()}
+      <div class="buoys-flux">${indices().map((i) => bouee(i)).join('')}</div>
+      <div class="s-nav"><button class="btn primary big" type="button">Continuer ${ico('arrow-right')}</button></div>
+    </div></div>`;
+}
+
+// --- 1 : la mer s'agrandit ----------------------------------------------------------------
+function mer(W, liste, { haut = 64, ecart = 168, A = 13, fond = 150, plus = null } = {}) {
+  const cap = Math.max(1, Math.min(8, Math.floor((W - 88) / 180)));
+  const tailles = repartir(liste.length, cap);
+  const R = tailles.length;
+  const lignes = tailles.map((_, k) => haut + k * ecart);
+  const hauteur = lignes[R - 1] + fond;
+  let svg = '', bouees = '', i = 0;
+  tailles.forEach((n, k) => {
+    const y = lignes[k], phase = k * W / 7, trace = vague(W, y, A, phase);
+    svg += `<path d="${trace} L${W},${hauteur} L0,${hauteur} Z" fill="url(#eau)" opacity="${(0.12 + 0.03 * k).toFixed(2)}"/>
+            <path d="${trace}" fill="none" stroke="var(--acc)" stroke-width="2.5" opacity=".55"/>`;
+    const pas = Math.min(230, (W - 88) / n), depart = (W - pas * n) / 2;
+    for (let j = 0; j < n; j++, i++) {
+      const x = depart + (j + 0.5) * pas;
+      const yb = y + ecartVague(x, W, A, phase) - 29;
+      const style = `left:${x.toFixed(1)}px;top:${yb.toFixed(1)}px;--d:${(-(x / W) * 3.4).toFixed(2)}s`;
+      bouees += liste[i] === 'plus' ? plus(style) : bouee(liste[i], style);
+    }
+  });
+  return `<div class="mer" style="height:${hauteur}px">
+      <svg viewBox="0 0 ${W} ${hauteur}" preserveAspectRatio="none" aria-hidden="true">${svg}</svg>${bouees}</div>`;
+}
+function rendreMer(W) {
+  return `<div class="defile"><div class="contenu">${tete()}</div>${mer(W, indices())}${barre()}</div>`;
+}
+
+// --- 2 : grandes tuiles dans l'eau --------------------------------------------------------
+function crete(W) {
+  return `<svg class="crete" viewBox="0 0 ${W} 44" preserveAspectRatio="none" aria-hidden="true">
+      <path d="${vague(W, 24, 11)} L${W},44 L0,44 Z" fill="url(#eau)" opacity=".22"/>
+      <path d="${vague(W, 24, 11)}" fill="none" stroke="var(--acc)" stroke-width="2.5" opacity=".55"/></svg>`;
+}
+function rendreTuiles(W) {
+  return `<div class="defile"><div class="contenu">${tete()}</div>
+    <div class="eau">${crete(W)}<div class="eau-corps"><div class="tuiles">${indices().map(tuile).join('')}</div></div></div>
+    ${barre()}</div>`;
+}
+
+// --- 3 : l'essentiel sur l'eau -------------------------------------------------------------
+function rendreEssentiel(W) {
+  const cap = Math.max(2, Math.min(6, Math.floor((W - 88) / 180)));
+  const tout = indices();
+  let dessus = tout, dessous = [];
+  if (tout.length > cap) { dessus = tout.slice(0, cap - 1); dessous = tout.slice(cap - 1); }
+  const liste = dessous.length ? [...dessus, 'plus'] : dessus;
+  const plus = (style) => `<button class="buoy plus" type="button" data-tous style="${style}" aria-expanded="${ETAT.tous}">
+      <span class="bi">${ico('plus')}</span><span class="blabel"><span class="bt">${dessous.length} autres</span>
+      <span class="bd">${ETAT.tous ? 'repliés dessous' : 'domaines'}</span></span></button>`;
+  const corps = ETAT.tous && dessous.length
+    ? `<div class="eau-corps" id="tous"><div class="tous"><h3>Tous les autres domaines</h3>
+        <div class="grille">${dessous.map(tuile).join('')}</div></div></div>`
+    : '';
+  return `<div class="defile"><div class="contenu">${tete()}</div>
+    ${mer(W, liste, { plus, fond: corps ? 120 : 150 })}${corps}${barre()}</div>`;
+}
+
+// --- 4 : une liste --------------------------------------------------------------------------
+function rendreListe(W) {
+  const ligne = (i) => {
+    const [nom, icone, min] = LOTS[i];
+    return `<button class="ligne-lot" type="button" data-lot="${i}" aria-current="${choisi(i)}">
+      <span class="li">${ico(icone)}</span><b>${esc(nom)}</b><span class="ld">${min} min</span><span class="radio"></span></button>`;
+  };
+  const deco = `<svg class="vague-deco" viewBox="0 0 ${W} 120" preserveAspectRatio="none" aria-hidden="true">
+      <path d="${vague(W, 40, 13)} L${W},120 L0,120 Z" fill="url(#eau)" opacity=".22"/>
+      <path d="${vague(W, 40, 13)}" fill="none" stroke="var(--acc)" stroke-width="2.5" opacity=".55"/></svg>`;
+  return `<div class="defile"><div class="contenu">${tete()}</div>
+    <div class="liste">${indices().map(ligne).join('')}</div>${deco}${barre()}</div>`;
+}
+
+// --- Rendu ------------------------------------------------------------------------------------
+const RENDUS = { actuel: rendreActuel, mer: rendreMer, tuiles: rendreTuiles, essentiel: rendreEssentiel, liste: rendreListe };
+
+function ajuster() {
+  const [W, H] = TAILLES[ETAT.taille];
+  const boite = document.getElementById('ecran');
+  const fen = document.getElementById('fen');
+  const k = Math.min(1, boite.clientWidth / W);
+  fen.style.transform = `scale(${k})`;
+  boite.style.height = `${Math.ceil(H * k)}px`;
+  document.getElementById('legende').textContent =
+    `Fenêtre de ${TAILLES[ETAT.taille][3]}${k < 1 ? ` — affichée à ${Math.round(k * 100)} % pour tenir dans la page` : ''}.`;
+}
+
+function rendre({ garderDefilement = false } = {}) {
+  const [W, H] = TAILLES[ETAT.taille];
+  const fen = document.getElementById('fen');
+  const avant = garderDefilement ? fen.querySelector('.defile')?.scrollTop || 0 : 0;
+  fen.style.width = `${W}px`;
+  fen.style.height = `${H}px`;
+  // La barre de defilement (9 px, toujours reservee) se retire de la largeur utile.
+  const utile = ETAT.prop === 'actuel' ? W : W - 9;
+  fen.innerHTML = barreTitre(W) + `<div class="scene">${RENDUS[ETAT.prop](utile)}</div>`;
+  const defile = fen.querySelector('.defile');
+  if (defile) defile.scrollTop = avant;
+
+  const p = PROPS[ETAT.prop];
+  document.getElementById('explication').innerHTML =
+    `<h2>${p.n ? `${p.n} · ` : ''}${p.nom}</h2><div>${p.texte}</div><div>
+      ${p.pour.length ? `<ul class="pour">${p.pour.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}
+      <ul class="contre">${p.contre.map((x) => `<li>${x}</li>`).join('')}</ul></div>
+      <p class="essai">${p.essai}</p>`;
+  document.querySelectorAll('[data-taille]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.taille === ETAT.taille));
+  document.querySelectorAll('[data-n]').forEach((b) => b.setAttribute('aria-pressed', Number(b.dataset.n) === ETAT.n));
+  document.querySelectorAll('[data-prop]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.prop === ETAT.prop));
+  ajuster();
+}
+
+document.getElementById('segTaille').innerHTML = Object.entries(TAILLES)
+  .map(([k, t]) => `<button type="button" data-taille="${k}">${t[2]}</button>`).join('');
+document.getElementById('segN').innerHTML = [6, 12, 18]
+  .map((n) => `<button type="button" data-n="${n}">${n}</button>`).join('');
+document.getElementById('onglets').innerHTML = Object.entries(PROPS)
+  .map(([k, p]) => `<button type="button" data-prop="${k}">${p.n ? `<span class="n">${p.n}</span>` : ''}${p.nom}</button>`).join('');
+
+document.addEventListener('click', (ev) => {
+  const c = ev.target.closest('[data-taille],[data-n],[data-prop],[data-lot],[data-tous],[data-theme-btn]');
+  if (!c) return;
+  const d = c.dataset;
+  if (d.taille) { ETAT.taille = d.taille; rendre(); }
+  else if (d.n) { ETAT.n = Number(d.n); if (ETAT.choix !== 'reco' && ETAT.choix >= ETAT.n) ETAT.choix = 'reco'; rendre(); }
+  else if (d.prop) { ETAT.prop = d.prop; ETAT.tous = false; rendre(); }
+  else if (d.lot) { ETAT.choix = d.lot === 'reco' ? 'reco' : Number(d.lot); rendre({ garderDefilement: true }); }
+  else if (d.tous !== undefined) {
+    ETAT.tous = !ETAT.tous;
+    rendre({ garderDefilement: true });
+    if (ETAT.tous) document.getElementById('tous')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  } else if (d.themeBtn) { document.documentElement.dataset.theme = d.themeBtn; marquerTheme(); }
+});
+
+const sombreSysteme = matchMedia('(prefers-color-scheme: dark)');
+function marquerTheme() {
+  const t = document.documentElement.dataset.theme || (sombreSysteme.matches ? 'dark' : 'light');
+  document.querySelectorAll('[data-theme-btn]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.themeBtn === t));
+}
+sombreSysteme.addEventListener('change', marquerTheme);
+addEventListener('resize', ajuster);
+marquerTheme();
+rendre();
+</script>
+</body>
+</html>
