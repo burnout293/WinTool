@@ -256,6 +256,156 @@ input:disabled { cursor: not-allowed; }
 .ref th, .ref td { text-align: left; padding: 7px 8px; border-top: 1px solid var(--border); vertical-align: top; }
 .ref th { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); border-top: none; }
 .ref code { font-family: var(--mono); font-size: 12px; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
+
+/* --- 3 · Simple, en moins : les graphiques ------------------------------ */
+.graphe { padding: 18px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border); }
+.graphe-h { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 10px; margin-bottom: 12px; }
+.graphe-h b { font-size: 24px; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
+.graphe-h span { color: var(--text-3); font-size: 13px; }
+.postes { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.poste { position: relative; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px;
+  border: 1px solid var(--border); background: var(--surface-soft); cursor: pointer; overflow: hidden; }
+.poste > * { position: relative; }
+.poste .remplissage { position: absolute; inset: 0 auto 0 0; opacity: .2; border-radius: 0; transition: width .25s; }
+.poste.decoche .remplissage { opacity: .06; }
+.poste .pt { width: 12px; height: 12px; border-radius: 4px; flex-shrink: 0; }
+.poste .l-t b { font-size: 14.5px; }
+.poste .l-t span { font-size: 12px; color: var(--text-3); }
+.poste .l-v { font-size: 15px; }
+.poste.decoche .l-v { color: var(--text-3); }
+.poste .note { margin-top: 4px; padding: 4px 8px; }
+.masques { margin-top: 12px; font-size: 12.5px; color: var(--text-3); display: flex; gap: 8px; align-items: center; }
+.anneau-zone { display: grid; grid-template-columns: 240px 1fr; gap: 20px; align-items: center; }
+@media (max-width: 700px) { .anneau-zone { grid-template-columns: 1fr; } }
+.anneau { position: relative; width: 220px; height: 220px; margin: 0 auto; }
+.anneau svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.anneau circle { fill: none; stroke-width: 26; transition: opacity .2s; }
+.anneau .centre { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.anneau .centre b { font-size: 26px; letter-spacing: -.6px; }
+.anneau .centre span { font-size: 12px; color: var(--text-3); }
+.disque { margin-top: 4px; }
+.disque-barre { display: flex; height: 40px; border-radius: 12px; overflow: hidden; background: var(--surface-3); }
+.disque-barre i { display: block; height: 100%; }
+.disque-barre .utilise { background: var(--border-2); }
+.disque-barre .libere { background: repeating-linear-gradient(45deg, var(--acc), var(--acc) 6px, var(--acc-2) 6px, var(--acc-2) 12px); }
+.disque-barre .libre { background: color-mix(in srgb, var(--ok) 25%, transparent); }
+.disque-l { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 10px; font-size: 12.5px; color: var(--text-2); }
+.disque-l i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.treemap { display: flex; flex-direction: column; gap: 4px; height: 240px; }
+.tm-rang { display: flex; gap: 4px; min-height: 0; }
+.tm-case { position: relative; min-width: 0; border-radius: 10px; padding: 8px 10px; color: #06121A; display: flex; flex-direction: column; justify-content: space-between;
+  overflow: hidden; cursor: pointer; transition: opacity .2s; text-align: left; border: none; }
+.tm-case b { font-size: 13px; line-height: 1.2; }
+.tm-case span { font-size: 12px; font-weight: 700; }
+.tm-case.off { opacity: .3; }
+.tm-case.petite b, .tm-case.petite span { display: none; }
+.gaufre { display: grid; grid-template-columns: repeat(20, 1fr); gap: 3px; }
+.gaufre i { aspect-ratio: 1; border-radius: 3px; transition: opacity .2s; }
+.gaufre i.off { opacity: .2; }
+.gaufre i.vide { background: var(--surface-3); }
+.jauge-seule { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 10px 0; }
+.interrupteur { display: inline-flex; align-items: center; gap: 12px; padding: 12px 18px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-soft); font-weight: 700; }
+.switch { flex-shrink: 0; width: 44px; height: 24px; border-radius: 999px; background: var(--border); border: none; position: relative; transition: background .16s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #7C8FA0; transition: transform .16s, background .16s; }
+.switch[aria-checked="true"] { background: var(--acc); }
+.switch[aria-checked="true"]::after { transform: translateX(20px); background: var(--ink); }
+.lien-detail { border: none; background: none; color: var(--acc-on); font-weight: 700; font-size: 13px; padding: 0; }
+
+/* --- 4 · Vues au choix du script -------------------------------------- */
+.galerie { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; margin-top: 12px; }
+@media (max-width: 520px) { .galerie { grid-template-columns: 1fr; } }
+.vue { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 18px; background: var(--surface-soft); border: 1px solid var(--border); }
+.vue-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.vue-h h3 { margin: 0; font-size: 15px; }
+.niveau { display: inline-flex; gap: 3px; margin-left: auto; }
+.niveau i { width: 8px; height: 8px; border-radius: 50%; background: var(--border-2); }
+.niveau i.on { background: var(--acc); }
+.vue p { margin: 0; font-size: 12.5px; color: var(--text-2); }
+.vue .decl { font: 11.5px var(--mono); padding: 6px 10px; border-radius: 10px; background: #0A2A33; color: #C7D9DE; }
+.vue-rendu { border-radius: 14px; background: var(--surface); border: 1px solid var(--border); padding: 14px; }
+.v-min { display: flex; align-items: center; gap: 14px; }
+.v-min .t { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.v-min b { font-size: 16px; }
+.v-min span { font-size: 12.5px; color: var(--text-3); }
+.feu { display: flex; align-items: center; gap: 16px; }
+.feu .lampe { width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; color: #fff; }
+.feu .lampe.ok { background: var(--ok); box-shadow: 0 0 0 8px color-mix(in srgb, var(--ok) 18%, transparent); }
+.feu .lampe.warn { background: var(--warn); box-shadow: 0 0 0 8px color-mix(in srgb, var(--warn) 18%, transparent); }
+.feu .lampe.crit { background: var(--err); box-shadow: 0 0 0 8px color-mix(in srgb, var(--err) 18%, transparent); }
+.feu b { font-size: 17px; display: block; }
+.feu span { font-size: 12.5px; color: var(--text-3); }
+.tuiles-app { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.tuile-app { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 8px 10px; border-radius: 14px;
+  border: 2px solid var(--border); background: var(--surface-soft); text-align: center; font-size: 12px; }
+.tuile-app.coche { border-color: var(--acc); }
+.tuile-app.verrou { opacity: .55; }
+.tuile-app .av { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; color: #06121A; font-size: 17px; }
+.tuile-app b { font-size: 12.5px; line-height: 1.2; }
+.tuile-app .muted { font-size: 11px; }
+.tuile-app .marque { position: absolute; top: 6px; right: 6px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--acc); color: #06121A; font-size: 12px; font-weight: 900; }
+.aa { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.aa th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); padding: 4px 6px; }
+.aa td { padding: 7px 6px; border-top: 1px solid var(--border); }
+.aa .fl { color: var(--text-3); padding: 7px 0; }
+.tab { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.tab th { text-align: left; padding: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); cursor: pointer; white-space: nowrap; user-select: none; }
+.tab th[aria-sort] { color: var(--acc-on); }
+.tab td { padding: 6px; border-top: 1px solid var(--border); vertical-align: top; }
+.tab td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tab .chemin { font-family: var(--mono); font-size: 11px; color: var(--text-3); overflow-wrap: anywhere; }
+.tab td.tab-vide { padding: 18px 6px; text-align: center; color: var(--text-3); }
+.tab-outils { display: flex; gap: 8px; margin-bottom: 8px; }
+.tab-outils input { flex: 1; height: 30px; border-radius: 999px; border: 1px solid var(--border-2); background: var(--surface-2); padding: 0 12px; font-size: 12.5px; }
+.fil-tm { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 12.5px; }
+.chrono { position: relative; padding-top: 4px; }
+.chrono-axe { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-3); margin-top: 6px; border-top: 1px solid var(--border-2); padding-top: 4px; }
+.chrono-ligne { display: grid; grid-template-columns: 130px 1fr; align-items: center; gap: 8px; height: 26px; font-size: 12px; }
+.chrono-ligne span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.chrono-piste { position: relative; height: 16px; }
+.chrono-piste i { position: absolute; top: 0; height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--acc), var(--acc-2)); }
+.chrono-piste i.coupe { background: repeating-linear-gradient(45deg, var(--border-2), var(--border-2) 4px, transparent 4px, transparent 8px); border: 1px dashed var(--border-2); }
+.chrono-piste i.sys { background: var(--text-3); }
+.colonnes { display: flex; align-items: flex-end; gap: 14px; height: 170px; padding: 0 6px; }
+.colonne { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; cursor: pointer; }
+.colonne i { width: 100%; max-width: 54px; border-radius: 8px 8px 3px 3px; background: var(--border-2); transition: background .2s; }
+.colonne.choisi i { background: linear-gradient(180deg, var(--acc), var(--acc-2)); }
+.colonne b { font-size: 12px; }
+.colonne span { font-size: 11px; color: var(--text-3); text-align: center; }
+.histo-barres { display: flex; align-items: flex-end; gap: 6px; height: 90px; }
+.histo-barres i { flex: 1; border-radius: 5px 5px 2px 2px; background: linear-gradient(180deg, var(--acc), var(--acc-2)); }
+.histo-dates { display: flex; gap: 6px; font-size: 10.5px; color: var(--text-3); }
+.histo-dates span { flex: 1; text-align: center; }
+.panneau .histo-dates span { white-space: nowrap; }
+.panneau .histo-dates span:nth-child(even) { visibility: hidden; }
+
+/* --- 5 · Expert et panneaux -------------------------------------------- */
+.tb.expert { background: var(--surface); border-bottom: 1px solid var(--border); }
+.tb .seg button { padding: 6px 16px; }
+.tb-cherche { width: 260px; height: 34px; margin-left: 12px; display: flex; align-items: center; gap: 9px; padding: 0 12px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text-3); font-size: 12.5px; }
+.xp { position: absolute; inset: 0; display: grid; grid-template-columns: 250px minmax(0, 1fr) 330px; }
+.xp-nav { padding: 14px 10px; border-right: 1px solid var(--border); background: var(--surface); overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.xp-nav .t { margin: 0 6px 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); }
+.xp-centre { overflow-y: auto; padding: 16px; }
+.xp-panneaux { border-left: 1px solid var(--border); background: var(--surface); overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.puces { display: flex; flex-wrap: wrap; gap: 5px; }
+.puces button { border: 1px solid var(--border); background: var(--surface-soft); border-radius: 999px; padding: 3px 9px; font-size: 11px; font-weight: 700; color: var(--text-3); }
+.puces button[aria-pressed="true"] { color: var(--acc-on); border-color: color-mix(in srgb, var(--acc) 45%, transparent); background: var(--acc-soft); }
+.panneau { border: 1px solid var(--border); border-radius: 14px; background: var(--surface-soft); overflow: hidden; }
+.panneau-h { display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-size: 12px; font-weight: 700; color: var(--text-2); border-bottom: 1px solid var(--border); }
+.panneau-h .muted { margin-left: auto; font-weight: 500; }
+.panneau-b { padding: 8px 10px; font-size: 12px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-family: var(--mono); font-size: 11.5px; }
+.kv span:nth-child(odd) { color: var(--text-3); }
+.kv .mod { color: var(--acc-on); }
+.journal { font: 11px/1.55 var(--mono); background: #0A2A33; color: #C7D9DE; border-radius: 10px; padding: 8px; max-height: 190px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.journal .m-step { color: #2DD4BF; } .journal .m-ok { color: #4ADE80; } .journal .m-warn { color: #FBBF24; } .journal .m-find { color: #7DB8E8; } .journal .m-log { color: #94A3B8; } .journal .h { color: #5B7C86; }
+.plan { margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 3px; }
+.plan .chemin { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); overflow-wrap: anywhere; }
+.attention-l { display: flex; gap: 8px; padding: 3px 0; font-size: 11.5px; }
+.attention-l code { font-family: var(--mono); color: var(--warn); }
+
 @media (prefers-reduced-motion: reduce) { .attente { animation: none; } .prog-barre i, .pile i, .chev { transition: none; } }
 </style>
 </head>
@@ -275,7 +425,10 @@ input:disabled { cursor: not-allowed; }
   <nav class="onglets">
     <button type="button" data-onglet="dispositions">1 · Dispositions de l'écran</button>
     <button type="button" data-onglet="exemples">2 · 14 exemples</button>
-    <button type="button" data-onglet="norme">3 · La norme</button>
+    <button type="button" data-onglet="simple">3 · Simple, en moins</button>
+    <button type="button" data-onglet="vues">4 · Vues au choix du script</button>
+    <button type="button" data-onglet="expert">5 · Expert et panneaux</button>
+    <button type="button" data-onglet="norme">6 · La norme</button>
   </nav>
 
   <section id="vue-dispositions">
@@ -306,6 +459,64 @@ input:disabled { cursor: not-allowed; }
     </div>
     <div class="barre-outils"><button class="btn compact" type="button" data-rejouer-ex>Rejouer l'analyse de tous les exemples</button></div>
     <div id="listeExemples"></div>
+  </section>
+
+  <section id="vue-simple" hidden>
+    <div class="explication">
+      <h2>Oui : c'est au script de faire simple — et la norme lui en donne les moyens</h2>
+      <p>En mode Simple, chaque action se <b>résume en un ou deux postes</b> qu'elle déclare elle-même
+        (bloc <code class="mono">WINTOOL:SIMPLE</code>) : le nettoyage des fichiers temporaires devient
+        « Fichiers inutiles » et « Anciennes mises à jour de Windows » au lieu de six lignes ; les restes de
+        programmes ne gardent que ce dont l'action est sûre. Une action qui touche aux <b>fichiers
+        personnels</b> (doublons, gros fichiers) peut se déclarer <b>réservée à l'Expert</b>. Résultat :
+        5 postes au lieu de 12.</p>
+      <p>WinTool garde une règle pour lui : un poste Simple ne prend jamais que ce que le script a coché
+        d'office. Un script ne peut donc pas glisser en Simple ce qu'il considère lui-même comme douteux.</p>
+    </div>
+    <div class="barre-outils">
+      <span><label>Graphique</label><span class="seg" id="segGraphe"></span></span>
+      <span><label>Postes</label><span class="seg"><button type="button" data-postes="simples">Résumés par les scripts (5)</button><button type="button" data-postes="tous">Tous (12)</button></span></span>
+    </div>
+    <div class="explication" id="explication3"></div>
+    <div class="ecran"><div class="fen" id="fen3"></div></div>
+    <section class="choix">
+      <h2>Mon conseil : l'anneau ou le disque avant/après</h2>
+      <p><b>Le disque avant/après</b> parle à tout le monde (« mon disque est presque plein, il le sera
+        moins »), <b>l'anneau</b> dit le mieux d'où vient la place. Les deux gardent la liste dessous. Et
+        rien n'empêche d'en laisser le choix dans les réglages.</p>
+    </section>
+  </section>
+
+  <section id="vue-vues" hidden>
+    <div class="explication">
+      <h2>Oui : l'écran est à WinTool, la vue d'une action est au script</h2>
+      <p>WinTool dispose les actions (onglet 1) ; chaque script dit comment <b>sa</b> partie s'affiche, avec
+        une vue pour le mode Simple et une pour l'Expert :
+        <code class="mono">## view : simple=minimal expert=table</code>. Une liste peut aussi choisir la
+        sienne : <code class="mono">[items] [view:tree]</code>. Sans rien déclarer, c'est la liste à
+        cocher. Quatorze vues, de la plus simple à la plus complexe — toutes branchées sur les mêmes cases :
+        cocher ici coche dans les autres onglets.</p>
+      <p>Les vues sont un <b>catalogue fermé</b>, dessiné par WinTool : un script en choisit une, il n'en
+        dessine pas. C'est ce qui garde l'application cohérente, accessible et traduite.</p>
+    </div>
+    <div class="galerie" id="galerie"></div>
+  </section>
+
+  <section id="vue-expert" hidden>
+    <div class="explication">
+      <h2>B, avec des panneaux</h2>
+      <p>À droite, des panneaux qu'on ouvre et ferme (les pastilles en haut) : <b>Réglages appliqués</b>
+        (le rappel des variables), <b>Progression</b> (le journal, filtrable : étapes, constats, et les canaux
+        que le script ouvre lui-même avec <code class="mono">[LOG] Registry …</code>), <b>Ce qui sera fait</b>
+        (la liste exacte, d'après les cases), <b>Ce que reçoit le script</b> (le
+        <code class="mono">WINTOOL_CONFIG</code> réel), <b>Points d'attention</b>, <b>Historique</b>,
+        <b>Provenance</b>, <b>Espace disque</b>. Le script propose ceux qui s'ouvrent d'office
+        (<code class="mono">## panels : plan progress</code>) ; l'utilisateur ajoute ou retire.</p>
+      <p>Essayez : « Retirer les restes » (journal avec un canal « Registry »), puis décochez un reste et
+        regardez « Ce qui sera fait » et « Ce que reçoit le script » suivre.</p>
+    </div>
+    <div class="barre-outils"><button class="btn compact" type="button" data-rejouer-xp>Rejouer l'analyse de cette action</button></div>
+    <div class="ecran"><div class="fen" id="fen5"></div></div>
   </section>
 
   <section id="vue-norme" hidden>
@@ -1034,11 +1245,12 @@ function rendreDispositions() {
 }
 
 function ajuster() {
-  const boite = document.getElementById('ecran');
-  const fen = document.getElementById('fen');
-  const k = Math.min(1, boite.clientWidth / 1180);
-  fen.style.transform = `scale(${k})`;
-  boite.style.height = `${Math.ceil(760 * k)}px`;
+  document.querySelectorAll('.ecran').forEach((boite) => {
+    const fen = boite.querySelector('.fen');
+    const k = Math.min(1, boite.clientWidth / 1180);
+    fen.style.transform = `scale(${k})`;
+    boite.style.height = `${Math.ceil(760 * k)}px`;
+  });
 }
 
 let minuterie = null;
@@ -1160,14 +1372,567 @@ function rendreReference() {
     <tr><td><code>version=</code> · <code>to=</code> · <code>date=</code> · <code>keep=</code></td><td>texte · AAAA-MM-JJ · booléen</td><td>version actuelle → proposée ; date ; exemplaire proposé à garder</td></tr>
     <tr><td><code>value=</code> · <code>unit=</code> · <code>health=</code> · <code>max=</code></td><td>nombre · <code>celsius pct hours days s count cycles</code> · <code>ok warn crit</code> · nombre</td><td>une mesure, son état, sa jauge</td></tr>
   </table></div>
+  <div class="ref"><h2>Simple, vues, panneaux : ce qui s'ajoute dans l'entête</h2><table>
+    <tr><th>Déclaration</th><th>Rôle</th></tr>
+    <tr><td>bloc <code>WINTOOL:SIMPLE</code> <span class="badge acc">nouveau</span></td><td>les postes du mode Simple : <code>Junk : Targets.user Targets.windows RecycleBin</code>, libellés traduits dans <code>LANG</code>. Un poste ne prend que ce que le script coche d'office.</td></tr>
+    <tr><td><code>## simple : hidden</code> <span class="badge acc">nouveau</span></td><td>l'action n'apparaît qu'en Expert (ce qui touche aux fichiers personnels, par exemple)</td></tr>
+    <tr><td><code>## view : simple=… expert=…</code> <span class="badge acc">nouveau</span></td><td>la vue de l'action, par mode : <code>minimal light gauge checklist bars donut tiles compare tree table treemap timeline chart history</code></td></tr>
+    <tr><td><code>[view:…]</code> sur une option <span class="badge acc">nouveau</span></td><td>la vue d'une liste ou d'un bloc précis</td></tr>
+    <tr><td><code>## panels : …</code> <span class="badge acc">nouveau</span></td><td>les panneaux de l'Expert ouverts d'office : <code>config progress plan payload attention history origin disk</code></td></tr>
+    <tr><td><code>[LOG] Canal texte</code> <span class="badge acc">nouveau</span></td><td>une ligne de journal rangée dans un canal (« Registry », « Network »…), filtrable dans le panneau Progression. Expert seulement : le texte est en anglais.</td></tr>
+  </table></div>
   <div class="ref"><h2>Ce qui ne change pas</h2>
     <p>Un script sans <code>scan: true</code> fonctionne comme avant. Analyser, c'est exécuter : l'approbation, le lanceur durci et l'arrêt s'appliquent (§17.4). Une ligne qui vise une option non déclarée, une mesure illisible, une note inconnue sont <b>ignorées et relevées</b> — l'onglet Exemples le montre si on en tape une. Et un script ne peut parler que de ses propres cases : jamais faire apparaître une case au nom d'un autre.</p></div>`;
 }
 
+// =============================================================================
+// Ce que la norme ajoute : le mode Simple de chaque script, ses vues, et les
+// panneaux de l'Expert. Tout ce qui suit lit les memes modeles et la meme
+// selection que les onglets 1 et 2 : cocher ici coche partout.
+// =============================================================================
+
+// --- Le bloc WINTOOL:SIMPLE de chaque script ------------------------------------
+// En Simple, un script se resume en quelques postes. Chaque poste regroupe des
+// cibles de l'entete ; pour une liste [items], il ne prend que ce que le script
+// a coche d'office (les « A verifier » et les cookies restent dehors). `hidden` :
+// l'action n'apparait qu'en Expert — ici, celles qui touchent aux fichiers
+// personnels.
+const SIMPLE = {
+  temp: [
+    { cle: 'Junk', label: 'Fichiers inutiles', sous: 'Fichiers temporaires, corbeille, miniatures, journaux', cibles: ['Targets.user', 'Targets.windows', 'Targets.thumbs', 'Targets.logs', 'Targets.dumps', 'RecycleBin'] },
+    { cle: 'OldUpdates', label: 'Anciennes mises à jour de Windows', sous: 'Leur copie de secours, gardée par Windows', cibles: ['Targets.update'], note: 'WuNote' },
+  ],
+  restes: [{ cle: 'Leftovers', label: 'Restes de programmes désinstallés', sous: 'Seulement ceux dont l’action est sûre', cibles: ['Leftovers'] }],
+  navigateurs: [{ cle: 'Cache', label: 'Fichiers en cache des navigateurs', sous: 'Vos mots de passe et vos sites ne sont pas touchés', cibles: ['Browsers'] }],
+  applis: [{ cle: 'Apps', label: 'Applications inutiles', sous: 'Jeux et publicités installés avec Windows', cibles: ['Apps'] }],
+  doublons: 'hidden',
+  gros: 'hidden',
+};
+
+function partsPoste(id, p) {
+  const ex = PAR_ID[id], m = modeles[id], s = selection(ex, m);
+  const parts = [];
+  for (const cible of p.cibles) {
+    const [k, choix] = cible.split('.');
+    const o = m.options[k];
+    if (!o) continue;
+    if (choix) {
+      const f = o.finds[choix];
+      if (f) parts.push({ taille: Number(f.size) || 0, get: () => s.choix[k][choix], set: (v) => { s.choix[k][choix] = v; } });
+    } else if (o.def.type === 'bool') {
+      if (o.find) parts.push({ taille: Number(o.find.size) || 0, get: () => s.bool[k], set: (v) => { s.bool[k] = v; } });
+    } else if (o.def.type === 'items') {
+      for (const it of o.items) {
+        if (!enfantsDe(o, it.id).length && cocheItem(it)) parts.push({ taille: Number(it.size) || 0, get: () => s.items[k][it.id], set: (v) => { s.items[k][it.id] = v; } });
+      }
+    }
+  }
+  return parts.filter((x) => x.taille > 0);
+}
+
+/** Les postes du mode Simple, et les actions qu'il masque. */
+function postesSimples(ids) {
+  const liste = [];
+  const masques = [];
+  for (const id of ids) {
+    const d = SIMPLE[id];
+    if (d === 'hidden') { masques.push(id); continue; }
+    for (const p of d || []) {
+      const parts = partsPoste(id, p);
+      if (!parts.length) continue;
+      const n = parts.filter((x) => x.get()).length;
+      const ex = PAR_ID[id];
+      liste.push({
+        attr: `data-poste-simple="${id}|${p.cle}"`, ex: id, label: p.label, sous: p.sous,
+        noteHtml: p.note && ex.notes?.[p.note] ? noteHtml(ex, { cle: p.note }) : '',
+        taille: parts.reduce((a, x) => a + x.taille, 0), choisi: parts.filter((x) => x.get()).reduce((a, x) => a + x.taille, 0),
+        coche: n === parts.length, partiel: n > 0 && n < parts.length,
+      });
+    }
+  }
+  return { liste: liste.sort((a, b) => b.taille - a.taille), masques };
+}
+function basculerPoste(cle, v) {
+  const [id, pc] = cle.split('|');
+  const p = SIMPLE[id].find((x) => x.cle === pc);
+  for (const part of partsPoste(id, p)) part.set(v);
+}
+/** Les postes de l'onglet 1 (tout, sans simplification), au meme format. */
+function postesTous() {
+  return postes().map((p) => ({
+    attr: `data-poste="${p.ex}|${p.k}|${p.c || ''}"`, ex: p.ex, label: p.label, sous: PAR_ID[p.ex].titre,
+    taille: p.taille, choisi: p.items ? p.choisi : p.coche ? p.taille : 0, coche: p.coche, partiel: p.partiel, verrou: p.garder,
+  }));
+}
+
+// --- 3 · Simple, en moins : sept graphiques -------------------------------------
+const SIMPLE3 = { graphe: 'anneau', postes: 'simples', detail: false };
+const LOT_SIMPLE = ['temp', 'restes', 'doublons', 'gros', 'navigateurs', 'applis'];
+const DISQUE = { total: 476 * 1073741824, utilise: 431.5 * 1073741824 };
+const GRAPHES = {
+  barre: ['La barre d’espace', 'Une barre découpée par poste, puis la liste.', 'Celle de l’onglet 1 ; les petits postes y deviennent des traits.'],
+  lignes: ['Le fond de chaque ligne', 'Pas de graphique à part : chaque ligne se remplit selon ce qu’elle représente. Le plus léger à l’écran.', 'Moins frappant d’un coup d’œil qu’un graphique.'],
+  anneau: ['L’anneau', 'Un anneau découpé par poste, le total à libérer au centre, la liste à côté.', 'Au-delà de six postes, les tranches fines se lisent mal.'],
+  disque: ['Le disque, avant et après', 'Ce que tout le monde comprend : votre disque est presque plein, voilà ce qu’il deviendra.', 'Ne dit pas d’où vient la place : la liste reste nécessaire.'],
+  treemap: ['Les rectangles', 'Chaque poste est un rectangle à sa taille ; un clic le coche ou le décoche.', 'Les très petits postes ne portent plus leur nom.'],
+  gaufre: ['La gaufre', 'Deux cents cases : chaque case vaut un deux-centième de ce qui a été trouvé. Se compte comme des billes.', 'Plus décoratif qu’utile au-delà de cinq postes.'],
+  jauge: ['La jauge seule', 'Le plus simple : un chiffre, un interrupteur « tout libérer », et le détail derrière un lien.', 'On ne voit plus d’où vient la place sans ouvrir le détail.'],
+};
+
+function enteteGraphe(entrees) {
+  const total = entrees.reduce((a, e) => a + e.taille, 0);
+  const choisi = entrees.reduce((a, e) => a + e.choisi, 0);
+  return `<div class="graphe-h"><b>${taille(choisi)}</b><span>à libérer, sur ${taille(total)} trouvés</span></div>`;
+}
+function lignePoste(e, couleur, { remplir = false, max = 1 } = {}) {
+  return `<label class="poste${e.coche || e.partiel ? '' : ' decoche'}">
+    ${remplir ? `<i class="remplissage" style="width:${(e.taille / max) * 100}%;background:${couleur}"></i>` : ''}
+    <input type="checkbox" ${e.attr}${e.coche ? ' checked' : ''}${e.partiel ? ' data-partiel="1"' : ''}${e.verrou ? ' disabled' : ''}>
+    ${remplir ? '' : `<span class="pt" style="background:${couleur}"></span>`}
+    <span class="l-t"><b>${esc(e.label)}</b><span>${esc(e.sous || '')}</span>${e.noteHtml || ''}</span>
+    <span class="l-v">${taille(e.taille)}${e.partiel ? `<small>${taille(e.choisi)} cochés</small>` : ''}</span></label>`;
+}
+const listePostes = (entrees, couleurs, options) =>
+  `<div class="postes">${entrees.map((e, i) => lignePoste(e, couleurs[i], options)).join('')}</div>`;
+
+function anneau(entrees, couleurs, centre) {
+  const total = entrees.reduce((a, e) => a + e.taille, 0) || 1;
+  const r = 80, C = 2 * Math.PI * r;
+  let cumul = 0;
+  const arcs = entrees.map((e, i) => {
+    const l = (e.taille / total) * C;
+    const arc = `<circle r="${r}" cx="110" cy="110" stroke="${couleurs[i]}" stroke-dasharray="${Math.max(0.5, l - 2)} ${C}" stroke-dashoffset="${-cumul}" opacity="${e.coche || e.partiel ? 1 : 0.18}"></circle>`;
+    cumul += l;
+    return arc;
+  }).join('');
+  return `<div class="anneau"><svg viewBox="0 0 220 220">${arcs}</svg><div class="centre">${centre}</div></div>`;
+}
+
+function grapheHtml(entrees) {
+  const couleurs = entrees.map((_, i) => PALETTE[i % PALETTE.length]);
+  const total = entrees.reduce((a, e) => a + e.taille, 0) || 1;
+  const choisi = entrees.reduce((a, e) => a + e.choisi, 0);
+  const g = SIMPLE3.graphe;
+  if (g === 'barre') {
+    const pile = entrees.map((e, i) => `<i class="${e.coche || e.partiel ? '' : 'off'}" style="flex-grow:${e.taille};background:${couleurs[i]}"></i>`).join('');
+    return `${enteteGraphe(entrees)}<div class="pile">${pile}</div>${listePostes(entrees, couleurs)}`;
+  }
+  if (g === 'lignes') return `${enteteGraphe(entrees)}${listePostes(entrees, couleurs, { remplir: true, max: Math.max(...entrees.map((e) => e.taille)) })}`;
+  if (g === 'anneau') {
+    return `<div class="anneau-zone">${anneau(entrees, couleurs, `<b>${taille(choisi)}</b><span>à libérer</span><span>sur ${taille(total)}</span>`)}
+      <div>${listePostes(entrees, couleurs)}</div></div>`;
+  }
+  if (g === 'disque') {
+    const libre = DISQUE.total - DISQUE.utilise;
+    const pc = (v) => `${(v / DISQUE.total) * 100}%`;
+    return `<div class="graphe-h"><b>Votre disque C:</b><span>${taille(DISQUE.utilise)} utilisés sur ${taille(DISQUE.total)}</span></div>
+      <div class="disque"><div class="disque-barre"><i class="utilise" style="width:${pc(DISQUE.utilise - choisi)}"></i><i class="libere" style="width:${pc(choisi)}"></i><i class="libre" style="width:${pc(libre)}"></i></div>
+      <div class="disque-l"><span><i style="background:var(--border-2)"></i>Utilisé</span><span><i style="background:var(--acc)"></i>Libéré par l’entretien : ${taille(choisi)}</span><span><i style="background:color-mix(in srgb, var(--ok) 25%, transparent)"></i>Libre</span></div>
+      <p class="muted" style="margin:10px 0 0">Après l’entretien : <b style="color:var(--text)">${taille(libre + choisi)} libres</b>, au lieu de ${taille(libre)}.</p></div>
+      ${listePostes(entrees, couleurs)}`;
+  }
+  if (g === 'treemap') {
+    // Deux rangs : les plus gros jusqu'a environ 60 % de la surface, puis le reste.
+    const rangs = [[], []];
+    let cumul = 0;
+    entrees.forEach((e, i) => { (cumul < total * 0.6 ? rangs[0] : rangs[1]).push([e, i]); cumul += e.taille; });
+    const html = rangs.filter((r) => r.length).map((rang) => {
+      const somme = rang.reduce((a, [e]) => a + e.taille, 0);
+      return `<div class="tm-rang" style="flex-grow:${somme}">${rang.map(([e, i]) => `
+        <label class="tm-case${e.coche || e.partiel ? '' : ' off'}${e.taille / total < 0.05 ? ' petite' : ''}" style="flex-grow:${e.taille};background:${couleurs[i]}" title="${esc(e.label)} — ${taille(e.taille)}">
+          <input type="checkbox" hidden ${e.attr}${e.coche ? ' checked' : ''}${e.verrou ? ' disabled' : ''}><b>${esc(e.label)}</b><span>${taille(e.taille)}</span></label>`).join('')}</div>`;
+    }).join('');
+    return `${enteteGraphe(entrees)}<div class="treemap">${html}</div><p class="muted" style="margin:8px 0 0;font-size:12px">Un clic sur un rectangle le coche ou le décoche.</p>`;
+  }
+  if (g === 'gaufre') {
+    const N = 200;
+    const parts = entrees.map((e) => (e.taille / total) * N);
+    const entiers = parts.map(Math.floor);
+    let reste = N - entiers.reduce((a, b) => a + b, 0);
+    parts.map((p, i) => [p - Math.floor(p), i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (reste > 0) { entiers[i]++; reste--; } });
+    const cases = entrees.flatMap((e, i) => Array.from({ length: entiers[i] }, () => `<i class="${e.coche || e.partiel ? '' : 'off'}" style="background:${couleurs[i]}"></i>`)).join('');
+    return `${enteteGraphe(entrees)}<div class="gaufre">${cases}</div>${listePostes(entrees, couleurs)}`;
+  }
+  // jauge
+  const tout = entrees.every((e) => e.coche || e.verrou);
+  return `<div class="jauge-seule">${anneau([{ taille: choisi || 0.0001, coche: true }, { taille: Math.max(0, total - choisi), coche: false }], ['var(--acc)', 'var(--border-2)'], `<b>${taille(choisi)}</b><span>à libérer</span>`)}
+      <span class="interrupteur">Tout libérer — ${taille(total)}<button class="switch" type="button" role="switch" aria-checked="${tout}" data-tout-postes></button></span>
+      <button class="lien-detail" type="button" data-jauge-detail>${SIMPLE3.detail ? 'Masquer le détail' : 'Voir le détail'}</button></div>
+    ${SIMPLE3.detail ? listePostes(entrees, couleurs) : ''}`;
+}
+
+function rendreSimple3() {
+  const fen = document.getElementById('fen3');
+  const avant = fen.querySelector('.defile')?.scrollTop || 0;
+  const { liste, masques } = SIMPLE3.postes === 'simples' ? postesSimples(LOT_SIMPLE) : { liste: postesTous(), masques: [] };
+  const choisi = liste.reduce((a, e) => a + e.choisi, 0);
+  const masquesHtml = masques.length
+    ? `<p class="masques">${ico('info', 'i14')}<span>${masques.length === 1 ? 'Une action ne s’affiche' : `${masques.length} actions ne s’affichent`} qu’en mode Expert : ${masques.map((id) => `« ${esc(PAR_ID[id].titre)} »`).join(', ')} — elles touchent à vos fichiers personnels.</span></p>`
+    : '';
+  fen.innerHTML = `<div class="tb"><span class="brand-mark">${ico('waves')}</span><span class="brand-name">WinTool</span>
+      <span class="crumb"><span>Choisir</span><i class="fait"></i><span class="on">Analyser</span><i class="actif"></i><span>Entretien</span><i></i></span>
+      <span class="tb-droite"><span class="winctl"><span>${ico('minus')}</span><span>${ico('square')}</span><span>${ico('x')}</span></span></span></div>
+    <div class="scene"><div class="defile"><div class="contenu" style="max-width:860px">
+      <div class="s-head"><h1>Voici ce que j’ai trouvé</h1><p>Cochez ce que vous voulez libérer. Rien n’a encore été modifié.</p></div>
+      <div class="graphe">${grapheHtml(liste)}</div>${masquesHtml}<div style="height:24px"></div></div>
+      <div class="barre-bas"><span class="resume">À libérer : <b>${taille(choisi)}</b></span>
+        <button class="btn" type="button">${ico('arrow-left', 'i14')} Retour</button>
+        <button class="btn primary big" type="button">Lancer l’entretien ${ico('arrow-right')}</button></div>
+    </div></div>`;
+  fen.querySelector('.defile').scrollTop = avant;
+  fen.querySelectorAll('[data-partiel="1"]').forEach((c) => { c.indeterminate = true; });
+  const [titre, pour, contre] = GRAPHES[SIMPLE3.graphe];
+  document.getElementById('explication3').innerHTML = `<h2>${titre}</h2><ul class="pour"><li>${pour}</li></ul><ul class="contre"><li>${contre}</li></ul>`;
+  document.querySelectorAll('[data-graphe]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.graphe === SIMPLE3.graphe));
+  document.querySelectorAll('[data-postes]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.postes === SIMPLE3.postes));
+  ajuster();
+}
+
+// --- 4 · Vues au choix du script ---------------------------------------------------
+const GALERIE = [
+  { style: 'minimal', niveau: 1, ex: 'temp', titre: 'Une phrase, un interrupteur', decl: '## view : simple=minimal', pour: 'Le mode Simple d’une action qui fait une chose, pour un proche qui ne veut rien choisir. Le texte vient du bloc SIMPLE du script.' },
+  { style: 'feu', niveau: 1, ex: 'disques', titre: 'Le feu tricolore', decl: '## view : simple=light', pour: 'Un diagnostic résumé en une couleur et une phrase : ça va, à surveiller, en danger.' },
+  { style: 'jauge', niveau: 1, ex: 'batterie', titre: 'Une jauge', decl: '## view : simple=gauge', pour: 'Une seule mesure qui compte : la batterie, l’espace libre, l’usure d’un disque.' },
+  { style: 'cases', niveau: 1, ex: 'vie-privee', titre: 'La liste à cocher', decl: '## view : simple=checklist', pour: 'La vue par défaut : des lignes, des cases. Rien à déclarer pour l’avoir.' },
+  { style: 'barres', niveau: 2, ex: 'temp', titre: 'Des lignes qui se remplissent', decl: '## view : expert=bars', pour: 'Comparer des tailles d’un coup d’œil, sans graphique séparé.' },
+  { style: 'anneau', niveau: 2, ex: 'temp', titre: 'L’anneau', decl: '## view : expert=donut', pour: 'Montrer qui prend la plus grosse part, jusqu’à cinq ou six postes.' },
+  { style: 'tuiles', niveau: 2, ex: 'applis', titre: 'Les tuiles', decl: '## view : simple=tiles', pour: 'Des choses qu’on reconnaît à leur nom et à leur visage : applications, programmes au démarrage.' },
+  { style: 'avant-apres', niveau: 2, ex: 'vie-privee', titre: 'Aujourd’hui → après', decl: '## view : expert=compare', pour: 'Des réglages : ce qui est en place aujourd’hui, et ce que l’entretien changera.' },
+  { style: 'arbre', niveau: 2, ex: 'restes', titre: 'L’arborescence', decl: '## Leftovers : [items] [view:tree]', pour: 'Des éléments rangés sous un parent : restes par programme, données par navigateur.' },
+  { style: 'tableau', niveau: 3, ex: 'restes', titre: 'Le tableau', decl: '## Leftovers : [items] [view:table]', pour: 'Beaucoup d’éléments : trier par colonne, chercher, cocher. L’outil de l’Expert.' },
+  { style: 'treemap', niveau: 3, ex: 'restes', titre: 'Les rectangles, à explorer', decl: '## view : expert=treemap', pour: 'Où est la place, à deux niveaux : un clic sur un programme montre ses restes.' },
+  { style: 'chronologie', niveau: 3, ex: 'demarrage', titre: 'La chronologie', decl: '## view : expert=timeline', pour: 'Ce qui se passe dans le temps : le démarrage, programme par programme, avant et après.' },
+  { style: 'colonnes', niveau: 3, ex: 'dns', titre: 'Le graphique de mesures', decl: '## view : expert=chart', pour: 'Comparer des mesures (temps de réponse, vitesses) et en choisir une.' },
+  { style: 'historique', niveau: 3, ex: 'temp', titre: 'L’historique', decl: '## view : expert=history', pour: 'Ce que l’action a libéré à chaque passage : WinTool le sait, le script n’a rien à fournir.' },
+];
+const TRI = { col: 'taille', sens: -1, recherche: '' };
+const TM = { programme: null };
+
+function vueMinimal(ex) {
+  const p = SIMPLE[ex.id][0];
+  const parts = partsPoste(ex.id, p);
+  const tout = parts.every((x) => x.get());
+  const t = parts.reduce((a, x) => a + x.taille, 0);
+  return `<div class="v-min"><span class="sc-i">${ico(ex.icone, 'i20')}</span><span class="t"><b>Libérer ${taille(t)} — ${esc(p.label.toLowerCase())}</b><span>${esc(p.sous)}</span></span>
+    <button class="switch" type="button" role="switch" aria-checked="${tout}" data-switch-poste="${ex.id}|${p.cle}"></button></div>`;
+}
+function vueFeu(ex, m) {
+  const ordre = ['ok', 'warn', 'crit'];
+  const pire = m.metriques.reduce((a, x) => (ordre.indexOf(x.health) > ordre.indexOf(a) ? x.health : a), 'ok');
+  const phrase = { ok: 'Vos disques vont bien', warn: 'Un disque est à surveiller', crit: 'Un disque est en danger' }[pire];
+  const groupes = [...new Set(m.metriques.map((x) => x.group))].map((g) => {
+    const h = m.metriques.find((x) => x.group === g && x.cle === 'Health')?.value || 'ok';
+    return `${esc(g)} : ${JETONS.health[h][0]}`;
+  });
+  return `<div class="feu"><span class="lampe ${pire}">${ico(pire === 'ok' ? 'shield' : 'alerte', 'i20')}</span><span><b>${phrase}</b><span>${groupes.join(' · ')}</span></span></div>
+    ${m.notes.map((n) => noteHtml(ex, n)).join('')}`;
+}
+function vueJauge(ex, m) {
+  const x = m.metriques[0];
+  const h = JETONS.health[x.health];
+  return `<div class="jauge-seule">${anneau([{ taille: Number(x.value), coche: true }, { taille: Number(x.max) - Number(x.value), coche: false }], [h[1] === 'warn' ? 'var(--warn)' : 'var(--ok)', 'var(--border-2)'], `<b>${x.value} %</b><span>${esc(ex.libelles[x.cle])}</span>`)}
+    <span class="badge ${h[1] === 'warn' ? 'med' : 'low'}">${h[0]}</span></div>`;
+}
+function vueBarres(ex, m) {
+  const s = selection(ex, m);
+  const o = m.options.Targets;
+  const e = Object.entries(o.finds).filter(([, f]) => Number(f.size) > 0).sort((a, b) => b[1].size - a[1].size);
+  const max = Math.max(...e.map(([, f]) => Number(f.size)));
+  return `<div class="postes">${e.map(([c, f]) => `<label class="poste${s.choix.Targets[c] ? '' : ' decoche'}">
+      <i class="remplissage" style="width:${(f.size / max) * 100}%;background:var(--acc)"></i>
+      <input type="checkbox" ${attrs(ex, 'Targets', `data-k="choix" data-choix="${c}"`)}${s.choix.Targets[c] ? ' checked' : ''}>
+      <span class="l-t"><b>${esc(o.def.choix[c])}</b><span>${pluriel(Number(f.count), 'fichier', 'fichiers')}</span></span><span class="l-v">${taille(f.size)}</span></label>`).join('')}</div>`;
+}
+function vueAnneau(ex, m) {
+  const s = selection(ex, m);
+  const o = m.options.Targets;
+  const e = Object.entries(o.finds).filter(([, f]) => Number(f.size) > 0).sort((a, b) => b[1].size - a[1].size)
+    .map(([c, f]) => ({ attr: attrs(ex, 'Targets', `data-k="choix" data-choix="${c}"`), label: o.def.choix[c], taille: Number(f.size), choisi: s.choix.Targets[c] ? Number(f.size) : 0, coche: !!s.choix.Targets[c] }));
+  const c = e.map((_, i) => PALETTE[i % PALETTE.length]);
+  const choisi = e.reduce((a, x) => a + x.choisi, 0);
+  return `<div class="anneau-zone" style="grid-template-columns:180px 1fr">${anneau(e, c, `<b style="font-size:20px">${taille(choisi)}</b><span>cochés</span>`)}<div>${listePostes(e, c)}</div></div>`;
+}
+function vueTuiles(ex, m) {
+  const s = selection(ex, m);
+  const o = m.options.Apps;
+  return `<div class="tuiles-app">${o.items.map((it, i) => {
+    const c = !!s.items.Apps[it.id];
+    return `<label class="tuile-app${c ? ' coche' : ''}${it.locked ? ' verrou' : ''}">
+      <input type="checkbox" hidden ${attrs(ex, 'Apps', `data-k="item" data-item="${it.id}"`)}${c ? ' checked' : ''}${it.locked ? ' disabled' : ''}>
+      ${c ? '<span class="marque">✓</span>' : ''}<span class="av" style="background:${PALETTE[i % PALETTE.length]}">${esc(it.name[0])}</span>
+      <b>${esc(it.name)}</b><span class="muted">${it.locked ? 'Nécessaire à Windows' : taille(it.size)}</span></label>`;
+  }).join('')}</div><p class="muted" style="margin:8px 0 0;font-size:12px">Une tuile cochée sera retirée.</p>`;
+}
+function vueAvantApres(ex, m) {
+  const s = selection(ex, m);
+  return `<table class="aa"><tr><th></th><th>Réglage</th><th>Aujourd’hui</th><th></th><th>Après</th></tr>${Object.entries(m.options).map(([k, o]) => {
+    const fait = o.find?.state === 'ok';
+    const apres = fait || s.bool[k];
+    return `<tr><td><input type="checkbox" ${attrs(ex, k, 'data-k="bool"')}${s.bool[k] ? ' checked' : ''}${fait ? ' disabled' : ''}></td><td>${esc(o.def.label)}</td>
+      <td>${fait ? '<span class="badge low">En place</span>' : '<span class="badge">Pas en place</span>'}</td><td class="fl">→</td>
+      <td>${apres ? '<span class="badge low">En place</span>' : '<span class="badge">Inchangé</span>'}</td></tr>`;
+  }).join('')}</table>`;
+}
+function vueTableau(ex, m) {
+  const s = selection(ex, m);
+  const o = m.options.Leftovers;
+  const q = TRI.recherche.toLowerCase();
+  let lignes = o.items.filter((it) => it.parent).map((it) => ({ it, prog: o.items.find((x) => x.id === it.parent)?.name || '' }))
+    .filter(({ it, prog }) => !q || `${prog} ${it.name} ${it.path}`.toLowerCase().includes(q));
+  const ordre = { confidence: { high: 0, medium: 1, low: 2 } };
+  lignes.sort((a, b) => {
+    const v = (x) => (TRI.col === 'taille' ? Number(x.it.size) || 0 : TRI.col === 'prog' ? x.prog : TRI.col === 'confiance' ? ordre.confidence[x.it.confidence] ?? 3 : x.it.name);
+    return (v(a) > v(b) ? 1 : v(a) < v(b) ? -1 : 0) * TRI.sens;
+  });
+  const th = (col, t) => `<th data-tri="${col}"${TRI.col === col ? ` aria-sort="${TRI.sens > 0 ? 'ascending' : 'descending'}"` : ''}>${t}${TRI.col === col ? (TRI.sens > 0 ? ' ▲' : ' ▼') : ''}</th>`;
+  return `<div class="tab-outils"><input type="search" placeholder="Chercher un programme, un dossier…" value="${esc(TRI.recherche)}" data-recherche-tab></div>
+    <table class="tab"><tr><th></th>${th('prog', 'Programme')}${th('nom', 'Élément')}${th('confiance', 'Confiance')}${th('taille', 'Taille')}</tr>
+    ${lignes.map(({ it, prog }) => `<tr><td><input type="checkbox" ${attrs(ex, 'Leftovers', `data-k="item" data-item="${it.id}"`)}${s.items.Leftovers[it.id] ? ' checked' : ''}></td>
+      <td>${esc(prog)}</td><td>${esc(it.name)}<div class="chemin">${esc(it.path)}</div></td><td>${badgeJeton('confidence', it.confidence)}</td><td class="n">${it.size ? taille(it.size) : '—'}</td></tr>`).join('')}
+    ${lignes.length ? '' : `<tr><td colspan="5" class="tab-vide">Rien ne correspond à « ${esc(TRI.recherche)} ».</td></tr>`}</table>`;
+}
+function vueTreemap(ex, m) {
+  const s = selection(ex, m);
+  const o = m.options.Leftovers;
+  let tuiles;
+  if (!TM.programme) {
+    tuiles = o.items.filter((it) => !it.parent).map((p) => {
+      const e = enfantsDe(o, p.id);
+      const t = e.reduce((a, x) => a + (Number(x.size) || 0), 0);
+      const n = e.filter((x) => s.items.Leftovers[x.id]).length;
+      return { id: p.id, label: p.name, taille: t, on: n > 0, sous: `${n} sur ${e.length} cochés`, drill: true };
+    });
+  } else {
+    tuiles = enfantsDe(o, TM.programme).map((x) => ({ id: x.id, label: x.name, taille: Number(x.size) || 0, on: !!s.items.Leftovers[x.id], sous: JETONS.confidence[x.confidence]?.[0] || '' }));
+  }
+  tuiles.sort((a, b) => b.taille - a.taille);
+  const total = tuiles.reduce((a, x) => a + x.taille, 0) || 1;
+  const fil = TM.programme
+    ? `<div class="fil-tm"><button class="lien-detail" type="button" data-tm-retour>← Tous les programmes</button><span class="muted">›</span><b>${esc(o.items.find((x) => x.id === TM.programme).name)}</b></div>`
+    : '<div class="fil-tm muted">Un clic sur un programme montre ses restes.</div>';
+  return `${fil}<div class="treemap" style="height:200px"><div class="tm-rang" style="flex-grow:1">${tuiles.map((x, i) => `
+    <button type="button" class="tm-case${x.on ? '' : ' off'}${x.taille / total < 0.04 ? ' petite' : ''}" style="flex-grow:${Math.max(x.taille, total * 0.02)};background:${PALETTE[i % PALETTE.length]}"
+      ${x.drill ? `data-tm="${x.id}"` : attrs(ex, 'Leftovers', `data-tm-item="${x.id}"`)} title="${esc(x.label)}">
+      <b>${esc(x.label)}</b><span>${taille(x.taille)} · ${esc(x.sous)}</span></button>`).join('')}</div></div>`;
+}
+function vueChronologie(ex, m) {
+  const s = selection(ex, m);
+  const o = m.options.Startup;
+  const duree = { high: 14, medium: 8, low: 3 };
+  const fin = 48;
+  let gain = 0;
+  const lignes = o.items.map((it, i) => {
+    const debut = 4 + i * 5;
+    const d = duree[it.impact] || 3;
+    const coupe = !!s.items.Startup[it.id];
+    if (coupe) gain += d * 0.55;
+    return `<label class="chrono-ligne"><span><input type="checkbox" ${attrs(ex, 'Startup', `data-k="item" data-item="${it.id}"`)}${coupe ? ' checked' : ''}${it.locked ? ' disabled' : ''}> ${esc(it.name)}</span>
+      <span class="chrono-piste"><i class="${it.locked ? 'sys' : coupe ? 'coupe' : ''}" style="left:${(debut / fin) * 100}%;width:${(d / fin) * 100}%"></i></span></label>`;
+  }).join('');
+  return `<div class="graphe-h"><b>${fin} s → ${Math.round(fin - gain)} s</b><span>durée du démarrage, avant et après</span></div>
+    <div class="chrono">${lignes}<div class="chrono-ligne"><span></span><div class="chrono-axe"><span>0 s</span><span>12 s</span><span>24 s</span><span>36 s</span><span>48 s</span></div></div></div>
+    <p class="muted" style="margin:6px 0 0;font-size:12px">Coché : ne se lancera plus au démarrage (hachuré).</p>`;
+}
+function vueColonnes(ex, m) {
+  const s = selection(ex, m);
+  const o = m.options.Dns;
+  const e = Object.entries(o.finds);
+  const max = Math.max(...e.map(([, f]) => Number(f.ms)));
+  return `<div class="colonnes">${e.map(([c, f]) => `<label class="colonne${s.select.Dns === c ? ' choisi' : ''}">
+      <input type="radio" hidden name="col-${ex.id}" ${attrs(ex, 'Dns', `data-k="select" data-choix="${c}"`)}${s.select.Dns === c ? ' checked' : ''}>
+      <b>${f.ms} ms</b><i style="height:${(f.ms / max) * 100}%"></i><span>${esc(o.def.choix[c])}${f.current === 'true' ? '<br>(actuel)' : ''}</span></label>`).join('')}</div>
+    <p class="muted" style="margin:8px 0 0;font-size:12px">Plus bas, plus rapide. Un clic sur une colonne la choisit.</p>`;
+}
+function vueHistorique() {
+  const h = [['12 juin', 0.6], ['3 juil.', 1.4], ['28 juil.', 0.9], ['15 août', 0.3], ['2 sept.', 1.3], ['18 sept.', 0.4], ['3 oct.', 1.1]];
+  const max = Math.max(...h.map((x) => x[1]));
+  return `<div class="graphe-h"><b>${taille(h.reduce((a, x) => a + x[1], 0) * 1073741824)}</b><span>libérés en ${h.length} passages</span></div>
+    <div class="histo-barres">${h.map(([, v]) => `<i style="height:${(v / max) * 100}%" title="${v} Go"></i>`).join('')}</div>
+    <div class="histo-dates">${h.map(([d]) => `<span>${d}</span>`).join('')}</div>`;
+}
+const RENDUS_VUE = {
+  minimal: vueMinimal, feu: vueFeu, jauge: vueJauge, cases: (ex, m) => corps(ex, m), barres: vueBarres, anneau: vueAnneau,
+  tuiles: vueTuiles, 'avant-apres': vueAvantApres, arbre: (ex, m) => briqueListe(ex, m, 'Leftovers'), tableau: vueTableau,
+  treemap: vueTreemap, chronologie: vueChronologie, colonnes: vueColonnes, historique: vueHistorique,
+};
+function rendreGalerie() {
+  const zone = document.getElementById('galerie');
+  const focus = document.activeElement?.matches?.('[data-recherche-tab]');
+  const niveaux = ['', 'Très simple', 'Intermédiaire', 'Complexe'];
+  zone.innerHTML = GALERIE.map((v) => {
+    const ex = PAR_ID[v.ex];
+    return `<article class="vue"><div class="vue-h"><h3>${esc(v.titre)}</h3><span class="badge">${esc(ex.titre)}</span>
+        <span class="niveau" title="${niveaux[v.niveau]}">${[1, 2, 3].map((n) => `<i class="${n <= v.niveau ? 'on' : ''}"></i>`).join('')}</span></div>
+      <p>${esc(v.pour)}</p><div class="decl">${esc(v.decl)}</div>
+      <div class="vue-rendu">${RENDUS_VUE[v.style](ex, modeles[v.ex])}</div></article>`;
+  }).join('');
+  zone.querySelectorAll('[data-partiel="1"]').forEach((c) => { c.indeterminate = true; });
+  if (focus) {
+    const champ = zone.querySelector('[data-recherche-tab]');
+    champ.focus();
+    champ.setSelectionRange(champ.value.length, champ.value.length);
+  }
+}
+
+// --- 5 · Expert et panneaux ---------------------------------------------------------
+const LOT_XP = ['temp', 'restes', 'navigateurs', 'demarrage', 'vie-privee', 'dns', 'disques'];
+const XP = { detail: 'restes', panneaux: null, progression: null, filtre: 'tout' };
+const PANNEAUX = {
+  reglages: 'Réglages appliqués', progression: 'Progression', plan: 'Ce qui sera fait', config: 'Ce que reçoit le script',
+  attention: 'Points d’attention', historique: 'Historique', provenance: 'Provenance', disque: 'Espace disque',
+};
+// Ce que le script propose d'ouvrir d'office (## panels : …) ; l'utilisateur ajoute ou retire.
+const PANNEAUX_SCRIPT = {
+  temp: ['reglages', 'progression', 'plan', 'disque'], restes: ['plan', 'progression', 'attention'], navigateurs: ['reglages', 'plan'],
+  demarrage: ['plan', 'historique'], 'vie-privee': ['reglages', 'plan'], dns: ['reglages', 'progression'], disques: ['historique', 'progression'],
+};
+const INFOS = {
+  temp: { verbe: 'Supprimer', fichier: '100_CLEAN_TEMP_FILES.ps1', source: 'Catalogue officiel 1.0.0', empreinte: 'af5c96a5e11b…', approbation: 'Signé par le projet WinTool — approuvé d’office', attention: [['Remove-Item -Recurse', 84], ['Clear-RecycleBin', 112]] },
+  restes: { verbe: 'Supprimer', fichier: 'DUPONT_LEFTOVERS.ps1', source: 'Catalogue « Scripts de Dupont » 2.1.0', empreinte: '4be17c09d2aa…', approbation: 'Approuvé par vous le 3 oct. 2026', attention: [['Remove-Item -Recurse', 132], ['Remove-Item HKLM:', 140], ['Get-ChildItem -Recurse C:\\', 61]] },
+  navigateurs: { verbe: 'Effacer', fichier: '210_BROWSER_CACHE.ps1', source: 'Catalogue officiel 1.0.0', empreinte: '0c93d1e7a420…', approbation: 'Signé par le projet WinTool — approuvé d’office', attention: [['Remove-Item -Recurse', 77]] },
+  demarrage: { verbe: 'Désactiver au démarrage', fichier: '300_STARTUP.ps1', source: 'Catalogue officiel 1.0.0', empreinte: '91f2e04b6c58…', approbation: 'Signé par le projet WinTool — approuvé d’office', attention: [['Set-ItemProperty HKCU:\\…\\Run', 58]] },
+  'vie-privee': { verbe: 'Appliquer', fichier: '400_PRIVACY.ps1', source: 'Catalogue officiel 1.0.0', empreinte: '7d03aa1e95c2…', approbation: 'Signé par le projet WinTool — approuvé d’office', attention: [['Set-ItemProperty HKLM:', 41], ['Stop-Service', 88]] },
+  dns: { verbe: 'Changer', fichier: '500_DNS.ps1', source: 'Vos scripts', empreinte: 'e2c4b8a1f093…', approbation: 'Approuvé par vous le 18 sept. 2026', attention: [['Set-DnsClientServerAddress', 36]] },
+  disques: { verbe: '', fichier: '600_DISK_HEALTH.ps1', source: 'Catalogue officiel 1.0.0', empreinte: '5aa0f1c37b6e…', approbation: 'Signé par le projet WinTool — approuvé d’office', attention: [] },
+};
+
+function panneauReglages(ex, m) {
+  const s = selection(ex, m);
+  const lignes = [];
+  for (const [k, o] of Object.entries(m.options)) {
+    const d = o.def;
+    let v;
+    if (d.type === 'bool') v = s.bool[k] ? 'Oui' : 'Non';
+    else if (d.type === 'multi') v = Object.keys(o.finds).filter((c) => s.choix[k][c]).join(', ') || '(aucun)';
+    else if (d.type === 'select') v = d.scan ? parametres(ex)[k] : s.select[k];
+    else if (d.type === 'number') v = parametres(ex)[k];
+    else if (d.type === 'items') v = `${Object.values(s.items[k]).filter(Boolean).length} cochés sur ${o.items.length}`;
+    lignes.push(`<span>${esc(k)}</span><span>${esc(v)}</span>`);
+  }
+  return lignes.length ? `<div class="kv">${lignes.join('')}</div>` : '<span class="muted">Aucun réglage : cette action ne fait que mesurer.</span>';
+}
+function lignesJournal(id) {
+  const brut = SORTIES[id].split('\n').filter((l) => l.trim());
+  // Quelques lignes que l'analyse aurait ecrites en plus : [OK], [WARN], [LOG].
+  const extra = { restes: ['[LOG] Registry Opening HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall', '[LOG] Registry 214 uninstall entries read', '[WARN] Access denied: C:\\ProgramData\\Microsoft\\Crypto', '[OK] 4 programs with leftovers'], temp: ['[OK] Measured 6 locations'] }[id] || [];
+  return [...brut, ...extra];
+}
+function panneauProgression(id) {
+  const lignes = lignesJournal(id);
+  const n = XP.progression === null ? lignes.length : Math.floor(XP.progression * lignes.length);
+  const filtre = XP.filtre;
+  const canaux = [...new Set(lignes.map((l) => /^\[LOG\]\s+(\w+)/.exec(l)?.[1]).filter(Boolean))];
+  const garde = (l) => filtre === 'tout' || (filtre === 'etapes' && /^\[(STEP|OK|WARN)\]/.test(l)) || (filtre === 'constats' && /^\[(FIND|ITEM|METRIC)\]/.test(l)) || l.startsWith(`[LOG] ${filtre}`);
+  const html = lignes.slice(0, n).filter(garde).map((l, i) => {
+    const m = /^\[([A-Z]+)\]/.exec(l)?.[1] || '';
+    const cls = { STEP: 'm-step', OK: 'm-ok', WARN: 'm-warn', FIND: 'm-find', ITEM: 'm-find', METRIC: 'm-find', LOG: 'm-log' }[m] || '';
+    return `<span class="h">00:0${Math.floor(i / 6)}.${(i * 3) % 10}</span> <span class="${cls}">${esc(l)}</span>`;
+  }).join('\n');
+  const puces = ['tout', 'etapes', 'constats', ...canaux].map((f) => `<button type="button" data-journal="${f}" aria-pressed="${filtre === f}">${{ tout: 'Tout', etapes: 'Étapes', constats: 'Constats' }[f] || f}</button>`).join('');
+  return `<div class="puces" style="margin-bottom:6px">${puces}</div><div class="journal">${html || '<span class="h">En attente…</span>'}</div>`;
+}
+function panneauPlan(ex, m) {
+  const s = selection(ex, m);
+  const verbe = INFOS[ex.id]?.verbe || 'Traiter';
+  const l = [];
+  for (const [k, o] of Object.entries(m.options)) {
+    const d = o.def;
+    if (d.scan) continue;
+    if (d.type === 'bool' && s.bool[k]) l.push(`${esc(d.label)}${o.find?.size ? ` — ${taille(o.find.size)}` : ''}`);
+    if (d.type === 'multi') for (const [c, f] of Object.entries(o.finds)) if (s.choix[k][c]) l.push(`${verbe} ${pluriel(Number(f.count) || 0, 'fichier', 'fichiers')} — ${esc(d.choix[c])} (${taille(f.size)})`);
+    if (d.type === 'select' && s.select[k]) {
+      const actuel = Object.entries(o.finds).find(([, f]) => f.current === 'true')?.[0];
+      if (actuel !== s.select[k]) l.push(`${verbe} : ${esc(d.choix[actuel] || actuel)} → ${esc(d.choix[s.select[k]])}`);
+    }
+    if (d.type === 'items') {
+      const feuilles = o.items.filter((it) => !enfantsDe(o, it.id).length && s.items[k][it.id]);
+      feuilles.slice(0, 6).forEach((it) => l.push(`${verbe} ${esc(it.label ? ex.libelles?.[it.label] || it.label : it.name)}${it.path ? `<div class="chemin">${esc(it.path)}</div>` : ''}`));
+      if (feuilles.length > 6) l.push(`… et ${feuilles.length - 6} autres`);
+    }
+  }
+  return l.length ? `<ol class="plan">${l.map((x) => `<li>${x}</li>`).join('')}</ol>` : '<span class="muted">Rien : cette action ne fait que mesurer, ou rien n’est coché.</span>';
+}
+function panneauConfig(ex, m) {
+  const s = selection(ex, m);
+  const cfg = {};
+  for (const [k, o] of Object.entries(m.options)) {
+    const d = o.def;
+    if (d.type === 'bool') cfg[k] = !!s.bool[k];
+    else if (d.type === 'multi') cfg[k] = Object.keys(o.finds).filter((c) => s.choix[k][c]);
+    else if (d.type === 'select') cfg[k] = d.scan ? parametres(ex)[k] : s.select[k];
+    else if (d.type === 'number') cfg[k] = parametres(ex)[k];
+    else if (d.type === 'items') cfg[k] = d.mode === 'garder-un'
+      ? o.items.filter((it) => s.garder[k][it.group || it.id] !== it.id).map((it) => it.id)
+      : o.items.filter((it) => !enfantsDe(o, it.id).length && s.items[k][it.id]).map((it) => it.id);
+  }
+  return `<div class="journal">WINTOOL_CONFIG = ${esc(JSON.stringify(cfg, null, 2))}</div>`;
+}
+function panneauHistorique(id) {
+  const runs = { temp: [['3 oct.', '1,1 Go'], ['18 sept.', '412 Mo'], ['2 sept.', '1,3 Go']], demarrage: [['1 oct.', '3 désactivés'], ['20 août', '1 désactivé']], disques: [['5 oct.', 'D: à surveiller'], ['5 sept.', 'Tout va bien']] }[id] || [['jamais', '—']];
+  return `${id === 'temp' ? vueHistorique() : ''}<div class="kv" style="margin-top:8px">${runs.map(([d, v]) => `<span>${d}</span><span>${v}</span>`).join('')}</div>`;
+}
+function panneauDisque(ex, m) {
+  const t = totaux(ex, m);
+  const libre = DISQUE.total - DISQUE.utilise;
+  const pc = (v) => `${(v / DISQUE.total) * 100}%`;
+  return `<div class="disque-barre" style="height:22px"><i class="utilise" style="width:${pc(DISQUE.utilise - t.choisi)}"></i><i class="libere" style="width:${pc(t.choisi)}"></i><i class="libre" style="width:${pc(libre)}"></i></div>
+    <p class="muted" style="margin:6px 0 0">C: — ${taille(libre)} libres → <b style="color:var(--text)">${taille(libre + t.choisi)}</b> après cette action.</p>`;
+}
+function panneauHtml(cle, ex, m) {
+  const i = INFOS[ex.id] || {};
+  const corpsP = {
+    reglages: () => panneauReglages(ex, m),
+    progression: () => panneauProgression(ex.id),
+    plan: () => panneauPlan(ex, m),
+    config: () => panneauConfig(ex, m),
+    attention: () => (i.attention?.length
+      ? `${i.attention.map(([c, l]) => `<div class="attention-l">${ico('alerte', 'i14')}<span><code>${esc(c)}</code> — ligne ${l}</span></div>`).join('')}<p class="muted" style="margin:6px 0 0">Liste non exhaustive : ce que WinTool repère dans le texte du script (§12.2).</p>`
+      : '<span class="muted">Rien de repéré.</span>'),
+    historique: () => panneauHistorique(ex.id),
+    provenance: () => `<div class="kv"><span>Source</span><span>${esc(i.source)}</span><span>Fichier</span><span>${esc(i.fichier)}</span><span>Empreinte</span><span>${esc(i.empreinte)}</span><span>Accord</span><span>${esc(i.approbation)}</span></div>`,
+    disque: () => panneauDisque(ex, m),
+  }[cle]();
+  return `<section class="panneau"><div class="panneau-h">${esc(PANNEAUX[cle])}${cle === 'progression' && XP.progression !== null ? '<span class="attente"></span>' : ''}</div><div class="panneau-b">${corpsP}</div></section>`;
+}
+
+function rendreXp() {
+  const fen = document.getElementById('fen5');
+  const centre = fen.querySelector('.xp-centre');
+  const avant = centre?.scrollTop || 0;
+  const ex = PAR_ID[XP.detail];
+  const m = modeles[XP.detail];
+  if (!XP.panneaux) XP.panneaux = new Set(PANNEAUX_SCRIPT[XP.detail]);
+  const nav = LOT_XP.map((id) => {
+    const t = totaux(PAR_ID[id], modeles[id]);
+    return `<button class="md-item" type="button" data-xp="${id}" aria-current="${XP.detail === id}">
+      <span class="sc-i">${ico(PAR_ID[id].icone, 'i14')}</span><span class="t"><b>${esc(PAR_ID[id].titre)}</b><span>${esc(t.trouve ? `${taille(t.choisi)} / ${taille(t.trouve)}` : resumeAction(t, modeles[id]))}</span></span></button>`;
+  }).join('');
+  const puces = Object.entries(PANNEAUX).map(([k, l]) => `<button type="button" data-panneau="${k}" aria-pressed="${XP.panneaux.has(k)}">${esc(l)}</button>`).join('');
+  fen.innerHTML = `<div class="tb expert"><span class="brand-mark">${ico('waves')}</span><span class="brand-name">WinTool</span>
+      <span class="tb-cherche">${ico('sliders', 'i14')} Filtrer…</span>
+      <span class="tb-droite"><span class="seg"><button type="button">Simple</button><button type="button" aria-pressed="true">Expert</button></span>
+      <span class="winctl"><span>${ico('minus')}</span><span>${ico('square')}</span><span>${ico('x')}</span></span></span></div>
+    <div class="scene"><div class="xp">
+      <nav class="xp-nav"><div class="t">Entretien complet</div>${nav}</nav>
+      <div class="xp-centre">${carte(ex, { progression: XP.progression })}</div>
+      <aside class="xp-panneaux"><div class="puces">${puces}</div>
+        ${Object.keys(PANNEAUX).filter((k) => XP.panneaux.has(k)).map((k) => panneauHtml(k, ex, m)).join('')}</aside>
+    </div></div>`;
+  const c = fen.querySelector('.xp-centre');
+  if (c) c.scrollTop = avant;
+  fen.querySelectorAll('[data-partiel="1"]').forEach((x) => { x.indeterminate = true; });
+  ajuster();
+}
+
 // --- Evenements ------------------------------------------------------------------------------
+const VUES_ONGLETS = ['dispositions', 'exemples', 'simple', 'vues', 'expert', 'norme'];
+const visible = (v) => !document.getElementById(`vue-${v}`).hidden;
 function rafraichir(id) {
-  if (!document.getElementById('vue-dispositions').hidden) rendreDispositions();
-  if (!document.getElementById('vue-exemples').hidden) rendreExemple(id);
+  if (visible('dispositions')) rendreDispositions();
+  if (visible('exemples') && id) rendreExemple(id);
+  if (visible('simple')) rendreSimple3();
+  if (visible('vues')) rendreGalerie();
+  if (visible('expert')) rendreXp();
 }
 
 document.addEventListener('change', (ev) => {
@@ -1183,7 +1948,11 @@ document.addEventListener('change', (ev) => {
     if (choix) s.choix[k][choix] = c.checked;
     else if (o.def.type === 'bool') s.bool[k] = c.checked;
     else for (const it of o.items) if (!it.locked && it.state !== 'ok') s.items[k][it.id] = c.checked;
-    return void rendreDispositions();
+    return void rafraichir(null);
+  }
+  if (c.dataset.posteSimple) {
+    basculerPoste(c.dataset.posteSimple, c.checked);
+    return void rafraichir(null);
   }
   const { ex: id, opt: k, k: genre } = c.dataset;
   if (!id || !genre) return;
@@ -1200,6 +1969,10 @@ document.addEventListener('change', (ev) => {
 });
 
 document.addEventListener('input', (ev) => {
+  if (ev.target.matches('[data-recherche-tab]')) {
+    TRI.recherche = ev.target.value;
+    return void rendreGalerie();
+  }
   const t = ev.target.closest('[data-sortie]');
   if (!t) return;
   SORTIES[t.dataset.sortie] = t.value;
@@ -1212,10 +1985,45 @@ document.addEventListener('click', (ev) => {
   if (!b) return;
   const d = b.dataset;
   if (d.onglet) {
-    for (const v of ['dispositions', 'exemples', 'norme']) document.getElementById(`vue-${v}`).hidden = v !== d.onglet;
+    for (const v of VUES_ONGLETS) document.getElementById(`vue-${v}`).hidden = v !== d.onglet;
     document.querySelectorAll('[data-onglet]').forEach((x) => x.setAttribute('aria-pressed', x.dataset.onglet === d.onglet));
-    if (d.onglet === 'dispositions') rendreDispositions();
+    rafraichir(null);
     return;
+  }
+  // --- 3 · Simple
+  if (d.graphe) { SIMPLE3.graphe = d.graphe; return void rendreSimple3(); }
+  if (d.postes) { SIMPLE3.postes = d.postes; return void rendreSimple3(); }
+  if (d.jaugeDetail !== undefined) { SIMPLE3.detail = !SIMPLE3.detail; return void rendreSimple3(); }
+  if (d.toutPostes !== undefined) {
+    const { liste } = SIMPLE3.postes === 'simples' ? postesSimples(LOT_SIMPLE) : { liste: postesTous() };
+    const v = !liste.every((e) => e.coche || e.verrou);
+    for (const e of liste) {
+      const cle = /data-poste-simple="([^"]+)"/.exec(e.attr)?.[1];
+      if (cle) basculerPoste(cle, v);
+    }
+    return void rafraichir(null);
+  }
+  if (d.switchPoste) {
+    const [id, pc] = d.switchPoste.split('|');
+    const parts = partsPoste(id, SIMPLE[id].find((x) => x.cle === pc));
+    basculerPoste(d.switchPoste, !parts.every((x) => x.get()));
+    return void rafraichir(id);
+  }
+  // --- 4 · Vues
+  if (d.tri) { TRI.sens = TRI.col === d.tri ? -TRI.sens : 1; TRI.col = d.tri; return void rendreGalerie(); }
+  if (d.tm) { TM.programme = d.tm; return void rendreGalerie(); }
+  if (d.tmRetour !== undefined) { TM.programme = null; return void rendreGalerie(); }
+  if (d.tmItem) {
+    const s = selection(PAR_ID.restes, modeles.restes);
+    s.items.Leftovers[d.tmItem] = !s.items.Leftovers[d.tmItem];
+    return void rafraichir('restes');
+  }
+  // --- 5 · Expert
+  if (d.xp) { XP.detail = d.xp; XP.panneaux = null; XP.filtre = 'tout'; return void rendreXp(); }
+  if (d.panneau) { XP.panneaux.has(d.panneau) ? XP.panneaux.delete(d.panneau) : XP.panneaux.add(d.panneau); return void rendreXp(); }
+  if (d.journal) { XP.filtre = d.journal; return void rendreXp(); }
+  if (d.rejouerXp !== undefined) {
+    return void rejouer([XP.detail], (etat, fini) => { XP.progression = fini ? null : etat[XP.detail]; rendreXp(); });
   }
   if (d.themeBtn) { document.documentElement.dataset.theme = d.themeBtn; return void marquerTheme(); }
   if (d.dispo) { DISPO.v = d.dispo; return void rendreDispositions(); }
@@ -1262,6 +2070,7 @@ sombre.addEventListener('change', marquerTheme);
 addEventListener('resize', ajuster);
 
 document.getElementById('segDispo').innerHTML = ['A', 'B', 'C'].map((v) => `<button type="button" data-dispo="${v}">${TEXTES_DISPO[v][0]}</button>`).join('');
+document.getElementById('segGraphe').innerHTML = Object.entries(GRAPHES).map(([k, v]) => `<button type="button" data-graphe="${k}">${v[0]}</button>`).join('');
 document.getElementById('segMoment').innerHTML = '<button type="button" data-moment="analyse">Analyse en cours</button><button type="button" data-moment="resultats">Résultats</button>';
 document.querySelector('[data-onglet="dispositions"]').setAttribute('aria-pressed', 'true');
 marquerTheme();
