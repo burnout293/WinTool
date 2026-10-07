@@ -489,7 +489,9 @@ function rendreEtiquettes(entree) {
       ? entree.verified
         ? etiquette(t('badge.officiel'), 'acc', true, t('badge.officiel_tip'))
         : etiquette(t('badge.modifie'), 'med', true, t('badge.modifie_tip'))
-      : etiquette(t('badge.perso'), 'neutre', true),
+      : entree.origin === 'tierce'
+        ? etiquette(nomSource(entree.source), 'med', true, t('badge.tierce_tip'))
+        : etiquette(t('badge.perso'), 'neutre', true),
     etiquette(libelleFait(derniereExecution(entree.id)), 'neutre', !!derniereExecution(entree.id)),
     entree.declared_id ? '' : etiquette(t('badge.sans_id'), 'med', true),
   ]
@@ -1200,6 +1202,13 @@ const ERREURS_CATALOGUE = {
   CATALOGUE_FORMAT: 'cat.format',
   CATALOGUE_EMPREINTE: 'cat.empreinte',
   CATALOGUE_INVALIDE: 'cat.invalide',
+  CATALOGUE_CLE: 'cat.err_cle',
+  CATALOGUE_DEPOT: 'cat.err_depot',
+  SOURCES_SANS_DROITS: 'cat.droits',
+  SOURCE_EXISTE: 'cat.err_existe',
+  SOURCE_NOM: 'cat.err_nom',
+  SOURCE_AUTRE_ID: 'cat.err_autre_id',
+  SOURCE_INCONNUE: 'cat.err_inconnue',
 };
 
 /** Les erreurs arrivent sous la forme `CODE: detail` (catalogue.rs). Une
@@ -1257,13 +1266,25 @@ function rendreBandeauCatalogue(message, { erreur = false } = {}) {
     return;
   }
 
-  const visible = !!bilanCatalogue && !catalogueRepousse;
+  // Un catalogue ajoute qui a des nouveautes : le bandeau mene a sa carte,
+  // ou l'on voit d'abord ce qui change (il ne s'installe pas d'ici).
+  const tierce = [...bilansSources.entries()].find(([id]) =>
+    etatSources?.sources.some((x) => x.id === id && x.active && !x.officielle),
+  );
+  const visible = (!!bilanCatalogue || !!tierce) && !catalogueRepousse;
   bandeau.hidden = !visible;
   bandeau.classList.remove('erreur');
   if (!visible) return;
-  texte.textContent = t('cat.banniere', { detail: resumeBilan(bilanCatalogue) });
   agir.hidden = false;
-  agir.textContent = t('cat.btn_maj');
+  if (bilanCatalogue) {
+    texte.textContent = t('cat.banniere', { detail: resumeBilan(bilanCatalogue) });
+    agir.textContent = t('cat.btn_maj');
+    agir.dataset.action = 'installer';
+  } else {
+    texte.textContent = t('cat.banniere_source', { nom: nomSource(tierce[0]), detail: resumeBilan(tierce[1]) });
+    agir.textContent = t('cat.voir');
+    agir.dataset.action = 'voir';
+  }
   plusTard.hidden = false;
   plusTard.textContent = t('maj.plus_tard');
   // Le script en cours est verrouille en ecriture : le remplacer echouerait.
@@ -1382,6 +1403,7 @@ async function installerCatalogue() {
   } catch (e) {
     console.error('Etat du catalogue :', e);
   }
+  await chargerSources();
   if (!erreur) {
     await chargerLots();
     await rafraichirSimulation();
@@ -1399,6 +1421,410 @@ async function installerCatalogue() {
     const visiteEtat = document.getElementById('onbCatalogueEtat');
     if (visiteEtat && erreur) visiteEtat.textContent = message;
   }
+}
+
+/* -------------------------------------------------------------------------
+   Catalogues (specification §16.2, §16.6) : l'officiel, et ceux qu'un
+   administrateur ajoute. Chacun a sa carte dans les Reglages ; « Consulter et
+   choisir » ouvre son contenu, action par action, avant meme l'installation.
+   Ajouter un catalogue, c'est decider a qui l'on confie des actions lancees en
+   administrateur : un depot GitHub, et la cle publique de son editeur.
+   ------------------------------------------------------------------------- */
+
+/** `lib::EtatSources` — null tant qu'inconnu. */
+let etatSources = null;
+/** Nouveautes des catalogues ajoutes : id -> `catalogue::Bilan`. Celles de
+ *  l'officiel restent dans `bilanCatalogue`. */
+const bilansSources = new Map();
+/** La page « Consulter et choisir » : { id, contenu, exclus: Set }. */
+let sourceOuverte = null;
+/** Le formulaire modifie cette source ; null : il en ajoute une. */
+let sourceModifiee = null;
+
+async function chargerSources() {
+  try {
+    etatSources = await invoke('sources_state');
+  } catch (e) {
+    console.error('Catalogues :', e);
+  }
+  rendreSources();
+}
+
+function sourceParId(id) {
+  return etatSources?.sources.find((x) => x.id === id) || null;
+}
+
+/** Le nom d'un catalogue ; celui de l'officiel se traduit. */
+function nomSource(id) {
+  const x = sourceParId(id);
+  if (!x) return id || '';
+  return x.officielle ? t('cat.titre_reglage') : x.nom;
+}
+
+/** Un texte par langue (titre ou description d'une action) : la langue de
+ *  l'interface, sinon le francais, sinon ce qu'il y a. */
+function texteLangue(textes) {
+  const t2 = textes || {};
+  return t2[currentLang()] || t2.fr || t2.en || Object.values(t2)[0] || '';
+}
+
+function libelleAgirSource(x) {
+  if (!x.installe) return x.probleme ? 'cat.btn_reinstaller' : 'cat.btn_installer';
+  return bilansSources.has(x.id) ? 'cat.btn_maj' : 'cat.btn_verifier';
+}
+
+function etatTexteSource(x) {
+  if (x.probleme) return t('cat.etat_probleme');
+  if (!x.installe) return t('cat.etat_absent');
+  const n = x.installe.scripts;
+  const texte = t('cat.etat_installe', { v: x.installe.version, d: dateCourte(x.installe.published), n, s: n > 1 ? 's' : '' });
+  const b = bilansSources.get(x.id);
+  return b ? `${texte} ${t('cat.disponible', { v: b.version, detail: resumeBilan(b) })}` : texte;
+}
+
+function carteSource(x, modifiable) {
+  const id = esc(x.id);
+  const nom = esc(nomSource(x.id));
+  const badge = x.officielle
+    ? `<span class="badge acc">${esc(t('offre.badge_officiel'))}</span>`
+    : `<span class="badge med">${esc(t('cat.badge_tierce'))}</span>`;
+  // La carte officielle garde ses identifiants : rendreReglagesCatalogue et la
+  // progression d'installation y ecrivent, comme avant.
+  const etat = x.officielle
+    ? '<span class="desc" id="catalogueEtat" aria-live="polite"></span>'
+    : `<span class="desc" data-source-etat="${id}" aria-live="polite">${esc(etatTexteSource(x))}</span>`;
+  const exclus = x.exclus ? `<span class="desc">${esc(PLURIEL('cat.exclus', x.exclus))}</span>` : '';
+  const avert = x.officielle ? '' : `<span class="desc source-avert">${esc(t('cat.tierce_avert'))}</span>`;
+  const inactive = x.active ? '' : `<span class="desc">${esc(t('cat.inactive'))}</span>`;
+  const indisponible = !x.active || !x.cle || catalogueInstallation;
+  const agir = x.officielle
+    ? `<button class="btn compact" type="button" id="btnCatalogue"${x.active ? '' : ' disabled'}></button>`
+    : `<button class="btn compact" type="button" data-source-agir="${id}"${indisponible ? ' disabled' : ''}>${esc(t(libelleAgirSource(x)))}</button>`;
+  const gerer =
+    !x.officielle && modifiable
+      ? `<button class="btn compact only-expert" type="button" data-source-modifier="${id}">${esc(t('cat.modifier'))}</button>
+         <button class="btn compact danger only-expert" type="button" data-source-retirer="${id}">${esc(t('cat.retirer'))}</button>`
+      : '';
+  return `<div class="setrow source-carte${x.active ? '' : ' inactive'}" data-num="2.1" data-source="${id}">
+    <span class="rg-bouclier"><svg class="ico i20" aria-hidden="true"><use href="#${x.officielle ? 'shield-check' : 'sec-catalogue'}" /></svg></span>
+    <span class="setrow-txt"><span class="num">2.1</span><span class="rg-libelle">
+      <b>${nom} ${badge}</b>
+      <span class="desc mono">github.com/${esc(x.depot)}</span>
+      ${etat}${exclus}${avert}${inactive}
+    </span></span>
+    <button class="switch" type="button" role="switch" data-source-active="${id}" aria-checked="${x.active}"
+      aria-label="${esc(t('cat.activer', { nom: nomSource(x.id) }))}"></button>
+    <div class="source-actions">
+      <button class="btn compact" type="button" data-source-consulter="${id}"${indisponible ? ' disabled' : ''}>${esc(t('cat.consulter'))}</button>
+      ${agir}${gerer}
+    </div>
+  </div>`;
+}
+
+function rendreSources() {
+  const zone = document.getElementById('sourcesListe');
+  if (!zone || !etatSources) return;
+  zone.innerHTML =
+    etatSources.sources.map((x) => carteSource(x, etatSources.modifiable)).join('') +
+    etatSources.problemes.map((p) => `<p class="ajout-err">${esc(p)}</p>`).join('');
+  rendreReglagesCatalogue();
+  document.getElementById('sourcesDroits').hidden = etatSources.modifiable;
+  document.getElementById('btnSourceAjouter').disabled = !etatSources.modifiable;
+}
+
+/** Ne telecharge que l'index signe d'un catalogue ajoute. */
+async function verifierSource(id, { silencieux = false } = {}) {
+  const ligne = () => document.querySelector(`[data-source-etat="${CSS.escape(id)}"]`);
+  if (!silencieux && ligne()) ligne().textContent = t('cat.verification');
+  try {
+    const b = await invoke('check_source', { id });
+    if (b.a_jour) bilansSources.delete(id);
+    else bilansSources.set(id, b);
+    if (!b.a_jour) catalogueRepousse = false;
+    rendreSources();
+    if (!silencieux && b.a_jour && ligne()) ligne().textContent = t('cat.a_jour', { v: b.version });
+  } catch (e) {
+    console.error('Verification du catalogue :', e);
+    if (!silencieux && ligne()) ligne().textContent = messageErreurCatalogue(e);
+  }
+  rendreBandeauCatalogue();
+}
+
+/** Installe un catalogue, sans ses actions decochees. L'officiel passe par
+ *  installerCatalogue, qui tient a jour l'accueil, la visite et le bandeau. */
+async function installerSource(id) {
+  if (id === 'officiel') {
+    await installerCatalogue();
+    return true;
+  }
+  if (catalogueInstallation || executionEnCours()) return false;
+  catalogueInstallation = true;
+  rendreSources();
+  const ecrire = (texte) => {
+    const ligne = document.querySelector(`[data-source-etat="${CSS.escape(id)}"]`);
+    if (ligne) ligne.textContent = texte;
+    if (sourceOuverte?.id === id) document.getElementById('sourceEtat').textContent = texte;
+  };
+  ecrire(t('cat.telechargement_debut'));
+  const arreterEcoute = await ecouter('catalogue:progress', (ev) => {
+    const { fait, total } = ev.payload;
+    ecrire(total ? t('cat.telechargement', { f: fait, n: total }) : t('cat.telechargement_debut'));
+  });
+  let message;
+  let ok = true;
+  try {
+    const r = await invoke('install_source', { id });
+    const morceaux = [t('cat.installe', { v: r.version })];
+    if (r.copies.length) morceaux.push(t('cat.copies', { f: r.copies.join(', ') }));
+    if (r.retires.length) morceaux.push(t('cat.retires_info', { f: r.retires.map(titreElement).join(', ') }));
+    message = morceaux.join(' ');
+    bilansSources.delete(id);
+  } catch (e) {
+    console.error('Installation du catalogue :', e);
+    message = messageErreurCatalogue(e);
+    ok = false;
+  } finally {
+    arreterEcoute();
+    catalogueInstallation = false;
+  }
+  await chargerSources();
+  if (ok) await chargerLots();
+  ecrire(message);
+  rendreBandeauCatalogue();
+  return ok;
+}
+
+/** La page « Consulter et choisir » d'un catalogue. */
+async function consulterSource(id, { message = '' } = {}) {
+  const x = sourceParId(id);
+  if (!x || catalogueInstallation) return;
+  sourceOuverte = { id, contenu: null, exclus: new Set() };
+  document.getElementById('sourceFilNom').textContent = nomSource(id);
+  document.getElementById('sourceTitre').textContent = nomSource(id);
+  document.getElementById('sourceSous').textContent = x.officielle
+    ? t('offre.officiel_desc')
+    : `github.com/${x.depot} — ${t('cat.tierce_avert')}`;
+  rendreContenuSource();
+  afficherSectionReglages('source');
+  const etat = document.getElementById('sourceEtat');
+  etat.textContent = t('cat.consultation_debut');
+  const arreterEcoute = await ecouter('catalogue:progress', (ev) => {
+    const { fait, total } = ev.payload;
+    if (sourceOuverte?.id === id && total) etat.textContent = t('cat.consultation', { f: fait, n: total });
+  });
+  try {
+    const contenu = await invoke('source_contents', { id });
+    if (sourceOuverte?.id !== id) return;
+    sourceOuverte.contenu = contenu;
+    sourceOuverte.exclus = new Set(contenu.filter((c) => c.exclu).map((c) => c.id));
+    etat.textContent = message;
+  } catch (e) {
+    console.error('Consultation du catalogue :', e);
+    if (sourceOuverte?.id === id) etat.textContent = messageErreurCatalogue(e);
+  } finally {
+    arreterEcoute();
+  }
+  rendreContenuSource();
+}
+
+const ETATS_ACTION = {
+  absent: ['cat.etat_absent_s', 'neutre'],
+  installe: ['cat.etat_installe_s', 'low'],
+  maj: ['cat.etat_maj_s', 'acc'],
+  modifie: ['cat.etat_modifie_s', 'med'],
+};
+
+function rendreContenuSource() {
+  const o = sourceOuverte;
+  const contenu = o?.contenu || [];
+  const liste = document.getElementById('sourceListe');
+  liste.innerHTML = contenu
+    .map((c) => {
+      const coche = !o.exclus.has(c.id);
+      const [cle, classe] = ETATS_ACTION[c.etat] || ETATS_ACTION.absent;
+      const risque = c.risk === 'high' || c.risk === 'medium'
+        ? `<span class="badge ${c.risk === 'high' ? 'high' : 'med'}">${esc(t(`risque.${c.risk}`))}</span>`
+        : '';
+      const desc = texteLangue(c.desc);
+      return `<li class="source-action${coche ? '' : ' exclu'}">
+        <label>
+          <input type="checkbox" data-action-id="${esc(c.id)}"${coche ? ' checked' : ''} />
+          <span class="sa-txt">
+            <b>${esc(texteLangue(c.title) || c.file)}</b>
+            ${desc ? `<span class="desc">${esc(desc)}</span>` : ''}
+            <span class="sa-meta"><span class="badge ${classe}">${esc(t(cle))}</span>${risque}${
+              c.admin ? `<span class="badge neutre">${esc(t('badge.admin_requis'))}</span>` : ''
+            }<span class="muted mono">${esc(c.version)}</span></span>
+          </span>
+        </label>
+      </li>`;
+    })
+    .join('');
+  if (o?.contenu && !contenu.length) liste.innerHTML = `<li class="rg-vide">${esc(t('cat.vide'))}</li>`;
+  const coches = contenu.filter((c) => !o.exclus.has(c.id)).length;
+  document.getElementById('sourceCompte').textContent = contenu.length ? t('cat.compte', { c: coches, n: contenu.length }) : '';
+  const pret = !!o?.contenu && !catalogueInstallation;
+  for (const b of ['btnSourceTout', 'btnSourceRien', 'btnSourceAppliquer']) document.getElementById(b).disabled = !pret;
+}
+
+/** Retient les actions decochees, puis installe le reste. Une action
+ *  decochee n'apparait plus ; son fichier, s'il etait installe, reste la. */
+async function appliquerSelectionSource() {
+  const o = sourceOuverte;
+  if (!o?.contenu || catalogueInstallation || executionEnCours()) return;
+  try {
+    reglagesActuels = await invoke('set_source_selection', { id: o.id, exclus: [...o.exclus] });
+  } catch (e) {
+    document.getElementById('sourceEtat').textContent = messageErreurCatalogue(e);
+    return;
+  }
+  document.getElementById('btnSourceAppliquer').disabled = true;
+  const ok = await installerSource(o.id);
+  await chargerLots();
+  await chargerSources();
+  if (ok) await consulterSource(o.id, { message: t('cat.applique') });
+  else rendreContenuSource();
+}
+
+function ouvrirFormulaireSource(id = null) {
+  sourceModifiee = id;
+  const x = id ? sourceParId(id) : null;
+  document.getElementById('sourceFormTitre').textContent = x
+    ? t('cat.form_modifier_titre', { nom: x.nom })
+    : t('cat.ajouter_titre');
+  document.getElementById('sourceDepot').value = x ? `https://github.com/${x.depot}` : '';
+  document.getElementById('sourceCle').value = x?.cle_publique || '';
+  document.getElementById('sourceNom').value = x?.nom || '';
+  document.getElementById('btnSourceValider').textContent = t(x ? 'cat.form_enregistrer' : 'cat.form_ajouter');
+  document.getElementById('sourceErreur').hidden = true;
+  const form = document.getElementById('sourceForm');
+  form.hidden = false;
+  form.scrollIntoView({ block: 'nearest' });
+  document.getElementById('sourceDepot').focus();
+}
+
+function fermerFormulaireSource() {
+  document.getElementById('sourceForm').hidden = true;
+  sourceModifiee = null;
+}
+
+async function validerFormulaireSource(ev) {
+  ev.preventDefault();
+  const depot = document.getElementById('sourceDepot').value.trim();
+  const cle = document.getElementById('sourceCle').value.trim();
+  const nom = document.getElementById('sourceNom').value.trim();
+  const erreur = document.getElementById('sourceErreur');
+  const valider = document.getElementById('btnSourceValider');
+  if (!depot || !cle) {
+    erreur.textContent = t('cat.err_champs');
+    erreur.hidden = false;
+    return;
+  }
+  valider.disabled = true;
+  valider.textContent = t('cat.form_verification');
+  erreur.hidden = true;
+  let id = sourceModifiee;
+  try {
+    if (sourceModifiee) await invoke('update_source', { id: sourceModifiee, nom, depot, cle });
+    else id = await invoke('add_source', { depot, cle, nom });
+  } catch (e) {
+    console.error('Catalogue :', e);
+    erreur.textContent = messageErreurCatalogue(e);
+    erreur.hidden = false;
+    valider.disabled = false;
+    valider.textContent = t(sourceModifiee ? 'cat.form_enregistrer' : 'cat.form_ajouter');
+    return;
+  }
+  const ajout = !sourceModifiee;
+  valider.disabled = false;
+  fermerFormulaireSource();
+  await chargerSources();
+  await chargerLots();
+  const ligne = document.querySelector(`[data-source-etat="${CSS.escape(id)}"]`);
+  if (ligne && ajout) ligne.textContent = t('cat.ajoute', { nom: nomSource(id) });
+}
+
+async function retirerSource(id) {
+  if (!confirm(t('cat.confirmer_retrait', { nom: nomSource(id) }))) return;
+  try {
+    await invoke('remove_source', { id });
+    bilansSources.delete(id);
+  } catch (e) {
+    console.error('Retrait du catalogue :', e);
+    const ligne = document.querySelector(`[data-source-etat="${CSS.escape(id)}"]`);
+    if (ligne) ligne.textContent = messageErreurCatalogue(e);
+    return;
+  }
+  reglagesActuels = await invoke('get_settings');
+  await chargerSources();
+  await chargerLots();
+  rendreBandeauCatalogue();
+}
+
+/** Desactiver : la source n'est plus interrogee, ses actions n'apparaissent
+ *  plus. Reactiver les rend telles quelles. */
+async function basculerSource(id) {
+  const x = sourceParId(id);
+  if (!x) return;
+  try {
+    reglagesActuels = await invoke('set_source_active', { id, active: !x.active });
+  } catch (e) {
+    console.error('Activation du catalogue :', e);
+    return;
+  }
+  if (x.active) bilansSources.delete(id);
+  await chargerSources();
+  await chargerLots();
+  rendreBandeauCatalogue();
+  const etapeVisible = document.querySelector('.s-step:not([hidden])')?.dataset.s;
+  if (modeCourant === 'simple' && etapeVisible === '1') await rendreEtapeChoisir();
+}
+
+function cablerSources() {
+  document.getElementById('sourcesListe').addEventListener('click', (ev) => {
+    const b = ev.target.closest('button');
+    if (!b || b.disabled) return;
+    if (b.id === 'btnCatalogue') {
+      if (!etatCatalogue?.installe || bilanCatalogue) installerCatalogue();
+      else verifierCatalogue();
+      return;
+    }
+    const d = b.dataset;
+    if (d.sourceConsulter) return void consulterSource(d.sourceConsulter);
+    if (d.sourceActive) return void basculerSource(d.sourceActive);
+    if (d.sourceModifier) return void ouvrirFormulaireSource(d.sourceModifier);
+    if (d.sourceRetirer) return void retirerSource(d.sourceRetirer);
+    if (d.sourceAgir) {
+      const x = sourceParId(d.sourceAgir);
+      if (!x?.installe || bilansSources.has(x.id)) installerSource(x.id);
+      else verifierSource(x.id);
+    }
+  });
+  document.getElementById('btnSourceAjouter').onclick = () => ouvrirFormulaireSource(null);
+  document.getElementById('btnSourceAnnuler').onclick = fermerFormulaireSource;
+  document.getElementById('sourceForm').addEventListener('submit', validerFormulaireSource);
+  document.getElementById('btnSourcesDroits').onclick = () => {
+    fermerReglages();
+    ouvrirFenetreDroits();
+  };
+  document.getElementById('sourceListe').addEventListener('change', (ev) => {
+    const c = ev.target.closest('[data-action-id]');
+    if (!c || !sourceOuverte) return;
+    if (c.checked) sourceOuverte.exclus.delete(c.dataset.actionId);
+    else sourceOuverte.exclus.add(c.dataset.actionId);
+    rendreContenuSource();
+  });
+  document.getElementById('btnSourceTout').onclick = () => {
+    if (!sourceOuverte) return;
+    sourceOuverte.exclus.clear();
+    rendreContenuSource();
+  };
+  document.getElementById('btnSourceRien').onclick = () => {
+    if (!sourceOuverte?.contenu) return;
+    sourceOuverte.exclus = new Set(sourceOuverte.contenu.map((c) => c.id));
+    rendreContenuSource();
+  };
+  document.getElementById('btnSourceAppliquer').onclick = appliquerSelectionSource;
 }
 
 /** Accueil sans aucun script (§16.6) : la liste des catalogues proposes, la
@@ -1467,15 +1893,20 @@ async function fermerRappelCatalogue() {
 }
 
 function cablerCatalogue() {
-  document.getElementById('catInstaller').addEventListener('click', installerCatalogue);
+  document.getElementById('catInstaller').addEventListener('click', (ev) => {
+    if (ev.currentTarget.dataset.action === 'voir') {
+      sectionReglages = 'catalogue';
+      if (!reglagesOuverts()) ouvrirReglages();
+      else afficherSectionReglages('catalogue');
+      return;
+    }
+    installerCatalogue();
+  });
   document.getElementById('catPlusTard').addEventListener('click', () => {
     catalogueRepousse = true;
     document.getElementById('catBanner').hidden = true;
   });
-  document.getElementById('btnCatalogue').addEventListener('click', () => {
-    if (!etatCatalogue?.installe || bilanCatalogue) installerCatalogue();
-    else verifierCatalogue();
-  });
+  cablerSources();
   document.getElementById('setCatalogueSelect').onchange = async (ev) => {
     reglagesActuels = await invoke('set_catalogue_check', { policy: ev.target.value });
   };
@@ -1763,7 +2194,13 @@ function ouvrirTerminal(entree, demarre) {
   // qu'a ce moment-la, il ne pouvait jamais fonctionner.
   term.log.dataset.path = demarre.log_path || '';
   term.fermer.hidden = true;
-  term.fermer.textContent = t('action.fermer');
+  etiqueterFermerJournal();
+}
+
+/** « Fermer » du journal : une croix et le mot, comme les autres boutons du
+ *  journal qui portent une icone. */
+function etiqueterFermerJournal() {
+  term.fermer.innerHTML = `<svg class="ico i14" aria-hidden="true"><use href="#x" /></svg>${esc(t('action.fermer'))}`;
 }
 
 const PLURIEL = (cle, n) => t(cle, { n, s: n > 1 ? 's' : '' });
@@ -1838,7 +2275,11 @@ function ouvrirEcranConfiance(entree, requete) {
   hashEnApprobation = requete.hash;
   const tr = entree.meta.translations?.[currentLang()];
   document.getElementById('trustTitre').textContent = tr?.title || entree.meta.title || entree.id;
-  document.getElementById('trustSous').textContent = t('trust.sous', { hash: requete.hash.slice(0, 16) });
+  // D'ou vient ce script se lit avant de decider (§16.6) : un catalogue ajoute
+  // n'est ni controle ni approuve par le projet WinTool.
+  const empreinte = t('trust.sous', { hash: requete.hash.slice(0, 16) });
+  document.getElementById('trustSous').textContent =
+    entree.origin === 'tierce' ? `${t('trust.tierce', { nom: nomSource(entree.source) })} ${empreinte}` : empreinte;
   document.getElementById('trustCode').textContent = requete.source;
 
   const zone = document.getElementById('trustAttention');
@@ -2009,7 +2450,7 @@ function alerterEchecLancement(entree, message) {
   term.stop.hidden = true;
   term.log.hidden = true;
   term.fermer.hidden = false;
-  term.fermer.textContent = t('action.fermer');
+  etiqueterFermerJournal();
 
   const bloc = document.createElement('div');
   bloc.className = 'term-verdict bad';
@@ -3376,7 +3817,15 @@ function appliquerTraductionsReglages() {
 
   document.getElementById('navCatalogue').textContent = t('reglages.nav_catalogue');
   document.getElementById('secCatalogueTitre').textContent = t('reglages.nav_catalogue');
-  document.getElementById('setCatalogueLabel').textContent = t('cat.titre_reglage');
+  document.getElementById('filCatalogue').textContent = t('reglages.nav_catalogue');
+  document.getElementById('sourceDepot').placeholder = t('cat.form_depot_ph');
+  document.getElementById('sourceCle').placeholder = t('cat.form_cle_ph');
+  rendreSources();
+  if (sourceOuverte) {
+    document.getElementById('sourceFilNom').textContent = nomSource(sourceOuverte.id);
+    document.getElementById('sourceTitre').textContent = nomSource(sourceOuverte.id);
+    rendreContenuSource();
+  }
   document.getElementById('setCatalogueVerifLabel').textContent = t('cat.verif_label');
   document.querySelector('#setCatalogueSelect [value="startup"]').textContent = t('cat.verif_startup');
   document.querySelector('#setCatalogueSelect [value="manual"]').textContent = t('cat.verif_manual');
@@ -3474,6 +3923,10 @@ function ouvrirReglages() {
   document.getElementById('btnRapportConformite').textContent = t('reglages.btn_afficher');
   document.getElementById('protegesErreur').hidden = true;
   document.getElementById('rgRecherche').value = '';
+  fermerFormulaireSource();
+  // La page d'un catalogue se rouvre sur la liste : son contenu a pu changer.
+  if (sectionReglages === 'source') sectionReglages = 'catalogue';
+  chargerSources();
   document.getElementById('settingsPage').hidden = false;
   document.body.classList.add('reglages-ouverts');
   document.getElementById('btnSettings').setAttribute('aria-pressed', 'true');
@@ -3503,8 +3956,9 @@ async function afficherSectionReglages(id, { ligne } = {}) {
     page.hidden = page.dataset.rgPage !== id;
   });
   document.getElementById('rgResultats').hidden = true;
-  // La page du plan du disque appartient a la section 3.
-  const menu = id === 'proteges' ? 'expert' : id;
+  // La page du plan du disque appartient a la section 3, celle d'un catalogue
+  // a la section 2.
+  const menu = { proteges: 'expert', source: 'catalogue' }[id] || id;
   document.querySelectorAll('#setNav [data-rg-section]').forEach((b) => {
     b.setAttribute('aria-current', b.dataset.rgSection === menu ? 'page' : 'false');
   });
@@ -3756,7 +4210,7 @@ function cablerOnboarding() {
     }
   };
   document.getElementById('btnOnbSuivant').onclick = () => {
-    if (visite.etape < ETAPES_VISITE.length - 1) {
+    if (visite.etape < presentation.pages.length - 1) {
       visite.etape += 1;
       rendreVisite();
     } else {
@@ -3779,14 +4233,44 @@ function cablerOnboarding() {
    pour le detail — toujours sans jargon.
    ------------------------------------------------------------------------- */
 
-const ETAPES_VISITE = ['bienvenue', 'principe', 'entretiens', 'securite'];
+/** Le contenu de la presentation : `src/presentation.json` (§13), modifiable
+ *  sans toucher au code — voir docs/PRESENTATION.md. Il est embarque dans
+ *  l'executable, et c'est voulu : un fichier modifiable apres installation
+ *  pourrait faire dire a WinTool « desactivez votre antivirus ». */
+let presentation = { format: 1, pages: [] };
+
+async function chargerPresentation() {
+  if (presentation.pages.length) return;
+  try {
+    const reponse = await fetch('presentation.json');
+    if (!reponse.ok) throw new Error(`HTTP ${reponse.status}`);
+    presentation = await reponse.json();
+  } catch (e) {
+    console.error('Presentation illisible :', e);
+  }
+}
+
+/** Un texte de la presentation, dans la langue courante ; le francais sinon.
+ *  `{n}`, `{s}`… se remplacent comme dans t(). */
+function textePresentation(textes, valeurs = {}) {
+  const brut = (textes && (textes[currentLang()] || textes.fr)) || '';
+  return brut.replace(/\{(\w+)\}/g, (m, k) => (k in valeurs ? String(valeurs[k]) : m));
+}
 
 /** Etat de la visite. `premiere` : on ne revient pas avant (relancee depuis les
- *  Reglages, elle commence apres la langue et l'apparence, deja reglees). */
+ *  Reglages, elle commence apres la page de bienvenue : langue et apparence
+ *  sont deja reglees). */
 let visite = { etape: 0, premiere: 0, depuisReglages: false, lang: 'fr', theme: 'system' };
 
-function ouvrirVisite({ depuisReglages = false } = {}) {
-  const premiere = depuisReglages ? 1 : 0;
+async function ouvrirVisite({ depuisReglages = false } = {}) {
+  await chargerPresentation();
+  const pages = presentation.pages;
+  const premiere = depuisReglages ? Math.max(0, pages.findIndex((p) => p.type !== 'bienvenue')) : 0;
+  if (!pages.length) {
+    // Sans contenu, pas de visite : l'application reste utilisable.
+    if (!depuisReglages) await terminerVisite();
+    return;
+  }
   visite = {
     etape: premiere,
     premiere,
@@ -3811,65 +4295,67 @@ async function terminerVisite() {
   proposerRappelCatalogue();
 }
 
-/** Les illustrations : du HTML et du CSS seulement, animes par styles.css. */
-function illustrationVisite(id, icones) {
-  if (id === 'principe') {
-    return `<div class="onb-illu illu-principe" aria-hidden="true">
-      <div class="mini mini-simple">
-        <span class="mini-titre">${esc(t('mode.simple'))}</span>
-        <span class="mini-bouton">${icones.sparkles}</span>
-        <span class="mini-vague"></span>
-      </div>
-      <div class="mini mini-expert">
-        <span class="mini-titre">${esc(t('mode.expert'))}</span>
-        <span class="mini-ligne"></span><span class="mini-ligne"></span><span class="mini-ligne"></span>
-        <span class="mini-terminal"><i></i><i></i><i></i></span>
-      </div>
-    </div>`;
+/** Les illustrations : du HTML et du CSS seulement, animes par styles.css.
+ *  `presentation.json` en choisit une par page ; `icone` affiche une seule
+ *  grande icone Lucide, pour une page qui n'a pas d'illustration a elle. */
+function illustrationVisite(page, icones) {
+  switch (page.illustration) {
+    case 'principe':
+      return `<div class="onb-illu illu-principe" aria-hidden="true">
+        <div class="mini mini-simple">
+          <span class="mini-titre">${esc(t('mode.simple'))}</span>
+          <span class="mini-bouton">${icones.sparkles}</span>
+          <span class="mini-vague"></span>
+        </div>
+        <div class="mini mini-expert">
+          <span class="mini-titre">${esc(t('mode.expert'))}</span>
+          <span class="mini-ligne"></span><span class="mini-ligne"></span><span class="mini-ligne"></span>
+          <span class="mini-terminal"><i></i><i></i><i></i></span>
+        </div>
+      </div>`;
+    case 'catalogue':
+      return `<div class="onb-illu illu-catalogue" aria-hidden="true">
+        <span class="illu-colis">${icones.package}</span>
+        <span class="illu-sceau">${icones['shield-check']}</span>
+        <span class="illu-ecran">${icones.monitor}</span>
+      </div>`;
+    case 'securite':
+      return `<div class="onb-illu illu-securite" aria-hidden="true">
+        <span class="illu-doc"><i></i><i></i><i class="suspect"></i><i></i><i></i></span>
+        <span class="illu-loupe">${icones.search}</span>
+        <span class="illu-bouclier">${icones.shield}</span>
+      </div>`;
+    case 'icone':
+      return `<div class="onb-illu illu-icone" aria-hidden="true"><span>${icones[page.icone] || ''}</span></div>`;
+    default:
+      return '';
   }
-  if (id === 'entretiens') {
-    return `<div class="onb-illu illu-catalogue" aria-hidden="true">
-      <span class="illu-colis">${icones.package}</span>
-      <span class="illu-sceau">${icones['shield-check']}</span>
-      <span class="illu-ecran">${icones.monitor}</span>
-    </div>`;
-  }
-  return `<div class="onb-illu illu-securite" aria-hidden="true">
-    <span class="illu-doc"><i></i><i></i><i class="suspect"></i><i></i><i></i></span>
-    <span class="illu-loupe">${icones.search}</span>
-    <span class="illu-bouclier">${icones.shield}</span>
-  </div>`;
 }
 
-/** Trois phrases et leurs icones, puis le detail, pour chaque page de contenu. */
-const CONTENU_VISITE = {
-  principe: { icones: ['sparkles', 'mouse-pointer-click', 'sliders-horizontal'], details: 4 },
-  entretiens: { icones: ['package', 'mouse-pointer-click', 'folder-open'], details: 4 },
-  securite: { icones: ['triangle-alert', 'eye', 'shield'], details: 5 },
-};
-
-/** La ligne du catalogue, sur la page des entretiens : l'installer d'ici, ou
- *  constater qu'il l'est deja. */
-function actionCatalogueVisite() {
+/** Le bouton du catalogue officiel, sur la page qui le demande : l'installer
+ *  d'ici, ou constater qu'il l'est deja. */
+function actionCatalogueVisite(action) {
   if (!etatCatalogue?.cle) return '';
   if (etatCatalogue.installe) {
     const n = etatCatalogue.installe.scripts;
-    return `<p class="onb-action ok">${esc(t('onb.entretiens.installe', { n, s: n > 1 ? 's' : '' }))}</p>`;
+    return `<p class="onb-action ok">${esc(textePresentation(action.installe, { n, s: n > 1 ? 's' : '' }))}</p>`;
   }
   return `<div class="onb-action">
-    <button class="btn primary" type="button" data-onb="installer"${catalogueInstallation ? ' disabled' : ''}>${esc(t('onb.entretiens.installer'))}</button>
-    <span class="muted">${esc(t('onb.entretiens.plus_tard'))}</span>
+    <button class="btn primary" type="button" data-onb="installer"${catalogueInstallation ? ' disabled' : ''}>${esc(textePresentation(action.installer))}</button>
+    <span class="muted">${esc(textePresentation(action.plus_tard))}</span>
     <p class="onb-etat" id="onbCatalogueEtat" aria-live="polite"></p>
   </div>`;
 }
 
 async function rendreVisite() {
-  const id = ETAPES_VISITE[visite.etape];
+  const pages = presentation.pages;
+  const donnees = pages[visite.etape];
+  if (!donnees) return;
   const page = document.getElementById('onbPage');
-  const derniere = visite.etape === ETAPES_VISITE.length - 1;
+  const derniere = visite.etape === pages.length - 1;
 
   // Points d'etape : ceux que cette visite parcourt reellement.
-  const pas = ETAPES_VISITE.slice(visite.premiere);
+  const pas = pages.slice(visite.premiere);
   document.getElementById('onbPas').innerHTML = pas
     .map((_, i) => `<span class="${i + visite.premiere === visite.etape ? 'actif' : ''}"></span>`)
     .join('');
@@ -3878,13 +4364,13 @@ async function rendreVisite() {
     t('onb.etape', { n: visite.etape - visite.premiere + 1, total: pas.length }),
   );
 
-  if (id === 'bienvenue') {
+  if (donnees.type === 'bienvenue') {
     const choix = (attr, valeur, actuelle, libelle) =>
       `<button type="button" data-${attr}="${valeur}" aria-pressed="${valeur === actuelle}">${esc(libelle)}</button>`;
     page.innerHTML = `
       <div class="onb-mark"><svg class="ico i28" aria-hidden="true"><use href="#logo" /></svg></div>
-      <h1 id="onbTitre">${esc(t('onb.titre'))}</h1>
-      <p class="onb-text">${esc(t('onb.texte'))}</p>
+      <h1 id="onbTitre">${esc(textePresentation(donnees.titre))}</h1>
+      <p class="onb-text">${esc(textePresentation(donnees.texte))}</p>
       <div class="onb-choices">
         <div class="grp">
           <span class="lbl">${esc(t('onb.langue'))}</span>
@@ -3896,22 +4382,26 @@ async function rendreVisite() {
         </div>
       </div>`;
   } else {
-    const c = CONTENU_VISITE[id];
-    const noms = [...new Set([...c.icones, 'sparkles', 'package', 'shield-check', 'monitor', 'search', 'shield'])];
+    const essentiel = donnees.essentiel || [];
+    // Les icones des illustrations, plus celles que la page nomme.
+    const noms = [
+      ...new Set([
+        ...essentiel.map((e) => e.icone),
+        ...(donnees.icone ? [donnees.icone] : []),
+        'sparkles', 'package', 'shield-check', 'monitor', 'search', 'shield',
+      ]),
+    ];
     const icones = Object.fromEntries(await Promise.all(noms.map(async (n) => [n, (await iconeSVG(n)) || ''])));
-    const rapide = c.icones
-      .map((ic, i) => `<li><span class="onb-puce">${icones[ic]}</span><span>${esc(t(`onb.${id}.r${i + 1}`))}</span></li>`)
+    const rapide = essentiel
+      .map((e) => `<li><span class="onb-puce">${icones[e.icone] || ''}</span><span>${esc(textePresentation(e.texte))}</span></li>`)
       .join('');
-    const detail = Array.from({ length: c.details }, (_, i) => `<p>${esc(t(`onb.${id}.d${i + 1}`))}</p>`).join('');
+    const detail = (donnees.detail || []).map((d) => `<p>${esc(textePresentation(d))}</p>`).join('');
     page.innerHTML = `
-      ${illustrationVisite(id, icones)}
-      <h1 id="onbTitre">${esc(t(`onb.${id}.titre`))}</h1>
-      <ul class="onb-rapide">${rapide}</ul>
-      ${id === 'entretiens' ? actionCatalogueVisite() : ''}
-      <details class="onb-detail">
-        <summary>${esc(t('onb.en_savoir_plus'))}</summary>
-        ${detail}
-      </details>`;
+      ${illustrationVisite(donnees, icones)}
+      <h1 id="onbTitre">${esc(textePresentation(donnees.titre))}</h1>
+      ${rapide ? `<ul class="onb-rapide">${rapide}</ul>` : ''}
+      ${donnees.action?.type === 'catalogue' ? actionCatalogueVisite(donnees.action) : ''}
+      ${detail ? `<details class="onb-detail"><summary>${esc(t('onb.en_savoir_plus'))}</summary>${detail}</details>` : ''}`;
   }
 
   const retour = document.getElementById('btnOnbRetour');
@@ -3958,6 +4448,8 @@ function cablerReglages() {
       afficherSectionReglages(sectionReglages);
     } else if (sectionReglages === 'proteges') {
       afficherSectionReglages('expert');
+    } else if (sectionReglages === 'source') {
+      afficherSectionReglages('catalogue');
     } else {
       fermerReglages();
     }
@@ -4326,6 +4818,8 @@ async function demarrer() {
   } catch (e) {
     console.error('catalogue_state a echoue :', e);
   }
+  // Les noms des catalogues ajoutes servent aux pastilles de provenance.
+  await chargerSources();
 
   await rafraichirHistorique();
   await chargerLots();
@@ -4339,8 +4833,11 @@ async function demarrer() {
   // Apres l'affichage, et sans l'attendre : une verification lente ou une
   // machine hors ligne ne doit jamais retarder l'ouverture de la fenetre.
   if (reglages.update_policy !== 'never') verifierMaj({ silencieux: true });
-  if (etatCatalogue?.installe && reglagesActuels?.catalogue_check !== 'manual') {
-    verifierCatalogue({ silencieux: true });
+  if (reglagesActuels?.catalogue_check !== 'manual') {
+    if (etatCatalogue?.installe && sourceParId('officiel')?.active !== false) verifierCatalogue({ silencieux: true });
+    for (const x of etatSources?.sources || []) {
+      if (!x.officielle && x.active && x.installe) verifierSource(x.id, { silencieux: true });
+    }
   }
   proposerRappelCatalogue();
 }

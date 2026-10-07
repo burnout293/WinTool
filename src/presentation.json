@@ -1,0 +1,183 @@
+{
+  "format": 1,
+  "pages": [
+    {
+      "id": "bienvenue",
+      "type": "bienvenue",
+      "titre": {
+        "fr": "Bienvenue dans WinTool",
+        "en": "Welcome to WinTool"
+      },
+      "texte": {
+        "fr": "Quatre petites pages pour bien démarrer. Choisissez d’abord votre langue et l’apparence.",
+        "en": "Four short pages to get started. First, choose your language and look."
+      }
+    },
+    {
+      "id": "principe",
+      "illustration": "principe",
+      "titre": {
+        "fr": "WinTool prend soin de votre ordinateur",
+        "en": "WinTool looks after your computer"
+      },
+      "essentiel": [
+        {
+          "icone": "sparkles",
+          "texte": {
+            "fr": "Il nettoie, règle et répare Windows à votre place.",
+            "en": "It cleans, tunes and repairs Windows for you."
+          }
+        },
+        {
+          "icone": "mouse-pointer-click",
+          "texte": {
+            "fr": "Mode Simple : un bouton, et c’est fait.",
+            "en": "Simple mode: one button, and it’s done."
+          }
+        },
+        {
+          "icone": "sliders-horizontal",
+          "texte": {
+            "fr": "Mode Expert : vous réglez chaque détail.",
+            "en": "Expert mode: you control every detail."
+          }
+        }
+      ],
+      "detail": [
+        {
+          "fr": "Tout ce que WinTool sait faire s’appelle une action : vider la corbeille, accélérer le démarrage, protéger votre vie privée… Derrière chaque action se cache un « script » : une recette que l’ordinateur suit, étape par étape.",
+          "en": "Everything WinTool can do is called an action: emptying the recycle bin, speeding up startup, protecting your privacy… Behind each action is a “script”: a recipe the computer follows, step by step."
+        },
+        {
+          "fr": "Le mode Simple vous guide en trois étapes — choisir, vérifier, lancer — puis vous dit ce qui a été fait. Rien ne se fait sans votre accord.",
+          "en": "Simple mode guides you in three steps — choose, check, start — then tells you what was done. Nothing happens without your consent."
+        },
+        {
+          "fr": "Le mode Expert montre tout : les actions rangées en lots, les réglages de chacune, et ce qui se passe pendant qu’elles travaillent. C’est là qu’on prépare le mode Simple, par exemple pour un proche.",
+          "en": "Expert mode shows everything: actions grouped into sets, the settings of each one, and what happens while they work. It is where you prepare Simple mode, for a relative for example."
+        },
+        {
+          "fr": "Le bouton « Simulation », en haut de la fenêtre, montre ce qu’une action ferait sans rien changer. On passe d’un mode à l’autre à tout moment, en haut de la fenêtre aussi.",
+          "en": "The “Simulation” button, at the top of the window, shows what an action would do without changing anything. You can switch modes at any time, at the top of the window too."
+        }
+      ]
+    },
+    {
+      "id": "actions",
+      "illustration": "catalogue",
+      "titre": {
+        "fr": "Les actions viennent de catalogues",
+        "en": "Actions come from catalogues"
+      },
+      "essentiel": [
+        {
+          "icone": "package",
+          "texte": {
+            "fr": "WinTool arrive vide : il ne contient aucune action.",
+            "en": "WinTool comes empty: it contains no actions."
+          }
+        },
+        {
+          "icone": "mouse-pointer-click",
+          "texte": {
+            "fr": "Le catalogue officiel en propose : un clic suffit.",
+            "en": "The official catalogue offers some: one click is enough."
+          }
+        },
+        {
+          "icone": "folder-open",
+          "texte": {
+            "fr": "Vous pouvez aussi utiliser vos propres scripts.",
+            "en": "You can also use your own scripts."
+          }
+        }
+      ],
+      "action": {
+        "type": "catalogue",
+        "installer": {
+          "fr": "Installer le catalogue officiel",
+          "en": "Install the official catalogue"
+        },
+        "plus_tard": {
+          "fr": "ou plus tard, depuis les Réglages",
+          "en": "or later, from Settings"
+        },
+        "installe": {
+          "fr": "Catalogue installé : {n} action{s} prête{s}.",
+          "en": "Catalogue installed: {n} action{s} ready."
+        }
+      },
+      "detail": [
+        {
+          "fr": "Pourquoi rien n’est fourni ? Le logiciel et ses actions n’ont ni les mêmes auteurs ni les mêmes règles. WinTool est gratuit et le restera ; les scripts appartiennent à ceux qui les écrivent. Les séparer laisse chacun libre.",
+          "en": "Why is nothing included? The software and its actions have neither the same authors nor the same rules. WinTool is free and will stay free; scripts belong to whoever writes them. Keeping them apart leaves everyone free."
+        },
+        {
+          "fr": "Le catalogue officiel est publié par le projet WinTool. Chaque action porte une signature numérique, comme un sceau : si elle était modifiée en route, WinTool la refuserait.",
+          "en": "The official catalogue is published by the WinTool project. Each action carries a digital signature, like a seal: if it were changed on the way, WinTool would refuse it."
+        },
+        {
+          "fr": "Vous choisissez les actions à installer, et d’autres catalogues peuvent s’ajouter depuis les Réglages. Rien ne part de votre ordinateur : WinTool télécharge une liste publique, c’est tout. Les nouveautés vous sont proposées, jamais imposées.",
+          "en": "You choose which actions to install, and other catalogues can be added from Settings. Nothing leaves your computer: WinTool downloads a public list, that’s all. Updates are offered to you, never forced on you."
+        },
+        {
+          "fr": "Vos propres scripts se déposent dans votre dossier de scripts (Réglages). Avant le premier lancement de chacun, WinTool vous demande votre accord.",
+          "en": "Your own scripts go in your scripts folder (Settings). Before each one runs for the first time, WinTool asks for your consent."
+        }
+      ]
+    },
+    {
+      "id": "securite",
+      "illustration": "securite",
+      "titre": {
+        "fr": "Votre sécurité d’abord",
+        "en": "Your safety first"
+      },
+      "essentiel": [
+        {
+          "icone": "triangle-alert",
+          "texte": {
+            "fr": "Un script peut tout faire sur votre ordinateur, le meilleur comme le pire.",
+            "en": "A script can do anything on your computer, the best as well as the worst."
+          }
+        },
+        {
+          "icone": "eye",
+          "texte": {
+            "fr": "N’approuvez que les scripts dont vous connaissez l’origine.",
+            "en": "Only approve scripts whose origin you know."
+          }
+        },
+        {
+          "icone": "shield",
+          "texte": {
+            "fr": "Votre antivirus peut se méfier de WinTool : c’est normal.",
+            "en": "Your antivirus may be wary of WinTool: that’s normal."
+          }
+        }
+      ],
+      "detail": [
+        {
+          "fr": "Les actions travaillent avec les droits d’administrateur : elles peuvent modifier Windows en profondeur. C’est ce qui les rend utiles, et ce qui rend un script malveillant dangereux.",
+          "en": "Actions work with administrator rights: they can change Windows deeply. That is what makes them useful, and what makes a malicious script dangerous."
+        },
+        {
+          "fr": "Le catalogue officiel est signé, et WinTool vérifie qu’il n’a pas été modifié. Un catalogue que vous ajoutez, ou un script trouvé ailleurs — un forum, une vidéo, un courriel —, ne vient pas du projet WinTool : WinTool vous montre alors son contenu et attend votre accord.",
+          "en": "The official catalogue is signed, and WinTool checks that it was not changed. A catalogue you add, or a script found elsewhere — a forum, a video, an email —, does not come from the WinTool project: WinTool then shows you its content and waits for your consent."
+        },
+        {
+          "fr": "Vous ne savez pas lire un script ? Demandez à quelqu’un de confiance, ou à une intelligence artificielle, de vous expliquer ce qu’il fait — avant de l’approuver. Méfiez-vous de quiconque vous presse de dire oui.",
+          "en": "Can’t read a script? Ask someone you trust, or an artificial intelligence, to explain what it does — before approving it. Be wary of anyone who rushes you into saying yes."
+        },
+        {
+          "fr": "Votre antivirus surveille les programmes qui lancent des scripts, et WinTool en fait partie : il peut afficher un avertissement, ou bloquer une action. Ne le désactivez jamais pour WinTool. Si une action du catalogue officiel est bloquée, signalez-le sur la page du projet.",
+          "en": "Your antivirus watches programs that run scripts, and WinTool is one of them: it may show a warning, or block an action. Never turn it off for WinTool. If an action from the official catalogue is blocked, report it on the project page."
+        },
+        {
+          "fr": "WinTool ne collecte rien sur vous, et n’envoie rien.",
+          "en": "WinTool collects nothing about you, and sends nothing."
+        }
+      ]
+    }
+  ]
+}

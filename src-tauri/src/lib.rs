@@ -9,11 +9,13 @@ mod runner;
 mod security;
 mod settings;
 mod simulation;
+mod sources;
 mod systeme;
 mod update;
 
 use serde::Serialize;
 use settings::{Category, Settings};
+use std::collections::HashSet;
 use std::sync::Arc;
 use tauri::Manager;
 
@@ -843,36 +845,275 @@ fn set_update_policy(app: tauri::AppHandle, policy: String) -> Result<Settings, 
 /// remplacement echouerait de toute facon — on le dit avant d'essayer.
 const CATALOGUE_PENDANT_EXECUTION: &str = "CATALOGUE_PENDANT_EXECUTION";
 
+/// Les scripts qu'on a decoches dans la page d'une source.
+fn exclus_de(reglages: &Settings, id: &str) -> HashSet<String> {
+    reglages
+        .sources_exclus
+        .get(id)
+        .map(|v| v.iter().cloned().collect())
+        .unwrap_or_default()
+}
+
+/// Codes d'erreur des sources, traduits par l'interface.
+const SOURCES_SANS_DROITS: &str = "SOURCES_SANS_DROITS";
+const SOURCE_INCONNUE: &str = "SOURCE_INCONNUE";
+const SOURCE_EXISTE: &str = "SOURCE_EXISTE";
+const SOURCE_NOM: &str = "SOURCE_NOM";
+const SOURCE_AUTRE_ID: &str = "SOURCE_AUTRE_ID";
+
+fn source_connue(id: &str) -> Result<sources::Source, String> {
+    sources::trouver(id).ok_or_else(|| format!("{SOURCE_INCONNUE}: {id}"))
+}
+
 /// Etat du catalogue officiel installe (§16) : version, nombre de scripts, et
 /// ce qui ne va pas s'il y a lieu.
 #[tauri::command]
 fn catalogue_state(app: tauri::AppHandle) -> Result<catalogue::Etat, String> {
-    catalogue::etat(&app)
+    catalogue::etat(&app, &sources::officielle())
 }
 
 /// Interroge le catalogue officiel et dit ce qu'une installation changerait.
 /// Ne telecharge que l'index signe ; aucun script, rien d'ecrit.
 #[tauri::command]
 async fn check_catalogue(app: tauri::AppHandle) -> Result<catalogue::Bilan, String> {
-    catalogue::examiner(&app).await
+    check_source(app, catalogue::SOURCE.to_string()).await
 }
 
-/// Installe ou met a jour le catalogue officiel. Installer, c'est aussi
-/// choisir cette source : le reglage suit.
+/// Installe ou met a jour le catalogue officiel.
 #[tauri::command]
 async fn install_catalogue(
     app: tauri::AppHandle,
     state: tauri::State<'_, Arc<runner::Runner>>,
 ) -> Result<catalogue::Installation, String> {
+    install_source(app, state, catalogue::SOURCE.to_string()).await
+}
+
+/// Une source, telle que la page des catalogues la montre.
+#[derive(Serialize)]
+struct EtatSource {
+    id: String,
+    nom: String,
+    depot: String,
+    /// La cle publique, pour la modifier ; vide pour l'officielle. Pas `cle` :
+    /// `catalogue::Etat`, aplati a cote, porte deja un `cle` (une cle est-elle
+    /// presente).
+    cle_publique: String,
+    officielle: bool,
+    active: bool,
+    /// Nombre de scripts decoches.
+    exclus: usize,
+    #[serde(flatten)]
+    etat: catalogue::Etat,
+}
+
+#[derive(Serialize)]
+struct EtatSources {
+    sources: Vec<EtatSource>,
+    /// Entrees du registre ignorees, illisibles ou trafiquees.
+    problemes: Vec<String>,
+    /// Ajouter, modifier ou retirer une source demande les droits
+    /// administrateur : la liste vit dans HKLM (§16.2).
+    modifiable: bool,
+}
+
+/// Toutes les sources, l'officielle en tete (§16.2, §16.6).
+#[tauri::command]
+fn sources_state(app: tauri::AppHandle) -> Result<EtatSources, String> {
+    let reglages = settings::load(&app)?;
+    let (liste, problemes) = sources::toutes();
+    let mut etats = Vec::with_capacity(liste.len());
+    for source in liste {
+        let etat = catalogue::etat(&app, &source)?;
+        etats.push(EtatSource {
+            active: !reglages.sources_inactives.contains(&source.id),
+            exclus: reglages.sources_exclus.get(&source.id).map_or(0, Vec::len),
+            cle_publique: if source.officielle {
+                String::new()
+            } else {
+                source.cle.clone()
+            },
+            id: source.id,
+            nom: source.nom,
+            depot: source.depot,
+            officielle: source.officielle,
+            etat,
+        });
+    }
+    Ok(EtatSources {
+        sources: etats,
+        problemes,
+        modifiable: is_elevated(),
+    })
+}
+
+/// Ce qu'une installation de cette source changerait. Ne telecharge que
+/// l'index signe ; aucun script, rien d'ecrit.
+#[tauri::command]
+async fn check_source(app: tauri::AppHandle, id: String) -> Result<catalogue::Bilan, String> {
+    let source = source_connue(&id)?;
+    let exclus = exclus_de(&settings::load(&app)?, &id);
+    catalogue::examiner(&app, &source, &exclus).await
+}
+
+/// Installe ou met a jour une source, sans les scripts decoches. Installer le
+/// catalogue officiel, c'est aussi le choisir : le reglage suit.
+#[tauri::command]
+async fn install_source(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<runner::Runner>>,
+    id: String,
+) -> Result<catalogue::Installation, String> {
     if state.snapshot().is_some() {
         return Err(CATALOGUE_PENDANT_EXECUTION.to_string());
     }
-    let fait = catalogue::installer(&app).await?;
-    with_settings(&app, |s| {
-        s.catalogue_source = "official".to_string();
-        Ok(())
-    })?;
+    let source = source_connue(&id)?;
+    let exclus = exclus_de(&settings::load(&app)?, &id);
+    let fait = catalogue::installer(&app, &source, &exclus).await?;
+    if source.officielle {
+        with_settings(&app, |s| {
+            s.catalogue_source = "official".to_string();
+            Ok(())
+        })?;
+    }
     Ok(fait)
+}
+
+/// Le contenu de la derniere release d'une source, script par script, avec
+/// son etat sur ce PC — pour la page « Consulter et choisir ». Rien d'ecrit.
+#[tauri::command]
+async fn source_contents(
+    app: tauri::AppHandle,
+    id: String,
+) -> Result<Vec<catalogue::Contenu>, String> {
+    let source = source_connue(&id)?;
+    let exclus = exclus_de(&settings::load(&app)?, &id);
+    catalogue::contenu(&app, &source, &exclus).await
+}
+
+/// Retient les scripts decoches d'une source. N'installe rien : c'est
+/// `install_source` qui telecharge ce qui est coche.
+#[tauri::command]
+fn set_source_selection(
+    app: tauri::AppHandle,
+    id: String,
+    exclus: Vec<String>,
+) -> Result<Settings, String> {
+    source_connue(&id)?;
+    if exclus.len() > 1000 || exclus.iter().any(|e| e.is_empty() || e.len() > 100) {
+        return Err("selection refusee".to_string());
+    }
+    with_settings(&app, |s| {
+        if exclus.is_empty() {
+            s.sources_exclus.remove(&id);
+        } else {
+            s.sources_exclus.insert(id, exclus);
+        }
+        Ok(())
+    })
+}
+
+/// Active ou desactive une source : desactivee, elle n'est plus interrogee et
+/// ses scripts n'apparaissent plus (ils restent sur le disque).
+#[tauri::command]
+fn set_source_active(app: tauri::AppHandle, id: String, active: bool) -> Result<Settings, String> {
+    source_connue(&id)?;
+    with_settings(&app, |s| {
+        s.sources_inactives.retain(|i| *i != id);
+        if !active {
+            s.sources_inactives.push(id);
+        }
+        Ok(())
+    })
+}
+
+/// Le nom donne a une source, ou celui de son depot s'il est vide.
+fn nom_de_source(nom: &str, depot: &str) -> Result<String, String> {
+    let nom = nom.trim();
+    let nom = if nom.is_empty() {
+        depot.rsplit('/').next().unwrap_or(depot)
+    } else {
+        nom
+    };
+    if !sources::nom_sur(nom) {
+        return Err(format!("{SOURCE_NOM}: {nom}"));
+    }
+    Ok(nom.to_string())
+}
+
+/// Ajoute une source tierce : un depot GitHub et la cle publique de son
+/// editeur. L'index est telecharge et verifie avec cette cle **avant**
+/// l'inscription : une source qui ne se verifie pas n'est jamais ajoutee. C'est
+/// son index qui donne l'identifiant de la source. Administrateur seulement.
+#[tauri::command]
+async fn add_source(depot: String, cle: String, nom: String) -> Result<String, String> {
+    if !is_elevated() {
+        return Err(SOURCES_SANS_DROITS.to_string());
+    }
+    let depot = catalogue::normaliser_depot(&depot)?;
+    let cle = cle.trim().to_string();
+    catalogue::decoder_cle(&cle)?;
+    let index = catalogue::decouvrir(&depot, &cle).await?;
+    let (connues, _) = sources::toutes();
+    if connues.iter().any(|s| s.id == index.source) {
+        return Err(format!("{SOURCE_EXISTE}: {}", index.source));
+    }
+    let source = sources::Source {
+        id: index.source,
+        nom: nom_de_source(&nom, &depot)?,
+        depot,
+        cle,
+        officielle: false,
+    };
+    sources::enregistrer(&source)?;
+    Ok(source.id)
+}
+
+/// Modifie une source tierce. Changer de depot ou de cle, c'est changer
+/// d'editeur : le nouvel index doit se verifier, et declarer la meme source.
+#[tauri::command]
+async fn update_source(id: String, nom: String, depot: String, cle: String) -> Result<(), String> {
+    if !is_elevated() {
+        return Err(SOURCES_SANS_DROITS.to_string());
+    }
+    let actuelle = source_connue(&id)?;
+    if actuelle.officielle {
+        return Err(format!("{SOURCE_INCONNUE}: {id}"));
+    }
+    let depot = catalogue::normaliser_depot(&depot)?;
+    let cle = cle.trim().to_string();
+    if depot != actuelle.depot || cle != actuelle.cle {
+        catalogue::decoder_cle(&cle)?;
+        let index = catalogue::decouvrir(&depot, &cle).await?;
+        if index.source != id {
+            return Err(format!("{SOURCE_AUTRE_ID}: {}", index.source));
+        }
+    }
+    sources::enregistrer(&sources::Source {
+        nom: nom_de_source(&nom, &depot)?,
+        id,
+        depot,
+        cle,
+        officielle: false,
+    })
+}
+
+/// Retire une source tierce. Ses scripts restent sur le disque — WinTool ne
+/// supprime jamais un script — mais n'apparaissent plus.
+#[tauri::command]
+fn remove_source(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    if !is_elevated() {
+        return Err(SOURCES_SANS_DROITS.to_string());
+    }
+    if source_connue(&id)?.officielle {
+        return Err(format!("{SOURCE_INCONNUE}: {id}"));
+    }
+    sources::retirer(&id)?;
+    with_settings(&app, |s| {
+        s.sources_inactives.retain(|i| *i != id);
+        s.sources_exclus.remove(&id);
+        Ok(())
+    })
+    .map(|_| ())
 }
 
 #[tauri::command]
@@ -1146,6 +1387,15 @@ pub fn run() {
             catalogue_state,
             check_catalogue,
             install_catalogue,
+            sources_state,
+            check_source,
+            install_source,
+            source_contents,
+            set_source_selection,
+            set_source_active,
+            add_source,
+            update_source,
+            remove_source,
             set_catalogue_source,
             set_catalogue_check,
             hide_catalogue_reminder,

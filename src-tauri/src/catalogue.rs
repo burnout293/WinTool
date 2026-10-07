@@ -1,9 +1,12 @@
-//! Catalogue officiel de scripts (specification §16).
+//! Catalogues de scripts (specification §16).
 //!
-//! WinTool n'embarque plus aucun script : il les recupere depuis une *source*,
-//! ici la seule source officielle, le depot WinTool-Catalogue. La separation est
-//! d'abord juridique — les scripts ne sont pas sous la licence de WinTool
-//! (§16.1) — et ce module la rend reelle dans le fonctionnement.
+//! WinTool n'embarque plus aucun script : il les recupere depuis des *sources*
+//! — la source officielle, le depot WinTool-Catalogue, et celles qu'un
+//! administrateur ajoute (`sources.rs`). La separation est d'abord juridique —
+//! les scripts ne sont pas sous la licence de WinTool (§16.1) — et ce module la
+//! rend reelle dans le fonctionnement. Toutes les sources passent par le meme
+//! code ; seule l'officielle a une cle compilee, et seuls ses scripts sont
+//! approuves d'office (§16.4).
 //!
 //! Une release du catalogue publie :
 //!
@@ -28,7 +31,9 @@
 //! d'un script officiel (§16.4). Le dossier reste inscriptible sans elevation ;
 //! un script modifie apres coup perd simplement cette approbation.
 
+use crate::contract;
 use crate::discovery;
+use crate::sources::Source;
 use base64::Engine as _;
 use minisign_verify::{PublicKey, Signature};
 use serde::{Deserialize, Serialize};
@@ -42,10 +47,16 @@ use tauri::{AppHandle, Emitter, Runtime};
 /// que son index doit declarer dans `source`.
 pub const SOURCE: &str = "officiel";
 
-/// Le depot qui publie le catalogue officiel. Un fork remplace cette constante
-/// et `src-tauri/catalogue.pub` (§16.8) : aucune autre adresse n'est cablee
-/// ailleurs.
-pub const DEPOT: &str = "https://github.com/burnout293/WinTool-Catalogue";
+/// Le depot GitHub qui publie le catalogue officiel, `proprietaire/depot`. Un
+/// fork remplace cette constante et `src-tauri/catalogue.pub` (§16.8) : aucune
+/// autre adresse n'est cablee ailleurs.
+pub const DEPOT: &str = "burnout293/WinTool-Catalogue";
+
+/// L'adresse d'un depot GitHub. Une source n'est jamais qu'un depot : ses
+/// releases portent l'index signe et les scripts.
+pub fn url_depot(depot: &str) -> String {
+    format!("https://github.com/{depot}")
+}
 
 /// Cle publique du catalogue, lue par `build.rs` dans `src-tauri/catalogue.pub`
 /// et **compilee dans le binaire** (§16.2) : rien sur le disque ne peut la
@@ -53,6 +64,10 @@ pub const DEPOT: &str = "https://github.com/burnout293/WinTool-Catalogue";
 /// genere la sienne. Le catalogue refuse alors tout, plutot que de faire
 /// confiance a quoi que ce soit ; et une release refuse de se construire sans.
 const CLE_PUBLIQUE: &str = env!("WINTOOL_CATALOGUE_PUB");
+
+pub fn cle_officielle() -> &'static str {
+    CLE_PUBLIQUE
+}
 
 /// Version du format d'index que cette version de WinTool sait lire.
 pub const FORMAT: u32 = 1;
@@ -80,6 +95,10 @@ pub mod code {
     pub const ANCIEN: &str = "CATALOGUE_ANCIEN";
     pub const EMPREINTE: &str = "CATALOGUE_EMPREINTE";
     pub const ECRITURE: &str = "CATALOGUE_ECRITURE";
+    /// Cle publique d'une source tierce illisible.
+    pub const CLE: &str = "CATALOGUE_CLE";
+    /// Adresse de depot qui n'est pas `proprietaire/depot` sur GitHub.
+    pub const DEPOT: &str = "CATALOGUE_DEPOT";
 }
 
 fn erreur(code: &str, detail: impl std::fmt::Display) -> String {
@@ -96,8 +115,9 @@ fn erreur(code: &str, detail: impl std::fmt::Display) -> String {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Index {
     pub format: u32,
-    /// Doit valoir `SOURCE` : un index signe pour une autre source n'est pas
-    /// le notre, meme si la cle se trouvait etre la meme.
+    /// L'identifiant de la source : un index signe pour une autre source est
+    /// refuse, meme si la cle se trouvait etre la meme. A l'ajout d'une source
+    /// tierce, c'est lui qui devient son identifiant, et son nom de dossier.
     pub source: String,
     /// Version du catalogue, `X.Y.Z`. Sert a refuser un retour en arriere.
     pub version: String,
@@ -155,6 +175,66 @@ pub fn nom_sur(nom: &str) -> bool {
     !RESERVES.iter().any(|r| r.eq_ignore_ascii_case(racine))
 }
 
+/// Un identifiant de source : il devient un nom de dossier. Minuscules,
+/// chiffres et tirets, 40 au plus — rien qu'un index puisse detourner en
+/// chemin.
+pub fn id_source_sur(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 40
+        && id.starts_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && id
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// `proprietaire/depot`, a partir de ce que l'utilisateur colle : l'adresse
+/// complete du depot, avec ou sans `https://`, `www.`, `.git` ou une page du
+/// depot derriere (`/releases`…). Les noms suivent les regles de GitHub.
+pub fn normaliser_depot(saisie: &str) -> Result<String, String> {
+    let refus = || {
+        erreur(
+            code::DEPOT,
+            format!("« {} » n'est pas un depot GitHub", saisie.trim()),
+        )
+    };
+    let mut reste = saisie.trim();
+    for prefixe in ["https://", "http://"] {
+        if let Some(r) = reste.strip_prefix(prefixe) {
+            reste = r;
+        }
+    }
+    reste = reste.strip_prefix("www.").unwrap_or(reste);
+    // Une adresse complete doit etre celle de GitHub ; sans adresse, la saisie
+    // est deja `proprietaire/depot` (un `gitlab.com/…` echoue plus bas : le
+    // point n'est pas permis dans un nom de proprietaire).
+    let reste = match reste.strip_prefix("github.com/") {
+        Some(r) => r,
+        None if saisie.contains("://") => return Err(refus()),
+        None => reste,
+    };
+    let mut morceaux = reste.split('/').filter(|m| !m.is_empty());
+    let (Some(proprietaire), Some(depot)) = (morceaux.next(), morceaux.next()) else {
+        return Err(refus());
+    };
+    let depot = depot.strip_suffix(".git").unwrap_or(depot);
+    let proprietaire_sur = proprietaire.len() <= 39
+        && !proprietaire.starts_with('-')
+        && proprietaire
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-');
+    let depot_sur = !depot.is_empty()
+        && depot.len() <= 100
+        && !depot.starts_with('.')
+        && !depot.contains("..")
+        && depot
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'));
+    if !proprietaire_sur || !depot_sur {
+        return Err(refus());
+    }
+    Ok(format!("{proprietaire}/{depot}"))
+}
+
 /// `X.Y.Z`, trois entiers, rien d'autre.
 fn triplet(v: &str) -> Option<(u32, u32, u32)> {
     let parties: Vec<&str> = v.split('.').collect();
@@ -177,8 +257,12 @@ fn hex64(s: &str) -> bool {
 }
 
 /// Analyse un index **deja authentifie**. Privee : la seule porte d'entree est
-/// `verifier_avec`, qui ne l'appelle qu'apres la signature.
-fn analyser(octets: &[u8]) -> Result<Index, String> {
+/// `verifier_pour`, qui ne l'appelle qu'apres la signature.
+///
+/// `attendu` : l'identifiant de la source dont l'index doit etre. `None`
+/// seulement a l'ajout d'une source tierce, quand c'est l'index qui le donne —
+/// il doit alors etre un identifiant sur.
+fn analyser(octets: &[u8], attendu: Option<&str>) -> Result<Index, String> {
     // Le format d'abord : un index d'un format futur doit dire « mettez WinTool
     // a jour », pas « index illisible ».
     #[derive(Deserialize)]
@@ -199,8 +283,14 @@ fn analyser(octets: &[u8]) -> Result<Index, String> {
     let index: Index = serde_json::from_slice(octets).map_err(|e| erreur(code::INVALIDE, e))?;
     let invalide = |m: String| Err(erreur(code::INVALIDE, m));
 
-    if index.source != SOURCE {
-        return invalide(format!("index de la source « {} »", index.source));
+    match attendu {
+        Some(id) if index.source != id => {
+            return invalide(format!("index de la source « {} »", index.source));
+        }
+        None if !id_source_sur(&index.source) => {
+            return invalide(format!("identifiant de source « {} » refuse", index.source));
+        }
+        _ => {}
     }
     if triplet(&index.version).is_none() {
         return invalide(format!(
@@ -246,38 +336,76 @@ fn decoder_b64(texte: &str, quoi: &str) -> Result<String, String> {
     String::from_utf8(octets).map_err(|_| erreur(code::SIGNATURE, format!("{quoi} illisible")))
 }
 
+/// Une cle publique minisign, sous l'une des formes qu'un editeur publie : le
+/// fichier `.pub` enveloppe de base64 (`tauri signer`, catalogue officiel), le
+/// fichier `.pub` de `minisign` tel quel, ou sa seule ligne de cle (`RW…`).
+pub fn decoder_cle(texte: &str) -> Result<PublicKey, String> {
+    let texte = texte.trim();
+    let illisible =
+        |e: &dyn std::fmt::Display| erreur(code::CLE, format!("cle publique illisible : {e}"));
+    if texte.contains("untrusted comment") {
+        return PublicKey::decode(texte).map_err(|e| illisible(&e));
+    }
+    if let Ok(octets) = base64::engine::general_purpose::STANDARD.decode(texte) {
+        if let Ok(fichier) = String::from_utf8(octets) {
+            if fichier.contains("untrusted comment") {
+                return PublicKey::decode(&fichier).map_err(|e| illisible(&e));
+            }
+        }
+    }
+    PublicKey::from_base64(texte).map_err(|e| illisible(&e))
+}
+
+/// La signature detachee : le fichier `.sig` enveloppe de base64 (`tauri
+/// signer`) ou le fichier `.minisig` de `minisign` tel quel.
+fn decoder_signature(octets: &[u8]) -> Result<Signature, String> {
+    let texte = std::str::from_utf8(octets)
+        .map_err(|_| erreur(code::SIGNATURE, "signature illisible"))?
+        .trim();
+    let fichier = if texte.contains("untrusted comment") {
+        texte.to_string()
+    } else {
+        decoder_b64(texte, "signature")?
+    };
+    Signature::decode(&fichier)
+        .map_err(|e| erreur(code::SIGNATURE, format!("signature illisible : {e}")))
+}
+
 /// Verifie la signature de l'index, **puis seulement** l'analyse.
 ///
-/// La cle et la signature sont au format de `tauri signer` : le fichier
-/// minisign, enveloppe de base64. On exige une signature pre-hachee (`ED`),
-/// celle que produit l'outil ; l'ancien format non pre-hache n'est pas admis.
-pub fn verifier_avec(cle_b64: &str, index: &[u8], signature: &[u8]) -> Result<Index, String> {
-    if cle_b64.trim().is_empty() {
+/// On exige une signature pre-hachee (`ED`), celle que produisent `tauri
+/// signer` et `minisign` ; l'ancien format non pre-hache n'est pas admis.
+pub fn verifier_pour(
+    cle: &str,
+    attendu: Option<&str>,
+    index: &[u8],
+    signature: &[u8],
+) -> Result<Index, String> {
+    if cle.trim().is_empty() {
         return Err(erreur(
             code::SANS_CLE,
             "aucune cle publique de catalogue n'est compilee dans cette version",
         ));
     }
-    let cle = PublicKey::decode(&decoder_b64(cle_b64, "cle publique")?)
-        .map_err(|e| erreur(code::SIGNATURE, format!("cle publique illisible : {e}")))?;
-    let texte = std::str::from_utf8(signature)
-        .map_err(|_| erreur(code::SIGNATURE, "signature illisible"))?;
-    let signature = Signature::decode(&decoder_b64(texte, "signature")?)
-        .map_err(|e| erreur(code::SIGNATURE, format!("signature illisible : {e}")))?;
+    let cle = decoder_cle(cle)?;
+    let signature = decoder_signature(signature)?;
     cle.verify(index, &signature, false).map_err(|_| {
         erreur(
             code::SIGNATURE,
-            "l'index ne porte pas la signature du catalogue officiel",
+            "l'index ne porte pas la signature de cette source",
         )
     })?;
     // Seulement maintenant : l'index est authentique, on peut le lire.
-    analyser(index)
+    analyser(index, attendu)
 }
 
-pub fn verifier(index: &[u8], signature: &[u8]) -> Result<Index, String> {
-    verifier_avec(CLE_PUBLIQUE, index, signature)
+/// Verifie un index de la source officielle.
+#[cfg(test)]
+pub fn verifier_avec(cle_b64: &str, index: &[u8], signature: &[u8]) -> Result<Index, String> {
+    verifier_pour(cle_b64, Some(SOURCE), index, signature)
 }
 
+#[cfg(test)]
 pub fn cle_presente() -> bool {
     !CLE_PUBLIQUE.trim().is_empty()
 }
@@ -313,11 +441,22 @@ pub fn refuser_retour_arriere(local: Option<&Index>, distant: &Index) -> Result<
 // Ce qui est installe
 // ---------------------------------------------------------------------------
 
-/// `%LOCALAPPDATA%\WinTool\sources\officiel` : un dossier par source, a part
+/// `%LOCALAPPDATA%\WinTool\sources\<id>` : un dossier par source, a part
 /// des scripts de l'utilisateur. La provenance d'un script se lit dans son
 /// chemin, et deux sources ne peuvent pas se marcher dessus.
+pub fn dossier_source<R: Runtime>(app: &AppHandle<R>, id: &str) -> Result<PathBuf, String> {
+    if !id_source_sur(id) {
+        return Err(erreur(
+            code::INVALIDE,
+            format!("identifiant de source « {id} »"),
+        ));
+    }
+    Ok(discovery::base_dir(app)?.join("sources").join(id))
+}
+
+/// Le dossier de la source officielle.
 pub fn dossier<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    Ok(discovery::base_dir(app)?.join("sources").join(SOURCE))
+    dossier_source(app, SOURCE)
 }
 
 fn lire_borne(chemin: &Path, max: u64) -> Result<Vec<u8>, String> {
@@ -336,7 +475,7 @@ fn lire_borne(chemin: &Path, max: u64) -> Result<Vec<u8>, String> {
 /// L'index installe, **re-verifie** a chaque lecture. `Ok(None)` : rien
 /// d'installe. `Err` : un index est la, mais ne se verifie pas — ses scripts
 /// perdent alors tous leur approbation implicite.
-pub fn index_local_avec(cle_b64: &str, dossier: &Path) -> Result<Option<Index>, String> {
+pub fn index_local_pour(cle: &str, attendu: &str, dossier: &Path) -> Result<Option<Index>, String> {
     let chemin_index = dossier.join(INDEX);
     let chemin_signature = dossier.join(SIGNATURE);
     if !chemin_index.exists() && !chemin_signature.exists() {
@@ -344,9 +483,15 @@ pub fn index_local_avec(cle_b64: &str, dossier: &Path) -> Result<Option<Index>, 
     }
     let index = lire_borne(&chemin_index, TAILLE_MAX_INDEX)?;
     let signature = lire_borne(&chemin_signature, TAILLE_MAX_SIGNATURE)?;
-    verifier_avec(cle_b64, &index, &signature).map(Some)
+    verifier_pour(cle, Some(attendu), &index, &signature).map(Some)
 }
 
+#[cfg(test)]
+pub fn index_local_avec(cle_b64: &str, dossier: &Path) -> Result<Option<Index>, String> {
+    index_local_pour(cle_b64, SOURCE, dossier)
+}
+
+#[cfg(test)]
 pub fn index_local(dossier: &Path) -> Result<Option<Index>, String> {
     index_local_avec(CLE_PUBLIQUE, dossier)
 }
@@ -413,15 +558,19 @@ pub struct Bilan {
     pub a_jour: bool,
 }
 
+/// Ce que changerait l'installation. `exclus` : les scripts que l'utilisateur
+/// a decoches dans la page du catalogue ; ils ne comptent ni comme nouveaux ni
+/// comme a mettre a jour.
 pub fn comparer(
     local: Option<&Index>,
     distant: &Index,
     presents: &HashMap<String, String>,
+    exclus: &HashSet<String>,
 ) -> Bilan {
     let mut nouveaux = Vec::new();
     let mut mis_a_jour = Vec::new();
     let mut remplaces = Vec::new();
-    for e in &distant.scripts {
+    for e in distant.scripts.iter().filter(|e| !exclus.contains(&e.id)) {
         match presents.get(&e.file.to_ascii_lowercase()) {
             None => nouveaux.push(Element::from(e)),
             Some(h) if *h == e.sha256 => {}
@@ -462,14 +611,17 @@ pub fn comparer(
     }
 }
 
-/// Les entrees dont le fichier manque ou differe : celles a telecharger.
+/// Les entrees retenues dont le fichier manque ou differe : celles a
+/// telecharger.
 pub fn a_telecharger<'a>(
     distant: &'a Index,
     presents: &HashMap<String, String>,
+    exclus: &HashSet<String>,
 ) -> Vec<&'a Entree> {
     distant
         .scripts
         .iter()
+        .filter(|e| !exclus.contains(&e.id))
         .filter(|e| presents.get(&e.file.to_ascii_lowercase()) != Some(&e.sha256))
         .collect()
 }
@@ -558,7 +710,8 @@ pub fn appliquer(
     ecrire_atomique(&dossier.join(SIGNATURE), signature_brute)?;
     ecrire_atomique(&dossier.join(INDEX), index_brut)?;
 
-    let index = analyser(index_brut)?;
+    // Deja verifie par l'appelant ; seule la liste des scripts sert ici.
+    let index: Index = serde_json::from_slice(index_brut).map_err(|e| erreur(code::INVALIDE, e))?;
     let retires = local
         .map(|l| {
             l.scripts
@@ -637,9 +790,15 @@ struct Distant {
     signature: Vec<u8>,
 }
 
-/// Telecharge l'index de la derniere release et le verifie.
-async fn consulter(client: &reqwest::Client) -> Result<Distant, String> {
-    if !cle_presente() {
+/// Telecharge l'index de la derniere release d'un depot et le verifie avec
+/// `cle`. `attendu` : la source dont l'index doit etre (`None` a l'ajout).
+async fn consulter_depot(
+    client: &reqwest::Client,
+    depot: &str,
+    cle: &str,
+    attendu: Option<&str>,
+) -> Result<Distant, String> {
+    if cle.trim().is_empty() {
         // Inutile d'interroger le reseau pour un index qu'on ne saurait pas
         // verifier.
         return Err(erreur(
@@ -647,16 +806,36 @@ async fn consulter(client: &reqwest::Client) -> Result<Distant, String> {
             "aucune cle publique de catalogue n'est compilee dans cette version",
         ));
     }
-    let base = format!("{DEPOT}/releases/latest/download");
+    // La cle d'abord : une cle illisible se dit sans aller sur le reseau.
+    decoder_cle(cle)?;
+    let base = format!("{}/releases/latest/download", url_depot(depot));
     let signature =
         telecharger(client, &format!("{base}/{SIGNATURE}"), TAILLE_MAX_SIGNATURE).await?;
     let brut = telecharger(client, &format!("{base}/{INDEX}"), TAILLE_MAX_INDEX).await?;
-    let index = verifier(&brut, &signature)?;
+    let index = verifier_pour(cle, attendu, &brut, &signature)?;
     Ok(Distant {
         index,
         brut,
         signature,
     })
+}
+
+async fn consulter(client: &reqwest::Client, source: &Source) -> Result<Distant, String> {
+    consulter_depot(client, &source.depot, &source.cle, Some(&source.id)).await
+}
+
+/// L'index d'un depot qu'on s'apprete a ajouter comme source, verifie avec la
+/// cle donnee. C'est lui qui dit l'identifiant de la source (`source`).
+pub async fn decouvrir(depot: &str, cle: &str) -> Result<Index, String> {
+    Ok(consulter_depot(&client()?, depot, cle, None).await?.index)
+}
+
+/// L'adresse d'un script dans la release que nomme l'index.
+fn url_script(source: &Source, tag: &str, fichier: &str) -> String {
+    format!(
+        "{}/releases/download/{tag}/{fichier}",
+        url_depot(&source.depot)
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -681,9 +860,9 @@ pub struct Etat {
     pub probleme: Option<String>,
 }
 
-pub fn etat<R: Runtime>(app: &AppHandle<R>) -> Result<Etat, String> {
-    let dossier = dossier(app)?;
-    let (installe, probleme) = match index_local(&dossier) {
+pub fn etat<R: Runtime>(app: &AppHandle<R>, source: &Source) -> Result<Etat, String> {
+    let dossier = dossier_source(app, &source.id)?;
+    let (installe, probleme) = match index_local_pour(&source.cle, &source.id, &dossier) {
         Ok(i) => (
             i.map(|i| Resume {
                 version: i.version,
@@ -695,8 +874,8 @@ pub fn etat<R: Runtime>(app: &AppHandle<R>) -> Result<Etat, String> {
         Err(e) => (None, Some(e)),
     };
     Ok(Etat {
-        cle: cle_presente(),
-        depot: DEPOT.to_string(),
+        cle: !source.cle.trim().is_empty(),
+        depot: source.depot.clone(),
         dossier: dossier.to_string_lossy().to_string(),
         installe,
         probleme,
@@ -705,17 +884,24 @@ pub fn etat<R: Runtime>(app: &AppHandle<R>) -> Result<Etat, String> {
 
 /// Interroge le catalogue et dit ce qu'une installation changerait. Ne
 /// telecharge que l'index : aucun script, rien d'ecrit.
-pub async fn examiner<R: Runtime>(app: &AppHandle<R>) -> Result<Bilan, String> {
-    let dossier = dossier(app)?;
+pub async fn examiner<R: Runtime>(
+    app: &AppHandle<R>,
+    source: &Source,
+    exclus: &HashSet<String>,
+) -> Result<Bilan, String> {
+    let dossier = dossier_source(app, &source.id)?;
     // Un index local qui ne se verifie plus ne compte pas : on comparera comme
     // si rien n'etait installe, et tout sera reverifie.
-    let local = index_local(&dossier).ok().flatten();
-    let distant = consulter(&client()?).await?;
+    let local = index_local_pour(&source.cle, &source.id, &dossier)
+        .ok()
+        .flatten();
+    let distant = consulter(&client()?, source).await?;
     refuser_retour_arriere(local.as_ref(), &distant.index)?;
     Ok(comparer(
         local.as_ref(),
         &distant.index,
         &empreintes(&dossier),
+        exclus,
     ))
 }
 
@@ -731,21 +917,27 @@ struct Progression {
 /// L'index est re-telecharge plutot que repris d'`examiner` : c'est la release
 /// publiee *maintenant* qu'on installe. Tous les scripts sont recus et
 /// controles en memoire avant que le premier soit ecrit.
-pub async fn installer<R: Runtime>(app: &AppHandle<R>) -> Result<Installation, String> {
-    let dossier = dossier(app)?;
-    let local = index_local(&dossier).ok().flatten();
+pub async fn installer<R: Runtime>(
+    app: &AppHandle<R>,
+    source: &Source,
+    exclus: &HashSet<String>,
+) -> Result<Installation, String> {
+    let dossier = dossier_source(app, &source.id)?;
+    let local = index_local_pour(&source.cle, &source.id, &dossier)
+        .ok()
+        .flatten();
     let client = client()?;
-    let distant = consulter(&client).await?;
+    let distant = consulter(&client, source).await?;
     refuser_retour_arriere(local.as_ref(), &distant.index)?;
 
     let presents = empreintes(&dossier);
-    let manquants = a_telecharger(&distant.index, &presents);
+    let manquants = a_telecharger(&distant.index, &presents, exclus);
     let total = manquants.len();
     let _ = app.emit("catalogue:progress", Progression { fait: 0, total });
 
     let mut recus = Vec::with_capacity(total);
     for (n, e) in manquants.into_iter().enumerate() {
-        let url = format!("{DEPOT}/releases/download/{}/{}", distant.index.tag, e.file);
+        let url = url_script(source, &distant.index.tag, &e.file);
         let octets = telecharger(&client, &url, e.size).await?;
         controler(e, &octets)?;
         recus.push((e, octets));
@@ -762,6 +954,128 @@ pub async fn installer<R: Runtime>(app: &AppHandle<R>) -> Result<Installation, S
         &distant.signature,
         &horodatage,
     )
+}
+
+/// Un script d'un catalogue, tel que la page « Consulter et choisir » le
+/// montre : ce qu'il fait, et ou il en est sur ce PC.
+#[derive(Debug, Clone, Serialize)]
+pub struct Contenu {
+    pub id: String,
+    pub file: String,
+    pub version: String,
+    /// Titre et description par langue, lus dans l'entete du script.
+    pub title: BTreeMap<String, String>,
+    pub desc: BTreeMap<String, String>,
+    pub category: String,
+    pub risk: String,
+    pub admin: bool,
+    /// `absent`, `installe` (a jour), `maj` (une version plus recente), ou
+    /// `modifie` (retouche sur ce PC : il serait remplace, la retouche gardee).
+    pub etat: &'static str,
+    pub exclu: bool,
+}
+
+/// Titre et description d'un script, par langue, d'apres son entete.
+fn textes_script(
+    octets: &[u8],
+) -> (
+    contract::Script,
+    BTreeMap<String, String>,
+    BTreeMap<String, String>,
+) {
+    let texte = String::from_utf8_lossy(octets);
+    let texte = texte.strip_prefix('\u{feff}').unwrap_or(&texte);
+    let meta = contract::parse(texte);
+    let mut titres = BTreeMap::new();
+    let mut descriptions = BTreeMap::new();
+    let langue = if meta.lang.trim().is_empty() {
+        "fr".to_string()
+    } else {
+        meta.lang.trim().to_string()
+    };
+    if !meta.title.trim().is_empty() {
+        titres.insert(langue.clone(), meta.title.trim().to_string());
+    }
+    if !meta.desc.trim().is_empty() {
+        descriptions.insert(langue, meta.desc.trim().to_string());
+    }
+    for (l, tr) in &meta.translations {
+        if !tr.title.trim().is_empty() {
+            titres.insert(l.clone(), tr.title.trim().to_string());
+        }
+        if !tr.desc.trim().is_empty() {
+            descriptions.insert(l.clone(), tr.desc.trim().to_string());
+        }
+    }
+    (meta, titres, descriptions)
+}
+
+/// Le contenu de la derniere release d'un catalogue, script par script, avec
+/// son etat sur ce PC. Rien n'est ecrit : un script installe et conforme se lit
+/// sur le disque, les autres sont recus en memoire, controles contre l'index
+/// signe, lus, et oublies.
+pub async fn contenu<R: Runtime>(
+    app: &AppHandle<R>,
+    source: &Source,
+    exclus: &HashSet<String>,
+) -> Result<Vec<Contenu>, String> {
+    let dossier = dossier_source(app, &source.id)?;
+    let local = index_local_pour(&source.cle, &source.id, &dossier)
+        .ok()
+        .flatten();
+    let client = client()?;
+    let distant = consulter(&client, source).await?;
+    refuser_retour_arriere(local.as_ref(), &distant.index)?;
+    let presents = empreintes(&dossier);
+
+    let total = distant.index.scripts.len();
+    let _ = app.emit("catalogue:progress", Progression { fait: 0, total });
+    let mut liste = Vec::with_capacity(total);
+    for (n, e) in distant.index.scripts.iter().enumerate() {
+        let present = presents.get(&e.file.to_ascii_lowercase());
+        let etat = match present {
+            None => "absent",
+            Some(h) if *h == e.sha256 => "installe",
+            Some(h) => {
+                let precedent = local.as_ref().and_then(|l| trouver(l, &e.file));
+                if precedent.is_some_and(|p| p.sha256 == *h) {
+                    "maj"
+                } else {
+                    "modifie"
+                }
+            }
+        };
+        let octets = if etat == "installe" {
+            fs::read(dossier.join(&e.file)).unwrap_or_default()
+        } else {
+            let recu = telecharger(
+                &client,
+                &url_script(source, &distant.index.tag, &e.file),
+                e.size,
+            )
+            .await?;
+            controler(e, &recu)?;
+            recu
+        };
+        let (meta, mut title, desc) = textes_script(&octets);
+        if title.is_empty() {
+            title = e.title.clone();
+        }
+        liste.push(Contenu {
+            id: e.id.clone(),
+            file: e.file.clone(),
+            version: e.version.clone(),
+            title,
+            desc,
+            category: meta.category,
+            risk: meta.risk,
+            admin: meta.admin,
+            etat,
+            exclu: exclus.contains(&e.id),
+        });
+        let _ = app.emit("catalogue:progress", Progression { fait: n + 1, total });
+    }
+    Ok(liste)
 }
 
 // ---------------------------------------------------------------------------
@@ -903,10 +1217,10 @@ mod tests {
             "index.json",
             "",
         ] {
-            let e = analyser(index_avec(nom).as_bytes()).unwrap_err();
+            let e = analyser(index_avec(nom).as_bytes(), Some(SOURCE)).unwrap_err();
             assert!(e.starts_with(code::INVALIDE), "{nom:?} : {e}");
         }
-        assert!(analyser(index_avec("100_CLEAN-TEMP.v2.ps1").as_bytes()).is_ok());
+        assert!(analyser(index_avec("100_CLEAN-TEMP.v2.ps1").as_bytes(), Some(SOURCE)).is_ok());
     }
 
     #[test]
@@ -918,21 +1232,21 @@ mod tests {
                  {{"id":"b","file":"a.PS1","version":"1","size":1,"sha256":"{h}"}}]}}"#,
             h = "b".repeat(64)
         );
-        assert!(analyser(brut.as_bytes())
+        assert!(analyser(brut.as_bytes(), Some(SOURCE))
             .unwrap_err()
             .starts_with(code::INVALIDE));
     }
 
     #[test]
     fn un_format_futur_demande_une_mise_a_jour_de_wintool() {
-        let e = analyser(br#"{"format":2,"tout":"autre chose"}"#).unwrap_err();
+        let e = analyser(br#"{"format":2,"tout":"autre chose"}"#, Some(SOURCE)).unwrap_err();
         assert!(e.starts_with(code::FORMAT), "{e}");
     }
 
     #[test]
     fn l_index_d_une_autre_source_est_refuse() {
         let brut = index_avec("a.ps1").replace("\"officiel\"", "\"un-fork\"");
-        assert!(analyser(brut.as_bytes())
+        assert!(analyser(brut.as_bytes(), Some(SOURCE))
             .unwrap_err()
             .starts_with(code::INVALIDE));
     }
@@ -940,11 +1254,11 @@ mod tests {
     #[test]
     fn empreinte_et_version_mal_formees_sont_refusees() {
         let majuscules = index_avec("a.ps1").replace(&"a".repeat(64), &"A".repeat(64));
-        assert!(analyser(majuscules.as_bytes()).is_err());
+        assert!(analyser(majuscules.as_bytes(), Some(SOURCE)).is_err());
         let version = index_avec("a.ps1").replace("\"1.0.0\"", "\"1.0\"");
-        assert!(analyser(version.as_bytes()).is_err());
+        assert!(analyser(version.as_bytes(), Some(SOURCE)).is_err());
         let tag = index_avec("a.ps1").replace("\"v1.0.0\"", "\"../v1\"");
-        assert!(analyser(tag.as_bytes()).is_err());
+        assert!(analyser(tag.as_bytes(), Some(SOURCE)).is_err());
     }
 
     #[test]
@@ -978,7 +1292,7 @@ mod tests {
 
     #[test]
     fn premiere_installation_tout_est_nouveau() {
-        let b = comparer(None, &v(I100, S100), &HashMap::new());
+        let b = comparer(None, &v(I100, S100), &HashMap::new(), &HashSet::new());
         assert_eq!(b.nouveaux.len(), 2);
         assert!(b.mis_a_jour.is_empty() && b.remplaces.is_empty() && b.retires.is_empty());
         assert!(!b.a_jour);
@@ -992,6 +1306,7 @@ mod tests {
             Some(&i),
             &i,
             &presents(&[("100_A.ps1", A1), ("200_B.ps1", B)]),
+            &HashSet::new(),
         );
         assert!(b.a_jour, "{b:?}");
     }
@@ -1004,6 +1319,7 @@ mod tests {
             Some(&local),
             &distant,
             &presents(&[("100_A.ps1", A1), ("200_B.ps1", B)]),
+            &HashSet::new(),
         );
         // A change de contenu, C arrive, B quitte le catalogue.
         assert_eq!(
@@ -1031,6 +1347,7 @@ mod tests {
             Some(&local),
             &distant,
             &presents(&[("100_a.PS1", b"modifie a la main"), ("200_B.ps1", B)]),
+            &HashSet::new(),
         );
         assert_eq!(
             b.remplaces.iter().map(|e| &e.file[..]).collect::<Vec<_>>(),
@@ -1089,7 +1406,7 @@ mod tests {
         // L'utilisateur retouche A.
         fs::write(bac.0.join("100_A.ps1"), b"ma version").unwrap();
         let p = empreintes(&bac.0);
-        let manquants = a_telecharger(&distant, &p);
+        let manquants = a_telecharger(&distant, &p, &HashSet::new());
         let recus: Vec<_> = manquants
             .into_iter()
             .map(|e| {
@@ -1144,7 +1461,7 @@ mod tests {
         appliquer(&bac.0, None, &HashMap::new(), &recus, I100, S100, "t").unwrap();
 
         let p = empreintes(&bac.0);
-        let recus: Vec<_> = a_telecharger(&distant, &p)
+        let recus: Vec<_> = a_telecharger(&distant, &p, &HashSet::new())
             .into_iter()
             .map(|e| {
                 (
@@ -1189,6 +1506,115 @@ mod tests {
         assert_eq!(index_local_avec(CLE, &bac.0.join("absent")).unwrap(), None);
     }
 
+    // ----- Sources tierces (specification 16.2) -----------------------------
+
+    /// Le fichier minisign que `tauri signer` enveloppe de base64.
+    fn deballe(b64: &[u8]) -> String {
+        decoder_b64(std::str::from_utf8(b64).unwrap(), "essai").unwrap()
+    }
+
+    #[test]
+    fn la_cle_d_un_editeur_se_lit_sous_ses_trois_formes() {
+        let fichier = deballe(CLE.as_bytes());
+        let ligne = fichier
+            .lines()
+            .find(|l| l.starts_with("RW"))
+            .expect("ligne de cle")
+            .to_string();
+        for forme in [CLE.to_string(), fichier, ligne] {
+            let cle = decoder_cle(&forme).expect("forme refusee");
+            let sig = decoder_signature(S100).unwrap();
+            assert!(cle.verify(I100, &sig, false).is_ok());
+        }
+        let e = decoder_cle("pas une cle").unwrap_err();
+        assert!(e.starts_with(code::CLE), "{e}");
+    }
+
+    #[test]
+    fn une_signature_minisign_brute_vaut_l_enveloppee() {
+        let brute = deballe(S100);
+        assert!(verifier_avec(CLE, I100, brute.as_bytes()).is_ok());
+    }
+
+    #[test]
+    fn a_l_ajout_c_est_l_index_qui_donne_l_identifiant() {
+        let i = verifier_pour(CLE, None, I100, S100).unwrap();
+        assert_eq!(i.source, "officiel");
+        let brut = index_avec("a.ps1").replace("\"officiel\"", "\"Pas Sur/../x\"");
+        assert!(analyser(brut.as_bytes(), None)
+            .unwrap_err()
+            .starts_with(code::INVALIDE));
+        let autre = index_avec("a.ps1").replace("\"officiel\"", "\"dupont\"");
+        assert_eq!(analyser(autre.as_bytes(), None).unwrap().source, "dupont");
+        assert!(analyser(autre.as_bytes(), Some("martin")).is_err());
+    }
+
+    #[test]
+    fn un_depot_github_se_reconnait_sous_ses_formes_courantes() {
+        for saisie in [
+            "dupont/scripts",
+            "https://github.com/dupont/scripts",
+            "https://github.com/dupont/scripts/",
+            "github.com/dupont/scripts.git",
+            "https://www.github.com/dupont/scripts/releases",
+            "  http://github.com/dupont/scripts  ",
+        ] {
+            assert_eq!(
+                normaliser_depot(saisie).as_deref(),
+                Ok("dupont/scripts"),
+                "{saisie}"
+            );
+        }
+        for saisie in [
+            "",
+            "dupont",
+            "https://gitlab.com/dupont/scripts",
+            "gitlab.com/dupont/scripts",
+            "dupont/..",
+            "dupont/.cache",
+            "-dupont/scripts",
+            "du pont/scripts",
+            "dupont/scripts?x=1",
+        ] {
+            let e = normaliser_depot(saisie).unwrap_err();
+            assert!(e.starts_with(code::DEPOT), "{saisie} : {e}");
+        }
+    }
+
+    #[test]
+    fn un_script_decoche_n_est_ni_propose_ni_telecharge() {
+        let distant = v(I110, S110);
+        let exclus: HashSet<String> = distant
+            .scripts
+            .iter()
+            .map(|e| e.id.clone())
+            .take(1)
+            .collect();
+        let b = comparer(None, &distant, &HashMap::new(), &exclus);
+        assert_eq!(b.nouveaux.len(), distant.scripts.len() - 1);
+        assert!(b.nouveaux.iter().all(|e| !exclus.contains(&e.id)));
+        let a = a_telecharger(&distant, &HashMap::new(), &exclus);
+        assert_eq!(a.len(), distant.scripts.len() - 1);
+    }
+
+    #[test]
+    fn un_identifiant_de_source_est_un_nom_de_dossier_sur() {
+        for id in ["officiel", "dupont", "scripts-2"] {
+            assert!(id_source_sur(id), "{id}");
+        }
+        for id in [
+            "",
+            "Dupont",
+            "-x",
+            "a/b",
+            "a..b",
+            "con.ps1",
+            &"x".repeat(41),
+        ] {
+            assert!(!id_source_sur(id), "{id}");
+        }
+    }
+
     /// Aller-retour avec `tools/construire-index-catalogue.ps1` : l'index que
     /// produit l'outil, signe par `tauri signer`, doit se verifier et se lire
     /// ici. A lancer a la main, avec un index et une cle jetables :
@@ -1223,11 +1649,14 @@ mod tests {
         let bac = Bac::neuf("publie");
         tauri::async_runtime::block_on(async {
             let client = client().expect("client HTTPS");
-            let distant = consulter(&client).await.expect("index officiel");
+            let officielle = crate::sources::officielle();
+            let distant = consulter(&client, &officielle)
+                .await
+                .expect("index officiel");
             let presents = HashMap::new();
             let mut recus = Vec::new();
-            for e in a_telecharger(&distant.index, &presents) {
-                let url = format!("{DEPOT}/releases/download/{}/{}", distant.index.tag, e.file);
+            for e in a_telecharger(&distant.index, &presents, &HashSet::new()) {
+                let url = url_script(&officielle, &distant.index.tag, &e.file);
                 let octets = telecharger(&client, &url, e.size)
                     .await
                     .unwrap_or_else(|err| panic!("{} : {err}", e.file));

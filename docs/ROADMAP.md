@@ -12,10 +12,11 @@ d'un cran (1.1, 1.2…), une version de corrections seules prend un troisième c
 | **1.1.1** | Simulation réglable script par script, bouées posées sur la vague, rangées multiples — et premier test réel de la mise à jour automatique | Publiée le 06/10/2026 |
 | **1.2** | Les scripts quittent WinTool : catalogue officiel dans son propre dépôt (MIT), index signé, installation et mises à jour depuis l'application (§16) ; durcissement (§12.4) ; visite du premier démarrage (§13) ; désinstallation au choix | Publiée le 06/10/2026 |
 | **1.2.1** | Réglages en page entière, une section par page, recherche, Simple / Expert sans les quitter (§8) ; emplacements protégés : résumé et plan du disque ; écran « Choisir » : le champ de bouées défile au lieu de se défaire, « Continuer » collé en bas (§15.2) | Prête |
-| **1.3** | Analyser → cocher → nettoyer (§17) | Contrat script prêt, interface à faire |
-| **1.4** | Catégories distinctes des lots, onglets Scripts / Lots en Expert | À faire |
+| **1.4** | Publiée d'un seul tenant, avec ce que prévoyait la 1.3 : | |
+| | — catalogues multiples : ajouter, modifier, retirer, activer ; consulter et choisir ses actions (§16) ; présentation modifiable sans code (`src/presentation.json`, §13) ; « action » au lieu d'« entretien » (§3) | Fait |
+| | — analyser → cocher → nettoyer (§17) | Contrat script prêt, interface à faire |
+| | — catégories distinctes des lots, onglets Scripts / Lots en Expert | À faire |
 | **1.5** | Témoin des changements sensibles (voir ci-dessous) | À faire |
-| plus tard | Sources tierces (§16.2, §16.8) | Spécifié |
 | en continu | Améliorations graphiques et d'organisation | Glissées dans chaque version |
 
 ## Pourquoi cet ordre
@@ -45,8 +46,10 @@ avant** WinTool 1.2, sans quoi la mise à jour automatique viderait les installa
 existantes. Et la clé publique du catalogue est compilée dans WinTool : elle doit exister
 avant la construction de la 1.2.
 
-**Les sources tierces viennent plus tard** : c'est la surface de sécurité la plus large — du
-PowerShell téléchargé auprès de n'importe qui, exécuté en administrateur.
+**Les sources tierces sont venues ensuite** (1.4) : c'est la surface de sécurité la plus
+large — du PowerShell téléchargé auprès de n'importe qui, exécuté en administrateur. Elles
+reprennent le chemin éprouvé par la source officielle (index signé, vérifié avant d'être
+lu), avec une décision en plus : qui les ajoute, et avec quelle clé (§16.2).
 
 ## Ce qui attend une décision
 
@@ -54,8 +57,6 @@ PowerShell téléchargé auprès de n'importe qui, exécuté en administrateur.
   occurrences dans le code et impose de migrer `settings.json` sans rien perdre.
   `tools/categories.json`, qui sert aujourd'hui à la fois au validateur et à fabriquer les
   lots d'usine, sera scindé en deux.
-- **Sources tierces** — l'emplacement de leur liste (réservé à l'administrateur, §16.2)
-  impose une élévation pour en ajouter une : à confirmer le moment venu.
 
 ## Idées pour plus tard
 

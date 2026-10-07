@@ -73,6 +73,12 @@ Aucun terme technique n'apparaît en mode Simple, jamais.
 | SFC, DISM, SMART | **Vérifier l'état du PC** — contrôle les disques et répare Windows |
 | DNS | **Utiliser un Internet plus rapide** |
 | Code de sortie 0 | **C'est terminé !** · *7 actions sur 7 réussies* |
+| Script, entretien (pour un script) | **une action** — « 24 actions », « catalogue d'actions » |
+
+**Une action, c'est ce que WinTool sait faire** — un script, vu du mode Expert. Le mot
+« entretien » ne désigne que le moment où WinTool travaille (« Entretien en cours »,
+l'étape 3) : appliqué à chaque script, il ne voulait rien dire pour un débutant. « Action »
+est aussi le mot du bilan ; un seul mot, partout.
 
 Deux obligations supplémentaires :
 
@@ -559,7 +565,8 @@ réellement.
 | Thème (clair / sombre / Windows) | **partout**, icône engrenage |
 | Langue | **partout** |
 | Comportement des mises à jour | **partout** |
-| Catalogue d'entretiens : installer, vérifier, moment de la vérification (§16) | **partout** |
+| Catalogues : consulter et choisir les actions, installer, vérifier, activer, moment de la vérification (§16) | **partout** |
+| Catalogues : en ajouter, en modifier, en retirer — en administrateur (§16.2) | Expert |
 | Comportement en cas d'échec | Expert |
 | Taille maximale des journaux | Expert |
 | Réinitialisation aux réglages d'usine | Expert |
@@ -916,7 +923,7 @@ tout moment depuis les Réglages généraux (« Présentation de WinTool »), da
 |---|---|
 | Bienvenue | La langue et l'apparence — sur cette page, et seulement elle, pour que la suite se lise dans la bonne langue |
 | Le principe | Ce que fait WinTool ; mode Simple et mode Expert ; la simulation |
-| Les entretiens | WinTool arrive vide, pourquoi (§16.1) ; le catalogue officiel, **installable depuis la page même** ; ses propres scripts |
+| Les actions | WinTool arrive vide, pourquoi (§16.1) ; le catalogue officiel, **installable depuis la page même**, et les autres catalogues ; ses propres scripts |
 | Votre sécurité | Ce qu'un script peut faire ; n'approuver que ce dont on connaît l'origine, se faire expliquer un script — par un proche ou par une intelligence artificielle — avant de l'approuver ; l'antivirus qui peut se méfier de WinTool, et ne jamais le désactiver pour lui |
 
 **Lisible à 9 ans comme à 80.** Chaque page se divise en deux :
@@ -931,6 +938,15 @@ Les illustrations sont faites en HTML et CSS, sans image : elles suivent le thè
 langue, et ne vieillissent pas comme une capture d'écran. Elles s'arrêtent quand la fenêtre
 n'est pas active et quand Windows demande moins d'animations (§15.3). La visite se passe à
 tout moment ; elle ne bloque rien.
+
+**Le contenu vit dans `src/presentation.json`** (1.4) : pages, titres, phrases, icônes,
+illustration de chaque page, bouton du catalogue. On le modifie sans toucher au code —
+mode d'emploi dans [`docs/PRESENTATION.md`](PRESENTATION.md) — et
+`tools/verifier-presentation.mjs`, lancé en CI, refuse un fichier incomplet (une langue
+manquante, une icône que Lucide ne connaît pas, plus de cinq phrases dans l'essentiel)
+plutôt que d'afficher une page blanche. Le fichier est **embarqué dans l'exécutable** : un
+fichier modifiable après l'installation laisserait un programme malveillant faire dire à
+WinTool, dans une page de confiance, « désactivez votre antivirus ».
 
 ---
 
@@ -1078,14 +1094,10 @@ par npm (`lucide-static`) côté frontend — ils ne sont pas versionnés dans l
 
 ## 16. Sources de scripts
 
-> **État : implémenté en 1.2 pour la source officielle** (`src-tauri/src/catalogue.rs`).
-> L'installeur ne contient plus aucun script ; le catalogue vit dans le dépôt
+> **État : implémenté** — la source officielle en 1.2, les sources tierces en 1.4
+> (`src-tauri/src/catalogue.rs`, `src-tauri/src/sources.rs`). L'installeur ne contient plus
+> aucun script ; le catalogue officiel vit dans le dépôt
 > [WinTool-Catalogue](https://github.com/burnout293/WinTool-Catalogue), sous licence MIT.
->
-> **Les sources tierces restent spécifiées, non implémentées** : en 1.2, WinTool ne connaît
-> que la source officielle. Ce qui les concerne — leur liste dans l'emplacement réservé à
-> l'administrateur, l'ajout et le retrait (§16.2), la mention « ni contrôlé ni approuvé »
-> (§16.6), le §16.8 — vaut pour la version qui les introduira.
 >
 > Cette section a été écrite avant le code, pour que le modèle de sécurité soit arrêté avant
 > qu'un raccourci ne le décide à notre place. Le code l'a suivie ; les écarts sont notés là
@@ -1140,6 +1152,34 @@ Pour la même raison, **la liste des sources vit dans l'emplacement réservé à
 l'administrateur**, avec le magasin d'approbations (§12.4). Ajouter ou retirer une source
 demande donc une élévation. C'est une friction volontaire : ajouter une source, c'est
 décider à qui l'on confiera l'exécution de code en administrateur.
+
+**Concrètement (1.4).** Une source tierce est **un dépôt GitHub et la clé publique de son
+éditeur** — rien d'autre à saisir. Elle s'inscrit sous `HKLM\SOFTWARE\WinTool\Sources\<id>`
+(`Nom`, `Depot`, `Cle`). L'ajout télécharge l'index de la dernière release, le vérifie avec
+la clé donnée, et **n'inscrit rien si la vérification échoue**. C'est l'index qui donne
+l'identifiant de la source (`source`) : il doit être un nom de dossier sûr (minuscules,
+chiffres, tirets), différent de `officiel` et de ceux déjà inscrits. Une entrée du registre
+qui ne se valide plus — clé illisible, dépôt mal formé — est ignorée et signalée, sans
+bloquer les autres.
+
+- **Pourquoi une clé, et pas l'adresse seule ?** Chaque script tiers demande de toute façon
+  l'approbation (§16.4). Mais sans clé, quiconque prend la main sur le compte GitHub de
+  l'éditeur publie une « mise à jour » que rien ne distingue d'une vraie ; avec, il lui faut
+  aussi la clé privée, qui n'a pas à vivre sur GitHub.
+- **Les formes de clé** acceptées sont celles qu'un éditeur publie : le fichier `.pub`
+  enveloppé de base64 (`tauri signer`, comme l'officielle), le fichier `.pub` de `minisign`
+  tel quel, ou sa seule ligne `RW…`. Les signatures, de même : `.sig` enveloppé ou
+  `.minisig` brut.
+- **L'adresse** se colle telle quelle — `https://github.com/editeur/catalogue`, avec ou sans
+  `.git` ou une page du dépôt derrière — et s'inscrit sous la forme `editeur/catalogue`.
+  GitHub seulement : l'index désigne la release où vivent les scripts (`tag`).
+- **Modifier** une source peut changer son nom sans rien vérifier ; changer de dépôt ou de
+  clé, c'est changer d'éditeur : le nouvel index doit se vérifier, et déclarer la même
+  source.
+
+Ce qui n'est **pas** une décision de confiance vit dans les réglages : une source
+**désactivée** (ni interrogée, ni montrée, ses scripts restent sur le disque) et les
+actions **décochées** de chacune.
 
 ### 16.3 L'index et sa vérification
 
@@ -1231,6 +1271,14 @@ Une mise à jour change l'empreinte. Elle repasse donc par la règle du §16.4 :
 pour la source officielle, écran d'approbation pour les autres. Un script mis à jour n'est
 jamais exécuté dans la foulée de son téléchargement.
 
+**Choisir ses actions (1.4).** Le contenu d'un catalogue se consulte avant même de
+l'installer : son index, puis chaque script — lu sur le disque s'il y est et conforme,
+sinon reçu en mémoire, contrôlé contre l'index signé, lu, et oublié. Rien n'est écrit. On
+coche ce qu'on veut ; seuls les **refus** sont retenus (`sources_exclus`, par identifiant
+d'index), si bien qu'une action qu'une nouvelle version ajoute arrive cochée. Une action
+décochée n'est ni téléchargée ni montrée ; son fichier, s'il avait déjà été installé,
+reste sur le disque — WinTool ne supprime jamais un script.
+
 ### 16.6 Ce que l'interface montre
 
 **Ni source ni script.** L'accueil affiche une liste de sources proposées, la source
@@ -1246,9 +1294,12 @@ respectée définitivement.
 officielle, nom de la source tierce, ou script local. Un script de source tierce porte la
 mention qu'il **n'est ni contrôlé ni approuvé par le projet WinTool**.
 
-**Dans les réglages**, une section Catalogue, visible dans les deux modes : l'état de la
-version installée, installer ou vérifier maintenant, et le moment de la vérification.
-Ajouter, retirer ou activer une source tierce viendront avec elles.
+**Dans les réglages**, une section Catalogues, visible dans les deux modes : une carte par
+catalogue — l'officiel en tête —, avec l'état de la version installée, « Consulter et
+choisir », installer ou vérifier, et un interrupteur pour l'activer ; puis le moment de la
+vérification. Ajouter, modifier ou retirer un catalogue reste au mode Expert, en
+administrateur. Les nouveautés d'un catalogue ajouté s'annoncent dans le même bandeau que
+celles de l'officiel, qui mène à sa carte plutôt que d'installer d'emblée.
 
 La formulation n'atteste que la **provenance** : « publiés et signés par le projet
 WinTool », jamais « vérifiés ». La licence (conditions additionnelles, §5) précise que le
@@ -1256,8 +1307,9 @@ concédant n'examine ni ne garantit les scripts, y compris ceux de la source off
 l'interface ne doit pas promettre davantage.
 
 Le mode Simple suit les règles de langage du §3. « Source » n'y apparaît pas : on y parle
-de **« catalogue d'entretiens »**, et une source tierce devient **« ajouté par vous, pas
-vérifié par WinTool »**.
+de **catalogues** et d'**actions**, et une source tierce devient **« Ajouté par vous — ni
+contrôlé ni approuvé par le projet WinTool »**, sur sa carte comme dans l'écran
+d'approbation de chacune de ses actions.
 
 ### 16.7 Vie privée
 

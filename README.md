@@ -13,8 +13,10 @@ leur fichier, en clair, et vous pouvez le lire avant de cliquer.
 
 **WinTool est livré sans aucun script.** Au premier lancement, il propose d'installer le
 [catalogue officiel](https://github.com/burnout293/WinTool-Catalogue) — publié à part, sous licence MIT, et signé : chaque script est
-vérifié contre un index signé avant d'être écrit sur le disque. Vous pouvez aussi continuer
-sans, et n'utiliser que vos propres scripts.
+vérifié contre un index signé avant d'être écrit sur le disque. Vous choisissez les actions
+à installer, et vous pouvez ajouter d'autres catalogues (Réglages → Catalogues) : un dépôt
+GitHub et la clé publique de son éditeur. Vous pouvez aussi continuer sans, et n'utiliser
+que vos propres scripts.
 
 ---
 
@@ -48,7 +50,7 @@ WinTool **s'ouvre normalement, sans élévation**. Il vous le dira s'il n'a pas 
 vous proposera de se relancer en administrateur — **une seule autorisation Windows**, et
 tous les scripts en héritent ensuite.
 
-La plupart des scripts d'entretien en ont besoin : Windows réserve aux administrateurs le
+La plupart des actions en ont besoin : Windows réserve aux administrateurs le
 droit d'effacer des fichiers système, de changer une configuration réseau ou de désinstaller
 une application.
 
@@ -155,11 +157,13 @@ Ce banc ne part jamais dans le binaire : les fixtures vivent dans `tools/bench/`
 |---|---|
 | [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md) | Ce que l'application doit faire, et pourquoi. Fait autorité en cas de doute. |
 | [`docs/FORMAT_SCRIPT.md`](docs/FORMAT_SCRIPT.md) | Écrire un script : squelette, règles, codes du validateur. |
+| [`docs/PRESENTATION.md`](docs/PRESENTATION.md) | Modifier la présentation du premier démarrage sans toucher au code. |
 | [WinTool-Catalogue](https://github.com/burnout293/WinTool-Catalogue) | Les scripts officiels, leur licence (MIT) et la liste des scripts prévus. |
 
 Une règle du projet : **toute convention décrite dans la documentation est vérifiée par un
-outil**. `tools/lint-scripts.ps1` valide les scripts, et la suite de tests Rust lit le
-squelette de `FORMAT_SCRIPT.md` pour qu'il ne puisse pas diverger du parseur.
+outil**. `tools/lint-scripts.ps1` valide les scripts, la suite de tests Rust lit le
+squelette de `FORMAT_SCRIPT.md` pour qu'il ne puisse pas diverger du parseur, et
+`tools/verifier-presentation.mjs` contrôle le contenu de la présentation.
 
 C'est la leçon de la version précédente, dont la convention était documentée et respectée
 par zéro script sur treize.

@@ -1,10 +1,11 @@
 //! Decouverte des scripts sur le disque.
 //!
-//! Deux racines, et c'est une decision de securite autant que de rangement
-//! (specification 4.3) :
+//! Des racines distinctes, et c'est une decision de securite autant que de
+//! rangement (specification 4.3) :
 //!
 //! ```text
 //! %LOCALAPPDATA%\WinTool\sources\officiel\   catalogue officiel (§16)
+//! %LOCALAPPDATA%\WinTool\sources\<id>\       une source tierce (§16.2)
 //! %LOCALAPPDATA%\WinTool\scripts\             scripts de l'utilisateur
 //! ├─ MesScripts\                              il organise comme il veut
 //! └─ Essais\
@@ -22,8 +23,11 @@
 use crate::catalogue;
 use crate::contract::{self, Finding, Script, Severity};
 use crate::security::{self, PointAttention};
+use crate::settings;
+use crate::sources::{self, Source};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, Runtime};
@@ -37,8 +41,11 @@ pub struct ScriptEntry {
     pub path: String,
     /// Chemin complet, utilise pour l'execution.
     pub abs_path: String,
-    /// `official` (nomme par l'index signe du catalogue officiel) ou `user`.
+    /// `official` (nomme par l'index signe du catalogue officiel), `tierce`
+    /// (nomme par celui d'une source tierce) ou `user`.
     pub origin: &'static str,
+    /// La source qui le publie, pour `official` et `tierce`.
+    pub source: Option<String>,
     /// Vrai pour un script officiel dont l'empreinte est exactement celle que
     /// declare l'index signe : le seul cas d'approbation implicite (§16.4).
     pub verified: bool,
@@ -205,6 +212,7 @@ fn lire_entree(
         path: relatif,
         abs_path: chemin.to_string_lossy().to_string(),
         origin,
+        source: None,
         verified: false,
         hash: sha256_hex(&octets),
         declared_id,
@@ -237,7 +245,7 @@ fn parcourir(
     }
 }
 
-/// Parcourt le dossier du catalogue officiel.
+/// Parcourt le dossier d'une source.
 ///
 /// Les fichiers que l'index signe nomme passent **en premier**, avant tout le
 /// reste : ce sont eux qui gardent leur `id` en cas de collision. Sans cet
@@ -246,9 +254,15 @@ fn parcourir(
 /// les lots de l'utilisateur. Il resterait soumis a l'approbation, mais elle lui
 /// serait demandee au milieu d'un entretien familier, la ou l'on clique sans
 /// lire. Ce qui n'est pas a l'index vient ensuite, comme script ordinaire.
+///
+/// Les scripts que l'utilisateur a decoches (`exclus`, par id d'index) ne sont
+/// pas montres : leur fichier peut rester sur le disque, d'une installation
+/// anterieure, mais ils n'apparaissent plus dans WinTool.
 fn parcourir_catalogue(
     racine: &Path,
+    source: &Source,
     index: Option<&catalogue::Index>,
+    exclus: &HashSet<String>,
     scripts: &mut Vec<ScriptEntry>,
     ids_vus: &mut Vec<String>,
     problems: &mut Vec<String>,
@@ -260,22 +274,35 @@ fn parcourir_catalogue(
     collect_ps1(racine, &mut fichiers, problems);
     fichiers.sort();
 
-    let signe = |chemin: &PathBuf| -> Option<String> {
+    let entree_index = |chemin: &PathBuf| -> Option<&catalogue::Entree> {
         // Le dossier d'une source est plat : un sous-dossier n'est jamais a l'index.
         if chemin.parent() != Some(racine) {
             return None;
         }
         let nom = chemin.file_name()?.to_str()?;
-        catalogue::trouver(index?, nom).map(|e| e.sha256.clone())
+        catalogue::trouver(index?, nom)
     };
-    let (officiels, autres): (Vec<PathBuf>, Vec<PathBuf>) =
-        fichiers.into_iter().partition(|c| signe(c).is_some());
+    let (signes, autres): (Vec<PathBuf>, Vec<PathBuf>) = fichiers
+        .into_iter()
+        .partition(|c| entree_index(c).is_some());
+    let origine = if source.officielle {
+        "official"
+    } else {
+        "tierce"
+    };
 
-    for chemin in officiels {
-        let attendu = signe(&chemin);
-        match lire_entree(&chemin, racine, "official", ids_vus) {
+    for chemin in signes {
+        let Some(attendu) = entree_index(&chemin) else {
+            continue;
+        };
+        if exclus.contains(&attendu.id) {
+            continue;
+        }
+        let empreinte = attendu.sha256.clone();
+        match lire_entree(&chemin, racine, origine, ids_vus) {
             Ok(mut e) => {
-                e.verified = attendu.as_deref() == Some(e.hash.as_str());
+                e.verified = empreinte == e.hash;
+                e.source = Some(source.id.clone());
                 scripts.push(e);
             }
             Err(e) => problems.push(e),
@@ -294,29 +321,44 @@ pub fn discover<R: Runtime>(app: &AppHandle<R>) -> Result<DiscoveryResult, Strin
     fs::create_dir_all(&racine_utilisateur)
         .map_err(|e| format!("creation de {} : {e}", racine_utilisateur.display()))?;
 
-    let mut problems = Vec::new();
     let racine_catalogue = catalogue::dossier(app)?;
-    // L'index installe est re-verifie a chaque decouverte. S'il ne se verifie
-    // plus, aucun script du catalogue n'est approuve d'office : on le dit.
-    let index = match catalogue::index_local(&racine_catalogue) {
-        Ok(i) => i,
-        Err(e) => {
-            problems.push(format!("Catalogue officiel : {e}"));
-            None
-        }
-    };
+    let reglages = settings::load(app)?;
+    let (liste, mut problems) = sources::toutes();
 
     let mut scripts: Vec<ScriptEntry> = Vec::new();
     let mut ids_vus: Vec<String> = Vec::new();
 
-    // Le catalogue d'abord : ses scripts gardent leur id en cas de collision.
-    parcourir_catalogue(
-        &racine_catalogue,
-        index.as_ref(),
-        &mut scripts,
-        &mut ids_vus,
-        &mut problems,
-    );
+    // Les sources d'abord, l'officielle en tete : leurs scripts gardent leur id
+    // en cas de collision. Une source desactivee n'est pas parcourue.
+    for source in liste
+        .iter()
+        .filter(|s| !reglages.sources_inactives.contains(&s.id))
+    {
+        let racine = catalogue::dossier_source(app, &source.id)?;
+        // L'index installe est re-verifie a chaque decouverte. S'il ne se
+        // verifie plus, aucun de ses scripts n'est reconnu : on le dit.
+        let index = match catalogue::index_local_pour(&source.cle, &source.id, &racine) {
+            Ok(i) => i,
+            Err(e) => {
+                problems.push(format!("{} : {e}", source.nom));
+                None
+            }
+        };
+        let exclus: HashSet<String> = reglages
+            .sources_exclus
+            .get(&source.id)
+            .map(|v| v.iter().cloned().collect())
+            .unwrap_or_default();
+        parcourir_catalogue(
+            &racine,
+            source,
+            index.as_ref(),
+            &exclus,
+            &mut scripts,
+            &mut ids_vus,
+            &mut problems,
+        );
+    }
     parcourir(
         &racine_utilisateur,
         "user",
@@ -534,10 +576,27 @@ existe\pas",
     }
 
     fn parcours_catalogue(bac: &Bac, index: Option<&catalogue::Index>) -> Vec<ScriptEntry> {
+        parcours_source(bac, &sources::officielle(), index, &HashSet::new())
+    }
+
+    fn parcours_source(
+        bac: &Bac,
+        source: &Source,
+        index: Option<&catalogue::Index>,
+        exclus: &HashSet<String>,
+    ) -> Vec<ScriptEntry> {
         let mut scripts = Vec::new();
         let mut ids = Vec::new();
         let mut problemes = Vec::new();
-        parcourir_catalogue(&bac.0, index, &mut scripts, &mut ids, &mut problemes);
+        parcourir_catalogue(
+            &bac.0,
+            source,
+            index,
+            exclus,
+            &mut scripts,
+            &mut ids,
+            &mut problemes,
+        );
         scripts
     }
 
@@ -604,5 +663,42 @@ existe\pas",
         // Meme nom qu'un script de l'index, mais pas a sa place : ordinaire.
         let cache = scripts.iter().find(|s| s.path == "sous/200_B.ps1").unwrap();
         assert_eq!(cache.origin, "user");
+    }
+
+    // ----- Sources tierces et scripts decoches (specification 16.2) --------
+
+    fn source_tierce() -> Source {
+        Source {
+            id: "dupont".into(),
+            nom: "Scripts de Dupont".into(),
+            depot: "dupont/scripts".into(),
+            cle: CLE_ESSAI.trim().into(),
+            officielle: false,
+        }
+    }
+
+    #[test]
+    fn une_source_tierce_signee_n_est_jamais_officielle() {
+        let bac = Bac::neuf("tierce");
+        let index = catalogue_de_test(&bac);
+        let scripts = parcours_source(&bac, &source_tierce(), Some(&index), &HashSet::new());
+        assert_eq!(scripts.len(), 2);
+        // Conformes a l'index signe de leur source, mais « tierce » : aucune
+        // approbation implicite (script_approuve exige « official »).
+        assert!(scripts
+            .iter()
+            .all(|s| s.origin == "tierce" && s.verified && s.source.as_deref() == Some("dupont")));
+    }
+
+    #[test]
+    fn un_script_decoche_n_apparait_plus() {
+        let bac = Bac::neuf("exclus");
+        let index = catalogue_de_test(&bac);
+        let exclus: HashSet<String> = [index.scripts[0].id.clone()].into();
+        let scripts = parcours_source(&bac, &sources::officielle(), Some(&index), &exclus);
+        assert_eq!(
+            scripts.iter().map(|s| &s.path[..]).collect::<Vec<_>>(),
+            ["200_B.ps1"]
+        );
     }
 }

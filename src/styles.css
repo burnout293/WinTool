@@ -1603,6 +1603,54 @@ body[data-simulation="activee"] .btn.primary.big.lancer { animation: none; box-s
   font-size: 12.5px; color: var(--text-2); cursor: pointer;
 }
 
+/* --- Catalogues (Reglages 2, specification §16.2) ---------------------------
+   Une carte par catalogue : l'officiel en tete, les ajouts marques comme tels.
+   Les commandes passent sous le texte : une carte en porte jusqu'a quatre. */
+.sources-liste { display: flex; flex-direction: column; gap: 10px; }
+.setrow.source-carte { flex-wrap: wrap; align-items: flex-start; }
+.source-carte .setrow-txt { flex: 1 1 300px; }
+.source-carte .rg-libelle b { flex-wrap: wrap; }
+.source-carte > .switch { margin-top: 10px; }
+.source-actions { flex-basis: 100%; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.source-carte.inactive .rg-bouclier, .source-carte.inactive .rg-libelle { opacity: .55; }
+.source-avert { color: var(--warn); }
+.source-form {
+  display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border-radius: 16px;
+  background: var(--surface); border: 1px solid color-mix(in srgb, var(--acc) 40%, transparent);
+}
+.source-form b { font-size: 14px; }
+.source-form .desc { font-size: 12.5px; color: var(--text-3); }
+.source-form label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.source-form input, .source-form textarea {
+  font-size: 13px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border-2);
+  border-radius: 10px; padding: 8px 10px; font-family: inherit; resize: vertical;
+}
+.source-form textarea { font-family: var(--mono); font-size: 12px; }
+.source-form input:focus-visible, .source-form textarea:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+.source-form-pied { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Consulter et choisir : une ligne par action, une case a cocher. */
+.source-outils { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.source-outils .muted { margin-left: auto; font-size: 12.5px; }
+.source-liste { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.source-action label {
+  display: flex; align-items: flex-start; gap: 14px; padding: 13px 16px; border-radius: 14px; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border);
+}
+.source-action label:hover { border-color: var(--border-2); }
+.source-action input { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; accent-color: var(--acc); }
+.source-action.exclu label { opacity: .6; }
+.sa-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.sa-txt b { font-size: 14px; }
+.sa-txt .desc { font-size: 12.5px; color: var(--text-3); }
+.sa-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 3px; }
+.sa-meta .mono { font-size: 11px; }
+/* « Appliquer » reste a portee pendant qu'on parcourt une longue liste. */
+.source-pied {
+  position: sticky; bottom: -48px; display: flex; justify-content: flex-end; margin-top: 14px;
+  padding: 12px 0 48px; background: linear-gradient(to top, var(--bg) 70%, transparent);
+}
+
 /* --- Emplacements proteges (Reglages 3.5, specification §12.4) ---------------
    Une ligne de resume, verte ou orange ; le plan du disque dans sa page. */
 .setrow.rg-protege { border-color: color-mix(in srgb, var(--acc) 38%, transparent); background: var(--acc-soft); }
@@ -1784,6 +1832,14 @@ button.etat:disabled { cursor: not-allowed; opacity: .6; }
   100% { background: var(--border-2); }
 }
 
+/* Une seule grande icone, pour une page de presentation.json sans illustration
+   a elle (« illustration »: « icone »). */
+.illu-icone { display: grid; place-items: center; }
+.illu-icone > span {
+  width: 96px; height: 96px; border-radius: 30px; display: grid; place-items: center; color: var(--ink);
+  background: linear-gradient(135deg, var(--acc), var(--acc-2)); animation: onb-pouls 3.2s ease-in-out infinite;
+}
+.illu-icone svg { width: 46px; height: 46px; }
 body.inactive .onb-illu * { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   .onb-illu * { animation: none !important; }

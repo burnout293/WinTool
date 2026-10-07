@@ -158,7 +158,13 @@
   const TOUT = Object.values(SCRIPTS).flat();
   /** Les scripts presents sur le disque : aucun tant que le catalogue n'est
    *  pas installe, dans le scenario `vide` et ses voisins. */
-  const presents = () => (catalogueInstalle || SCENARIO === 'perso' ? TOUT : []);
+  const presents = () => {
+    if (SCENARIO === 'perso') return TOUT;
+    if (!catalogueInstalle || reglages.sources_inactives.includes('officiel')) return [];
+    // Les actions decochees dans « Consulter et choisir » n'apparaissent plus.
+    const exclus = reglages.sources_exclus.officiel || [];
+    return TOUT.filter((x) => !exclus.includes(x.id));
+  };
   // `has` autant que `get` : filter, map et forEach testent la presence de
   // chaque indice avant de le lire — sans lui, la liste paraitrait vide.
   const TOUS = new Proxy([], {
@@ -214,6 +220,8 @@
     catalogue_source: catalogueInstalle ? 'official' : '',
     catalogue_check: 'startup',
     catalogue_reminder_hidden: false,
+    sources_inactives: [],
+    sources_exclus: {},
     // Le banc saute l'accueil par defaut ; `?onboarding=1` le rejoue.
     onboarded: !new URLSearchParams(location.search).has('onboarding'),
   };
@@ -233,6 +241,15 @@
   // Le banc rejoue une sortie plausible pour que la progression, les couleurs
   // de marqueur et le bilan soient reellement observables.
   const auditeurs = { 'script:line': [], 'script:end': [], 'catalogue:progress': [] };
+  /** Catalogues ajoutes (`?sources`), et le contenu de celui de Dupont. */
+  let tierces = new URLSearchParams(location.search).has('sources')
+    ? [{ id: 'dupont', nom: 'Scripts de Dupont', depot: 'dupont/scripts-windows', cle_publique: 'RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3', installe: true }]
+    : [];
+  const ACTIONS_DUPONT = [
+    { id: 'dupont-wifi', file: 'DUPONT_WIFI.ps1', version: '2.1', title: { fr: 'Réparer le Wi-Fi', en: 'Fix Wi-Fi' }, desc: { fr: 'Réinitialise la carte réseau et vide le cache DNS', en: 'Resets the network adapter and flushes DNS' }, category: 'network', risk: 'medium', admin: true, etat: 'installe' },
+    { id: 'dupont-teams', file: 'DUPONT_TEAMS.ps1', version: '1.4', title: { fr: 'Vider le cache de Teams', en: 'Clear the Teams cache' }, desc: { fr: 'Libère de la place sans toucher à vos conversations', en: 'Frees space without touching your chats' }, category: 'cleaning', risk: 'low', admin: false, etat: 'maj' },
+    { id: 'dupont-export', file: 'DUPONT_EXPORT.ps1', version: '0.9', title: { fr: 'Exporter les mots de passe du navigateur', en: 'Export browser passwords' }, desc: { fr: 'Copie les mots de passe enregistrés dans un fichier', en: 'Copies saved passwords to a file' }, category: 'tools', risk: 'high', admin: true, etat: 'absent' },
+  ];
   /** `garde::ConfigGarde` — dans HKLM cote Rust. */
   const garde = { retires: [], ajouts: [] };
   const emettre = (nom, payload) => auditeurs[nom]?.forEach((f) => f({ payload }));
@@ -382,6 +399,90 @@
       return SCENARIO === 'maj'
         ? { version: '1.1.0', ecrits: 3, copies: [], retires: [{ id: 'smart', file: '110_SMART.ps1', title: { fr: 'Vérifier la santé du disque', en: 'Check disk health' } }] }
         : { version: '1.0.0', ecrits: TOUT.length, copies: [], retires: [] };
+    },
+    // Catalogues (§16.2). `lib::EtatSources`, `catalogue::Contenu`. Avec
+    // `?sources`, un catalogue ajoute, installe : « Scripts de Dupont ».
+    sources_state: () => ({
+      sources: [
+        { id: 'officiel', nom: 'Catalogue officiel', depot: 'burnout293/WinTool-Catalogue', cle_publique: '', officielle: true, installe: catalogueInstalle },
+        ...tierces,
+      ].map((x) => ({
+        ...x,
+        officielle: !!x.officielle,
+        active: !reglages.sources_inactives.includes(x.id),
+        exclus: (reglages.sources_exclus[x.id] || []).length,
+        cle: true,
+        dossier: `C:\\Users\\Buly\\AppData\\Local\\WinTool\\sources\\${x.id}`,
+        installe: x.installe ? { version: x.id === 'officiel' ? '1.0.0' : '2.1.0', published: '2026-10-06', scripts: x.id === 'officiel' ? TOUT.length : ACTIONS_DUPONT.length } : null,
+        probleme: null,
+      })),
+      problemes: [],
+      modifiable: !new URLSearchParams(location.search).has('sansadmin'),
+    }),
+    check_source: async (a) => {
+      if (a.id === 'officiel') return REPONSES.check_catalogue();
+      await new Promise((r) => setTimeout(r, 400));
+      const nouveau = { id: 'dupont-imprimante', file: 'DUPONT_IMPRIMANTE.ps1', title: { fr: 'Débloquer l’imprimante', en: 'Unjam the printer' } };
+      return SCENARIO === 'maj'
+        ? { version: '2.2.0', published: '2026-10-20', installee: '2.1.0', nouveaux: [nouveau], mis_a_jour: [], remplaces: [], retires: [], a_jour: false }
+        : { version: '2.1.0', published: '2026-10-06', installee: '2.1.0', nouveaux: [], mis_a_jour: [], remplaces: [], retires: [], a_jour: true };
+    },
+    install_source: async (a) => {
+      if (a.id === 'officiel') return REPONSES.install_catalogue();
+      for (let fait = 0; fait <= 2; fait += 1) {
+        emettre('catalogue:progress', { fait, total: 2 });
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      const x = tierces.find((y) => y.id === a.id);
+      if (x) x.installe = true;
+      return { version: '2.1.0', ecrits: 2, copies: [], retires: [] };
+    },
+    source_contents: async (a) => {
+      const exclus = reglages.sources_exclus[a.id] || [];
+      const liste = a.id === 'officiel'
+        ? TOUT.map((x) => ({
+          id: x.id, file: x.path, version: '1.0', title: { fr: x.meta.title, en: x.meta.title },
+          desc: { fr: x.meta.desc, en: x.meta.desc }, category: x.meta.category, risk: x.meta.risk,
+          admin: true, etat: catalogueInstalle ? (exclus.includes(x.id) ? 'absent' : 'installe') : 'absent',
+        }))
+        : ACTIONS_DUPONT;
+      for (let fait = 0; fait <= liste.length; fait += 4) {
+        emettre('catalogue:progress', { fait, total: liste.length });
+        await new Promise((r) => setTimeout(r, 60));
+      }
+      return liste.map((c) => ({ ...c, exclu: exclus.includes(c.id) }));
+    },
+    set_source_selection: (a) => {
+      if (a.exclus.length) reglages.sources_exclus[a.id] = [...a.exclus];
+      else delete reglages.sources_exclus[a.id];
+      return JSON.parse(JSON.stringify(reglages));
+    },
+    set_source_active: (a) => {
+      reglages.sources_inactives = reglages.sources_inactives.filter((i) => i !== a.id);
+      if (!a.active) reglages.sources_inactives.push(a.id);
+      return JSON.parse(JSON.stringify(reglages));
+    },
+    add_source: async (a) => {
+      if (new URLSearchParams(location.search).has('sansadmin')) throw new Error('SOURCES_SANS_DROITS');
+      await new Promise((r) => setTimeout(r, 500));
+      const m = /^(?:https?:\/\/)?(?:www\.)?(?:github\.com\/)?([\w-]+)\/([\w.-]+?)(?:\.git)?\/?$/.exec(a.depot.trim());
+      if (!m) throw new Error(`CATALOGUE_DEPOT: « ${a.depot} » n'est pas un depot GitHub`);
+      if (!/^(untrusted comment|RW|dW)/.test(a.cle.trim())) throw new Error('CATALOGUE_CLE: cle publique illisible');
+      const id = m[2].toLowerCase().replace(/[^a-z0-9-]/g, '-').slice(0, 40);
+      if (id === 'officiel' || tierces.some((x) => x.id === id)) throw new Error(`SOURCE_EXISTE: ${id}`);
+      tierces.push({ id, nom: a.nom.trim() || m[2], depot: `${m[1]}/${m[2]}`, cle_publique: a.cle.trim(), installe: false });
+      return id;
+    },
+    update_source: async (a) => {
+      await new Promise((r) => setTimeout(r, 300));
+      const x = tierces.find((y) => y.id === a.id);
+      if (x) Object.assign(x, { nom: a.nom.trim() || x.nom, cle_publique: a.cle.trim() });
+      return null;
+    },
+    remove_source: (a) => {
+      tierces = tierces.filter((x) => x.id !== a.id);
+      delete reglages.sources_exclus[a.id];
+      return null;
     },
     // Emplacements proteges (§12.4). `lib::EmplacementsProteges`.
     protected_paths: () => ({

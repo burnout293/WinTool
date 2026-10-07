@@ -361,18 +361,19 @@
               </div>
             </section>
 
-            <!-- Catalogue d'entretiens (specification §16) : visible dans les deux
-                 modes. Rien ne s'installe sans un clic. -->
+            <!-- Catalogues d'actions (specification §16) : visibles dans les deux
+                 modes, l'officiel en tete. Ajouter, modifier ou retirer un
+                 catalogue reste au mode Expert, et demande les droits
+                 administrateur (leur liste vit dans HKLM). Rien ne s'installe
+                 sans un clic. -->
             <section class="set-group" id="sec-catalogue" data-rg-page="catalogue" data-rg-icone="sec-catalogue" hidden>
               <header class="rg-h">
                 <span class="rg-gi"><svg class="ico i24" aria-hidden="true"><use href="#sec-catalogue" /></svg></span>
                 <div><h1><span class="num">2</span><span id="secCatalogueTitre"></span></h1><p data-i18n="reglages.sous_catalogue"></p></div>
               </header>
               <div class="rg-cartes">
-                <div class="setrow" data-num="2.1">
-                  <span class="setrow-txt"><span class="num">2.1</span><span class="rg-libelle"><b id="setCatalogueLabel"></b><span class="desc" id="catalogueEtat" aria-live="polite"></span></span></span>
-                  <button class="btn compact" type="button" id="btnCatalogue"></button>
-                </div>
+                <!-- Une carte par catalogue : rendreSources(). -->
+                <div class="sources-liste" id="sourcesListe"></div>
                 <div class="setrow" data-num="2.2">
                   <span class="setrow-txt"><span class="num">2.2</span><span class="rg-libelle"><b id="setCatalogueVerifLabel"></b><span class="desc" data-i18n="reglages.d_catalogue_verif"></span></span></span>
                   <select class="cat-select" id="setCatalogueSelect">
@@ -380,6 +381,56 @@
                     <option value="manual"></option>
                   </select>
                 </div>
+                <p class="rg-bandeau only-expert" id="sourcesDroits" hidden>
+                  <svg class="ico i20" aria-hidden="true"><use href="#lock" /></svg>
+                  <span data-i18n="cat.droits"></span>
+                  <button class="btn compact primary" type="button" id="btnSourcesDroits" data-i18n="reglages.proteges_relancer"></button>
+                </p>
+                <div class="setrow only-expert" data-num="2.3">
+                  <span class="setrow-txt"><span class="num">2.3</span><span class="rg-libelle"><b data-i18n="cat.ajouter_titre"></b><span class="desc" data-i18n="cat.ajouter_desc"></span></span></span>
+                  <button class="btn compact" type="button" id="btnSourceAjouter" data-i18n="cat.ajouter_btn"></button>
+                </div>
+                <!-- Ajouter ou modifier un catalogue : un depot GitHub et la cle
+                     publique de son editeur. Rien n'est inscrit avant que son
+                     index ne se verifie avec cette cle. -->
+                <form class="source-form only-expert" id="sourceForm" hidden novalidate>
+                  <b id="sourceFormTitre"></b>
+                  <p class="desc" data-i18n="cat.form_aide"></p>
+                  <label><span data-i18n="cat.form_depot"></span><input type="text" id="sourceDepot" spellcheck="false" autocomplete="off" /></label>
+                  <label><span data-i18n="cat.form_cle"></span><textarea class="mono" id="sourceCle" rows="3" spellcheck="false"></textarea></label>
+                  <label><span data-i18n="cat.form_nom"></span><input type="text" id="sourceNom" maxlength="60" autocomplete="off" /></label>
+                  <p class="ajout-err" id="sourceErreur" role="alert" hidden></p>
+                  <div class="source-form-pied">
+                    <button class="btn" type="button" id="btnSourceAnnuler" data-i18n="cat.form_annuler"></button>
+                    <button class="btn primary" type="submit" id="btnSourceValider"></button>
+                  </div>
+                </form>
+              </div>
+            </section>
+
+            <!-- Consulter et choisir : le contenu d'un catalogue, action par
+                 action, consultable avant meme de l'installer. On coche ce
+                 qu'on veut ; une action decochee n'est ni telechargee ni
+                 montree. -->
+            <section class="set-group" id="sec-source" data-rg-page="source" data-rg-icone="sec-catalogue" hidden>
+              <div class="rg-fil">
+                <button type="button" data-rg-section="catalogue" id="filCatalogue"></button>
+                <svg class="ico i14" aria-hidden="true"><use href="#chevron-right" /></svg>
+                <span id="sourceFilNom"></span>
+              </div>
+              <header class="rg-h">
+                <span class="rg-gi"><svg class="ico i24" aria-hidden="true"><use href="#sec-catalogue" /></svg></span>
+                <div><h1 id="sourceTitre"></h1><p id="sourceSous"></p></div>
+              </header>
+              <div class="source-outils">
+                <button class="btn compact" type="button" id="btnSourceTout" data-i18n="cat.tout_cocher"></button>
+                <button class="btn compact" type="button" id="btnSourceRien" data-i18n="cat.tout_decocher"></button>
+                <span class="muted" id="sourceCompte"></span>
+              </div>
+              <p class="maj-etat" id="sourceEtat" aria-live="polite"></p>
+              <ul class="source-liste" id="sourceListe"></ul>
+              <div class="source-pied">
+                <button class="btn primary" type="button" id="btnSourceAppliquer" data-i18n="cat.appliquer"></button>
               </div>
             </section>
 

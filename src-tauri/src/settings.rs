@@ -121,6 +121,16 @@ pub struct Settings {
     /// respecte definitivement.
     #[serde(default)]
     pub catalogue_reminder_hidden: bool,
+    /// Sources desactivees, par identifiant (§16.2) : ni interrogees, ni
+    /// montrees — leurs scripts restent sur le disque. Une preference : la
+    /// decision de confiance, elle, est l'inscription de la source (HKLM).
+    #[serde(default)]
+    pub sources_inactives: Vec<String>,
+    /// Par source, les scripts que l'utilisateur a decoches dans la page du
+    /// catalogue : ni telecharges, ni montres. Les scripts qu'une nouvelle
+    /// version ajoute arrivent coches ; on ne retient que les refus.
+    #[serde(default)]
+    pub sources_exclus: BTreeMap<String, Vec<String>>,
 }
 
 /// Valeurs admises pour `catalogue_source` une fois la decision prise.
@@ -207,6 +217,8 @@ pub fn default_settings(factory: Vec<Category>) -> Settings {
         catalogue_source: String::new(),
         catalogue_check: "startup".to_string(),
         catalogue_reminder_hidden: false,
+        sources_inactives: Vec::new(),
+        sources_exclus: BTreeMap::new(),
     }
 }
 
@@ -554,6 +566,7 @@ mod tests {
             path: format!("{id}.ps1"),
             abs_path: format!("{id}.ps1"),
             origin: "user",
+            source: None,
             verified: false,
             hash: "0".repeat(64),
             declared_id: true,
