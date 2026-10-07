@@ -202,7 +202,10 @@ svg { display: block; }
 .ico { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.9;
        stroke-linecap: round; stroke-linejoin: round; }
 .i14 { width: 14px; height: 14px; }
+.i16 { width: 16px; height: 16px; }
 .i17 { width: 17px; height: 17px; }
+.i20 { width: 20px; height: 20px; }
+.i24 { width: 24px; height: 24px; }
 
 /* Divise par --echelle : sous zoom, les unites de fenetre ne sont pas
    compensees (voir appliquerEchelle). */
@@ -294,6 +297,9 @@ svg { display: block; }
 .water {
   position: absolute; left: 0; bottom: 0;
   width: 200%; height: 760px; pointer-events: none;
+  /* A l'etape 1, l'eau suit le champ de bouees quand la page defile (majMaree).
+     `translate` se compose avec la derive, qui anime `transform`. */
+  translate: 0 var(--maree, 0px);
 }
 
 /*
@@ -848,10 +854,11 @@ body:not([data-console="compact"]) .lots-journal { display: none; }
 .s-scroll::-webkit-scrollbar { width: 9px; }
 .s-scroll::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 5px; }
 .s-wrap { max-width: 720px; margin: 0 auto; padding: 30px 24px 48px; }
-.s-step[data-s="1"] .s-wrap {
-  max-width: 1000px; min-height: 100%; display: flex; flex-direction: column;
-}
-.s-step[data-s="1"] .s-nav { margin-top: auto; padding-top: 34px; }
+/* Etape 1 : l'en-tete, puis le champ de bouees, pleine largeur, pousse au bas
+   de la page ; s'il ne tient pas, la page defile (specification §15.2). */
+.s-step[data-s="1"] .s-scroll { display: flex; flex-direction: column; }
+.s-step[data-s="1"] .s-scroll > * { flex-shrink: 0; }
+.s-step[data-s="1"] .s-wrap { width: 100%; max-width: 1000px; padding-bottom: 18px; }
 
 .s-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
 .s-head h2 { font-size: 20px; font-weight: 800; letter-spacing: -.4px; }
@@ -929,26 +936,31 @@ body[data-mode="simple"] .titlebar { background: none; border-bottom: none; }
 
 /* Une bouee, ce n'est pas une pastille ronde avec du texte dedans : c'est un
    flotteur rond, et son etiquette pend dessous (maquette). */
-/* Champ de bouees (positionnerBouees). Par defaut — fenetre trop basse pour
-   tout poser sur l'eau —, les bouees restent dans le flux de la page, en
-   rangees qui passent a la ligne, et la page defile. En « flottant », le champ
-   est ancre au bas de la scene, comme l'eau, et chaque bouee est posee sur sa
-   ligne d'eau. */
-.buoys {
-  position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: flex-start;
-  justify-content: center; gap: 22px 12px; padding: 34px 0 0;
+/* Champ de bouees (positionnerBouees) : toujours pose sur l'eau. Il est en bas
+   de la page, a sa hauteur ; chaque bouee y est placee sur sa ligne d'eau. */
+.buoys { position: relative; z-index: 1; margin-top: auto; pointer-events: none; }
+.buoys .buoy { position: absolute; width: 150px; margin-left: -75px; pointer-events: auto; }
+.buoys .sect-champ { position: absolute; left: 0; right: 0; margin: 0; }
+/* Le libelle « Ou choisissez un domaine precis » vit dans le champ. */
+.s-step[data-s="1"] #sectAutres { display: none; }
+
+/* « Continuer », colle au bas de l'ecran : il reste visible quand le champ
+   defile, et rappelle ce qui est choisi. Sa marge negative le pose sur le bas
+   du champ, sous la rangee de devant, la ou il etait avant la 1.2.1. */
+.s1-barre {
+  --barre-h: 96px;
+  position: sticky; bottom: 0; z-index: 30;
+  height: var(--barre-h); margin-top: calc(-1 * var(--barre-h));
+  display: flex; align-items: center; justify-content: center; gap: 22px; padding: 0 24px;
 }
-.buoys.flottant {
-  position: absolute; left: 0; right: 0; bottom: 0; display: block; padding: 0;
-  pointer-events: none;
+.s1-choisi { font-size: 13.5px; color: var(--text-2); }
+.s1-choisi b { color: var(--text); }
+/* Un fond seulement quand quelque chose passe dessous. Opaque aux neuf
+   dixiemes, sans flou : un flou recalculerait l'eau animee a chaque image. */
+.s-step[data-s="1"].deborde .s1-barre {
+  background: color-mix(in srgb, var(--bg) 90%, transparent);
+  border-top: 1px solid var(--border);
 }
-.buoys.flottant .buoy { position: absolute; width: 150px; margin-left: -75px; pointer-events: auto; }
-.buoys .sect-champ { display: none; }
-.buoys.flottant .sect-champ { display: block; position: absolute; left: 0; right: 0; margin: 0; }
-/* En flottant, « Ou choisissez un domaine precis » vit dans le champ, juste
-   au-dessus de la rangee du haut : celui du flux flotterait loin des bouees.
-   `visibility` plutot que `display` : la mesure qui decide du mode ne bouge pas. */
-.s-step[data-s="1"].champ-flottant #sectAutres { visibility: hidden; }
 
 /* La houle : vue d'un point fixe, une vague qui derive est une oscillation
    verticale. Chaque bouee monte et descend a la cadence de sa vague, dephasee
@@ -1126,50 +1138,108 @@ body.inactive .rise-crest { animation-play-state: paused; }
 .grp .lbl { font-size: 12.5px; font-weight: 650; color: var(--text-2); }
 .grp .seg { flex-shrink: 0; }
 
-.set-card {
-  width: 100%; max-width: 700px; max-height: calc(82vh / var(--echelle, 1)); margin: 0 20px; background: var(--surface);
-  border-radius: 20px; box-shadow: var(--sh-2); display: flex; flex-direction: column; overflow: hidden;
+/* --- Reglages : une page de WinTool (specification §8) ------------------------
+   Pas une fenetre posee dessus : la page couvre la scene, sous la barre de
+   titre, qui reste active. Un menu des sections a gauche, une section a la
+   fois a droite, une carte par reglage. */
+.reglages-page { position: absolute; inset: 0; z-index: 40; display: flex; background: var(--bg); }
+body.reglages-ouverts .titlebar { background: var(--surface); border-bottom: 1px solid var(--border); }
+body.reglages-ouverts .s-breadcrumb, body.reglages-ouverts .tb-search { display: none; }
+.tb-lieu { display: none; margin-left: 6px; font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+body.reglages-ouverts .tb-lieu { display: block; }
+/* La roue dentee reste allumee tant que la page est ouverte. */
+#btnSettings[aria-pressed="true"] {
+  color: var(--ink); border-color: transparent;
+  background: linear-gradient(135deg, var(--acc), var(--acc-2));
 }
-.set-head {
-  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
-  padding: 18px 22px; border-bottom: 1px solid var(--border);
-}
-.set-head h2 { font-size: 16px; font-weight: 800; letter-spacing: -.3px; }
 
-.set-body { flex: 1; min-height: 0; display: flex; }
-
-/* Sidemenu : sauter directement a une section plutot que de tout faire
-   defiler — ajoute apres le premier test utilisateur. */
-.set-nav {
-  width: 164px; flex-shrink: 0; border-right: 1px solid var(--border);
-  padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto;
+.rg-nav {
+  width: 268px; flex-shrink: 0; display: flex; flex-direction: column; gap: 3px;
+  padding: 18px 14px; overflow-y: auto;
+  background: var(--surface); border-right: 1px solid var(--border);
 }
-.set-nav a {
-  display: flex; align-items: baseline; gap: 8px; padding: 7px 9px; border-radius: 8px;
-  font-size: 12.5px; font-weight: 650; color: var(--text-2); text-decoration: none;
+.rg-retour {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 8px;
+  height: 34px; padding: 0 14px 0 10px; margin-bottom: 14px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: 12.5px; font-weight: 700; color: var(--text-2);
 }
-.set-nav a:hover { background: var(--surface-2); color: var(--text); }
-
-.set-scroll { flex: 1; min-width: 0; overflow-y: auto; padding: 18px 22px 26px; scroll-behavior: smooth; }
-.set-scroll::-webkit-scrollbar { width: 9px; }
-.set-scroll::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 5px; }
-
-.set-group { padding: 4px 0 22px; scroll-margin-top: 8px; }
-.set-group + .set-group { border-top: 1px solid var(--border); padding-top: 18px; }
-.set-group-title {
-  display: flex; align-items: baseline; gap: 8px;
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-  color: var(--text-3); margin-bottom: 10px;
+.rg-retour:hover { background: var(--surface-2); color: var(--text); }
+.rg-titre { margin: 0 8px 12px; font-size: 22px; font-weight: 800; letter-spacing: -.5px; }
+.rg-cherche {
+  display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; margin-bottom: 12px;
+  border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-3);
 }
-.setrow { display: flex; align-items: center; gap: 10px; padding: 8px 0; font-size: 13px; }
+.rg-cherche:focus-within { border-color: var(--acc); }
+.rg-cherche input {
+  flex: 1; min-width: 0; border: none; background: none; outline: none;
+  font-family: inherit; font-size: 13px; color: var(--text);
+}
+.rg-menu { display: flex; flex-direction: column; gap: 3px; }
+.rg-item {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 10px;
+  border-radius: 12px; text-align: left; font-size: 13.5px; font-weight: 650; color: var(--text-2);
+}
+.rg-item:hover { background: var(--surface-2); color: var(--text); }
+.rg-item .num { margin-left: -4px; }
+.rg-i {
+  width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0; display: grid; place-items: center;
+  background: var(--surface-2); color: var(--text-2);
+}
+.rg-item[aria-current="page"] { background: var(--acc-soft); color: var(--text); }
+.rg-item[aria-current="page"] .rg-i { color: var(--ink); background: linear-gradient(135deg, var(--acc), var(--acc-2)); }
+
+.rg-page { flex: 1; min-width: 0; overflow-y: auto; padding: 30px 40px 48px; }
+.rg-page::-webkit-scrollbar { width: 9px; }
+.rg-page::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 5px; }
+.rg-in { max-width: 760px; margin: 0 auto; }
+.rg-h { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
+.rg-gi {
+  width: 52px; height: 52px; border-radius: 16px; flex-shrink: 0; display: grid; place-items: center;
+  color: var(--ink); background: linear-gradient(135deg, var(--acc), var(--acc-2));
+}
+.rg-h h1 { display: flex; align-items: baseline; gap: 10px; font-size: 26px; font-weight: 800; letter-spacing: -.6px; }
+.rg-h h1 .num { font-size: 13px; }
+.rg-h p { margin-top: 3px; font-size: 13.5px; color: var(--text-2); }
+.rg-cartes { display: flex; flex-direction: column; gap: 10px; }
+
+/* Un reglage par carte : le libelle et sa phrase d'explication a gauche, la
+   commande a droite. */
+.setrow {
+  display: flex; align-items: center; gap: 18px; padding: 15px 18px; font-size: 13px;
+  border-radius: 16px; background: var(--surface); border: 1px solid var(--border);
+}
 .setrow-txt { display: flex; align-items: baseline; gap: 8px; flex: 1; min-width: 0; }
-.setrow > .seg, .setrow > select, .setrow > input { flex-shrink: 0; }
-/* `.setrow > button` visait aussi les interrupteurs, qui s'etiraient alors sur
-   toute la largeur de la ligne. Seuls les boutons d'action s'etendent. */
-.setrow > button:not(.switch) { flex: 1; justify-content: center; }
-.setrow > .switch { flex: 0 0 auto; }
-/* Un bouton d'action a cote d'un libelle garde sa taille, comme un menu. */
-.setrow > .btn.compact { flex: 0 0 auto; }
+.rg-libelle { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rg-libelle b { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.rg-libelle .desc { font-size: 12.5px; color: var(--text-3); }
+.rg-libelle .maj-etat:empty { display: none; }
+.setrow > .seg, .setrow > select, .setrow > input, .setrow > .btn, .setrow > .switch { flex-shrink: 0; }
+/* Une recherche qui aboutit illumine le reglage un instant. */
+.setrow.eclair { animation: eclair 1.8s ease-out; }
+@keyframes eclair {
+  0%, 35% { box-shadow: 0 0 0 3px var(--acc); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.rg-resultat {
+  display: flex; align-items: center; gap: 14px; width: 100%; padding: 13px 16px; text-align: left;
+  border-radius: 14px; background: var(--surface); border: 1px solid var(--border); color: var(--text-3);
+}
+.rg-resultat:hover { border-color: var(--acc); }
+.rg-resultat-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.rg-resultat-txt b { font-size: 14px; color: var(--text); }
+.rg-resultat-txt small { font-size: 12px; }
+.rg-vide { padding: 30px; text-align: center; color: var(--text-3); }
+.rg-fil { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; font-size: 12.5px; color: var(--text-3); }
+.rg-fil button { font-weight: 700; color: var(--acc-on); }
+.rg-bandeau {
+  display: flex; align-items: center; gap: 14px; padding: 14px 18px; margin-bottom: 14px;
+  border-radius: 16px; font-size: 13px; color: var(--text-2);
+  background: var(--warn-s); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.rg-bandeau > span { flex: 1; }
+.rg-bandeau > svg { color: var(--warn); flex-shrink: 0; }
 
 /* Numero discret de chaque option (ex. 2.3) : reference stable pour en
    parler sans ambiguite, jamais une hierarchie a memoriser. */
@@ -1220,7 +1290,7 @@ body[data-mode="simple"] .only-expert { display: none; }
    de monospace brut coupe au milieu d'un chemin se lisait mal ; encadre et
    avec une coupure propre, il redevient consultable. */
 #cheminsScripts {
-  margin: -2px 0 10px; padding: 9px 12px;
+  margin: 8px 0 0; padding: 9px 12px;
   background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
   font-size: 10.5px; line-height: 1.7; color: var(--text-3);
   word-break: break-all; overflow-wrap: anywhere;
@@ -1533,26 +1603,68 @@ body[data-simulation="activee"] .btn.primary.big.lancer { animation: none; box-s
   font-size: 12.5px; color: var(--text-2); cursor: pointer;
 }
 
-/* --- Emplacements proteges (Reglages, section Expert) ------------------------ */
-.box.proteges { display: flex; flex-direction: column; gap: 8px; margin: -2px 0 10px; }
-.proteges-liste {
-  list-style: none; margin: 0; padding: 4px 12px; display: flex; flex-direction: column;
-  background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+/* --- Emplacements proteges (Reglages 3.5, specification §12.4) ---------------
+   Une ligne de resume, verte ou orange ; le plan du disque dans sa page. */
+.setrow.rg-protege { border-color: color-mix(in srgb, var(--acc) 38%, transparent); background: var(--acc-soft); }
+.rg-bouclier {
+  width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center;
+  color: var(--acc-on); background: color-mix(in srgb, var(--acc) 18%, transparent);
 }
-.protege-ligne { display: flex; align-items: center; gap: 12px; padding: 7px 0; }
-.protege-ligne + .protege-ligne { border-top: 1px solid var(--border); }
-.protege-ligne .switch { flex: 0 0 auto; }
-.protege-texte { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 12.5px; }
-.protege-texte .mono { font-size: 10.5px; overflow-wrap: anywhere; }
-.protege-texte .badge { margin-left: 6px; }
-.proteges-droits { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0; }
-#protegesAjouts {
-  width: 100%; resize: vertical; min-height: 60px; padding: 8px 10px; font-size: 11.5px;
-  color: var(--text); background: var(--surface); border: 1px solid var(--border-2);
-  border-radius: 10px;
+.setrow.rg-protege.alerte { border-color: color-mix(in srgb, var(--warn) 45%, transparent); background: var(--warn-s); }
+.setrow.rg-protege.alerte .rg-bouclier { color: var(--warn); background: color-mix(in srgb, var(--warn) 16%, transparent); }
+.setrow.rg-protege.alerte .desc { color: var(--warn); font-weight: 600; }
+
+.d-arbre { list-style: none; margin: 0; padding: 4px 0; border-radius: 16px; border: 1px solid var(--border); background: var(--surface); }
+.d-noeud { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-height: 40px; padding: 3px 14px; }
+.d-noeud.n1 { padding-left: 40px; }
+.d-noeud.n2 { padding-left: 66px; }
+.d-noeud.lecteur:not(:first-child) { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px; }
+/* Les traits de l'arborescence : celui du lecteur pour tout enfant, celui du
+   dossier parent pour un petit-enfant. */
+.d-noeud.n1, .d-noeud.n2 { background: linear-gradient(var(--border-2), var(--border-2)) no-repeat 27px 0 / 1px 100%; }
+.d-noeud.n2::before { content: ""; position: absolute; left: 53px; top: 0; bottom: 0; width: 1px; background: var(--border-2); }
+.d-noeud.n1::after, .d-noeud.n2::after { content: ""; position: absolute; top: 20px; width: 9px; height: 1px; background: var(--border-2); }
+.d-noeud.n1::after { left: 28px; }
+.d-noeud.n2::after { left: 54px; }
+.d-ico {
+  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0; display: grid; place-items: center;
+  background: var(--surface-2); color: var(--text-2);
 }
-#protegesAjouts:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
-.proteges-actions { display: flex; align-items: center; gap: 10px; }
+.d-nom { flex: 1; min-width: 0; display: flex; align-items: baseline; flex-wrap: wrap; gap: 7px; font-size: 13px; }
+.d-nom .muted { font-size: 11.5px; overflow-wrap: anywhere; }
+.d-nom .cadenas { align-self: center; display: inline-flex; color: var(--text-3); }
+.d-droite { display: inline-flex; align-items: center; gap: 6px; }
+.etat {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; flex-shrink: 0;
+  border-radius: 999px; font-size: 11.5px; font-weight: 700; border: 1px solid transparent;
+}
+.etat.on { color: var(--acc-on); background: var(--acc-soft); border-color: color-mix(in srgb, var(--acc) 40%, transparent); }
+.etat.off {
+  color: var(--warn); background: var(--warn-s); border-style: dashed;
+  border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+}
+.etat.libre { color: var(--text-3); border-color: var(--border); font-weight: 600; }
+button.etat:disabled { cursor: not-allowed; opacity: .6; }
+.d-noeud.off .d-ico { background: var(--warn-s); color: var(--warn); }
+.d-noeud.libre .d-ico { background: transparent; border: 1px dashed var(--border-2); }
+.d-noeud.reste { min-height: 30px; }
+.d-reste { padding-left: 38px; font-size: 11.5px; font-style: italic; color: var(--text-3); }
+.d-alerte {
+  flex-basis: 100%; display: flex; align-items: center; gap: 6px; margin: 0 0 4px 38px;
+  font-size: 11.5px; font-weight: 600; color: var(--warn);
+}
+.d-noeud .x {
+  width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+  border: 1px solid var(--border); color: var(--text-3);
+}
+.d-noeud .x:hover { color: var(--err); background: var(--err-s); }
+.ajout {
+  display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 4px 4px 4px 14px;
+  border-radius: 999px; border: 1px dashed var(--border-2); background: var(--surface); color: var(--text-3);
+}
+.ajout:focus-within { border-style: solid; border-color: var(--acc); }
+.ajout input { flex: 1; min-width: 0; border: none; background: none; outline: none; font-size: 12px; padding: 6px 0; color: var(--text); }
+.ajout-err { display: flex; align-items: center; gap: 6px; margin: 6px 4px 0; font-size: 12px; color: var(--err); }
 
 /* --- Premier demarrage : la visite (specification §13) ----------------------
    Gros caracteres, phrases courtes, une icone par phrase : lisible a 9 ans comme

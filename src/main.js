@@ -1407,9 +1407,9 @@ async function installerCatalogue() {
  *  pour arriver a l'application. */
 async function rendreOffreCatalogue() {
   document.getElementById('buoysZone').innerHTML = '';
-  retirerVaguesArriere();
+  positionnerBouees();
   document.getElementById('sectAutres').hidden = true;
-  document.getElementById('btnContinuerChoix').hidden = true;
+  document.getElementById('s1Barre').hidden = true;
 
   const avecCle = !!etatCatalogue?.cle;
   const sans = reglagesActuels?.catalogue_source === 'none' || !avecCle;
@@ -2466,6 +2466,14 @@ function basculerMode(mode) {
     b.setAttribute('aria-pressed', String(b.dataset.modeBtn === mode));
   });
   if (mode === 'simple') afficherEtapeSimple(1);
+  else majMaree();
+  // Les reglages restent ouverts, sur la meme section si elle existe dans ce
+  // mode (§8) : changer de mode ne demande plus de les quitter.
+  if (reglagesOuverts()) {
+    const recherche = document.getElementById('rgRecherche').value;
+    if (recherche.trim()) rechercherReglages(recherche);
+    else afficherSectionReglages(sectionReglages);
+  }
 }
 
 function majRepere(etape) {
@@ -2483,7 +2491,10 @@ function afficherEtapeSimple(n) {
   });
   majRepere(n);
   if (n === 1) rendreEtapeChoisir();
-  else retirerVaguesArriere();
+  else {
+    retirerVaguesArriere();
+    majMaree();
+  }
 }
 
 /** Etape 1 : la categorie epinglee en grand, les autres en bouees sur une
@@ -2509,6 +2520,7 @@ async function rendreEtapeChoisir() {
   const zoneBuoys = document.getElementById('buoysZone');
   const sectAutres = document.getElementById('sectAutres');
   const btnContinuer = document.getElementById('btnContinuerChoix');
+  const barre = document.getElementById('s1Barre');
   // La fleche fait partie du bouton dans la maquette : elle dit qu'on avance
   // d'une etape, la ou un libelle seul pourrait passer pour un bouton d'action.
   btnContinuer.innerHTML =
@@ -2521,9 +2533,9 @@ async function rendreEtapeChoisir() {
   if (!dispo.length) {
     zoneReco.innerHTML = `<p class="muted">${esc(t('simple.aucune_categorie'))}</p>`;
     zoneBuoys.innerHTML = '';
-    retirerVaguesArriere();
+    positionnerBouees();
     sectAutres.hidden = true;
-    btnContinuer.hidden = true;
+    barre.hidden = true;
     return;
   }
 
@@ -2562,7 +2574,13 @@ async function rendreEtapeChoisir() {
   );
   zoneBuoys.innerHTML = buoys.join('');
   positionnerBouees();
-  btnContinuer.hidden = false;
+  // La barre rappelle ce qui est choisi : utile quand le champ a defile et
+  // que la bouee choisie n'est plus a l'ecran.
+  const choisi = dispo.find((g) => g.category.id === selectionSimpleId) || epinglee;
+  document.getElementById('s1Choisi').innerHTML =
+    `${esc(t('s1.choisi'))} <b>${esc(nomCategorie(choisi.category))}</b> · ` +
+    esc(t('simple.duree_courte', { n: minutesLot(choisi) }));
+  barre.hidden = false;
 }
 
 /* --- Champ de bouees (etape 1, specification §15.2) ------------------------
@@ -2583,7 +2601,9 @@ async function rendreEtapeChoisir() {
    sans calcul a chaque image (voir retardHoule).
 
    Quand les lots sont nombreux, ils se repartissent en rangees, chacune sur sa
-   propre vague, etagees vers le haut et vers l'arriere. */
+   propre vague, etagees vers le haut et vers l'arriere. Si la fenetre est trop
+   basse, le champ ne change pas de forme : il s'allonge sous le reste, la page
+   defile, et l'eau defile avec lui (majMaree). */
 const VAGUE = {
   ligne: 308,         // px entre le bas de la scene et la ligne d'eau de devant
   amplitude: 37.5,    // px : la courbe dessinee monte de 452 a 414,5 (Bezier, 0,75 x 50)
@@ -2593,7 +2613,7 @@ const VAGUE = {
   ralenti: 0.35,      // chaque vague plus loin derive 35 % plus lentement
   attenue: 0.68,      // et s'efface d'autant
   marge: 44,          // px de bord, de chaque cote
-  pasMin: 150,        // px par bouee : en dessous, on ouvre une rangee de plus
+  pasMin: 170,        // px par bouee : en dessous, on ouvre une rangee de plus
   pasMax: 230,        // px par bouee : au-dela, la rangee s'etire trop
   parRangee: 8,       // au plus : sur un tres grand ecran, une rangee de seize se lit mal
   flotteur: 29,       // px : demi-hauteur du flotteur (.buoy .bi, 58 px)
@@ -2652,13 +2672,17 @@ function assurerVaguesArriere(n) {
   for (let d = 1; d <= n; d++) {
     if (vagueDeRang(d)) continue;
     const trace = cheminVague(VAGUE.houleArriere ** d);
+    // La nappe descend jusqu'au bas de la scene : posee plus haut, son bord
+    // inferieur tracait une bande plate au milieu de l'eau de devant. Sa ligne
+    // d'eau reste a y = 452 ; seul le bas s'allonge, d'un ecart par rang.
+    const bas = 760 + d * VAGUE.ecart;
     const boite = document.createElement('div');
-    boite.innerHTML = `<svg class="water surface arriere" data-rang="${d}" viewBox="0 0 2360 760" preserveAspectRatio="none" aria-hidden="true">
-      <path d="${trace} L2360,760 L0,760 Z" fill="url(#eau)" opacity="0.26" />
+    boite.innerHTML = `<svg class="water surface arriere" data-rang="${d}" viewBox="0 0 2360 ${bas}" preserveAspectRatio="none" aria-hidden="true">
+      <path d="${trace} L2360,${bas} L0,${bas} Z" fill="url(#eau)" opacity="0.26" />
       <path d="${trace}" fill="none" stroke="var(--acc)" stroke-width="2.5" opacity="0.55" />
     </svg>`;
     const v = boite.firstElementChild;
-    v.style.bottom = `${d * VAGUE.ecart}px`;
+    v.style.height = `${bas}px`;
     v.style.opacity = String(VAGUE.attenue ** d);
     v.style.animationDuration = `${dureeDeRang(d)}s`;
     // Derriere toutes les autres : la nappe de devant la recouvre la ou elles
@@ -2689,7 +2713,12 @@ function retardHoule(x, lambda, periode, tVague) {
 }
 
 /** Pose les bouees deja rendues dans #buoysZone, et cree les vagues qui les
- *  portent. A rappeler a chaque redimensionnement et changement d'echelle. */
+ *  portent. A rappeler a chaque redimensionnement et changement d'echelle.
+ *
+ *  Le champ est toujours pose sur l'eau, au bas de la page. Jusqu'a la 1.2.0,
+ *  une fenetre trop basse le renvoyait en rangees ordinaires dans le flux, et
+ *  la vague, restee au bas de la fenetre, passait au hasard derriere les
+ *  bouees — des la taille d'ouverture avec une douzaine de lots. */
 function positionnerBouees() {
   const etape = document.querySelector('.s-step[data-s="1"]');
   const zone = document.getElementById('buoysZone');
@@ -2697,47 +2726,29 @@ function positionnerBouees() {
   const visible = etape && !etape.hidden && !document.querySelector('.simple').hidden;
   if (!visible || !bouees.length) {
     retirerVaguesArriere();
+    if (zone) zone.style.height = '';
+    majMaree();
     return;
   }
 
   const z = echelleCourante();
-  const scene = document.querySelector('.stage').getBoundingClientRect();
-  const largeur = scene.width / z;
-  const hauteur = scene.height / z;
+  const largeur = document.querySelector('.stage').getBoundingClientRect().width / z;
   const tailles = repartirRangees(bouees.length, largeur);
   const R = tailles.length;
   const hauteurChamp = VAGUE.ligne + (R - 1) * VAGUE.ecart + VAGUE.flotteur + VAGUE.amplitude + VAGUE.libelle;
 
-  // Le champ ne doit jamais recouvrir le titre ni la carte recommandee. S'il ne
-  // tient pas — fenetre basse, echelle forte, beaucoup de rangees —, les bouees
-  // restent dans le flux de la page, qui defile : rien n'est jamais inaccessible.
-  const sect = document.getElementById('sectAutres');
-  const basFlux = (sect.getBoundingClientRect().top - scene.top) / z;
-  const flottant = hauteur - hauteurChamp >= basFlux + 8;
-  zone.classList.toggle('flottant', flottant);
-  etape.classList.toggle('champ-flottant', flottant);
-
+  // « Ou choisissez un domaine precis » vit dans le champ, juste au-dessus de
+  // la rangee du haut : hors du champ, il flotterait loin des bouees.
   let libelle = zone.querySelector('.sect-champ');
   if (!libelle) {
     libelle = document.createElement('div');
     libelle.className = 'sect sect-champ';
     zone.prepend(libelle);
   }
-  libelle.textContent = sect.textContent;
+  libelle.textContent = document.getElementById('sectAutres').textContent;
 
   const immobile = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const lambda = largeur / 2;
-
-  if (!flottant) {
-    retirerVaguesArriere();
-    zone.style.height = '';
-    bouees.forEach((b) => {
-      b.style.left = b.style.top = b.style.zIndex = '';
-      b.style.transform = '';
-      b.classList.remove('houle');
-    });
-    return;
-  }
 
   assurerVaguesArriere(R - 1);
   zone.style.height = `${hauteurChamp}px`;
@@ -2784,6 +2795,30 @@ function positionnerBouees() {
       }
     }
   });
+  majMaree();
+}
+
+/**
+ * L'eau suit le champ de bouees. Les nappes sont ancrees au bas de la scene, le
+ * champ au bas de la page : quand la page defile — ou que le journal reduit la
+ * hauteur de l'etape —, l'eau se decale d'autant, et chaque bouee reste sur sa
+ * vague. `translate` se compose avec la derive, qui anime `transform`. Ailleurs
+ * qu'a l'etape 1, l'eau reprend sa place.
+ */
+function majMaree() {
+  const scene = document.querySelector('.stage');
+  if (!scene) return;
+  const etape = document.querySelector('.s-step[data-s="1"]');
+  const zone = document.getElementById('buoysZone');
+  const actif = etape && !etape.hidden && !document.querySelector('.simple').hidden && zone?.offsetHeight > 0;
+  let decalage = 0;
+  if (actif) {
+    decalage = (zone.getBoundingClientRect().bottom - scene.getBoundingClientRect().bottom) / echelleCourante();
+    // La barre « Continuer » ne prend un fond que si quelque chose passe dessous.
+    const defile = etape.querySelector('.s-scroll');
+    etape.classList.toggle('deborde', defile.scrollHeight > defile.clientHeight + 1);
+  }
+  scene.style.setProperty('--maree', `${decalage.toFixed(1)}px`);
 }
 
 let minuteurBouees = 0;
@@ -2791,6 +2826,15 @@ window.addEventListener('resize', () => {
   cancelAnimationFrame(minuteurBouees);
   minuteurBouees = requestAnimationFrame(positionnerBouees);
 });
+let minuteurMaree = 0;
+document.querySelector('.s-step[data-s="1"] .s-scroll')?.addEventListener(
+  'scroll',
+  () => {
+    cancelAnimationFrame(minuteurMaree);
+    minuteurMaree = requestAnimationFrame(majMaree);
+  },
+  { passive: true },
+);
 
 function selectionnerChoix(id) {
   selectionSimpleId = id;
@@ -3298,13 +3342,19 @@ function rendreHistorique() {
 }
 
 function appliquerTraductionsReglages() {
+  // Textes fixes de la page : la cle est dans l'attribut data-i18n.
+  document.querySelectorAll('#settingsPage [data-i18n]').forEach((el) => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.getElementById('tbReglages').textContent = t('reglages.titre');
+  document.getElementById('rgRecherche').placeholder = t('reglages.rechercher');
   document.getElementById('setVisiteLabel').textContent = t('reglages.visite');
   document.getElementById('btnRevoirVisite').textContent = t('reglages.visite_btn');
   if (!document.getElementById('onboarding').hidden) rendreVisite();
 
   document.getElementById('setTitre').textContent = t('reglages.titre');
   document.getElementById('navGeneral').textContent = t('reglages.nav_general');
-  document.getElementById('navExpert').textContent = t('reglages.section_expert');
+  document.getElementById('navExpert').textContent = t('reglages.nav_execution');
   document.getElementById('navOutils').textContent = t('reglages.nav_outils');
   document.getElementById('navConfig').textContent = t('reglages.nav_config');
   document.getElementById('navHisto').textContent = t('reglages.nav_histo');
@@ -3338,7 +3388,8 @@ function appliquerTraductionsReglages() {
   document.getElementById('btnRappelFermer').textContent = t('rappel.fermer');
   document.getElementById('btnRappelInstaller').textContent = t('rappel.installer');
 
-  document.getElementById('setSectionExpert').textContent = t('reglages.section_expert');
+  document.getElementById('setSectionExpert').textContent = t('reglages.nav_execution');
+  document.getElementById('filExecution').textContent = t('reglages.nav_execution');
   document.getElementById('setEchecLabel').textContent = t('reglages.echec_comportement');
   document.querySelector('#setEchecSelect [value="continue"]').textContent = t('reglages.echec_continuer');
   document.querySelector('#setEchecSelect [value="stop"]').textContent = t('reglages.echec_arreter');
@@ -3351,20 +3402,24 @@ function appliquerTraductionsReglages() {
   if (aide) aide.dataset.tip = t('reglages.politique_aide');
   document.getElementById('setNumerosLabel').textContent = t('reglages.numeros_reglages');
   document.getElementById('setProtegesLabel').textContent = t('reglages.proteges');
-  document.getElementById('aideProteges').dataset.tip = t('reglages.proteges_aide');
-  document.getElementById('protegesIntegresTitre').textContent = t('reglages.proteges_integres');
-  document.getElementById('protegesAjoutsLabel').textContent = t('reglages.proteges_ajouts');
-  document.getElementById('btnProtegesEnregistrer').textContent = t('reglages.proteges_enregistrer');
   document.getElementById('protegesDroitsTexte').textContent = t('reglages.proteges_droits');
   document.getElementById('btnProtegesDroits').textContent = t('reglages.proteges_relancer');
+  document.getElementById('protegesAjoutChemin').placeholder = t('garde.ajouter_placeholder');
+  document.getElementById('btnProtegesAjouter').textContent = t('garde.ajouter');
+  rendreResumeProteges();
+  rendrePlanProteges();
   document.getElementById('setEchelleLabel').textContent = t('reglages.echelle');
-  document.getElementById('btnOuvrirDossierReglages').textContent = t('reglages.dossier_scripts');
-  document.getElementById('btnReanalyserReglages').textContent = t('reglages.reanalyser');
-  document.getElementById('btnRapportConformite').textContent = t('reglages.rapport_conformite');
-  document.getElementById('btnVoirHistorique').textContent = t('histo.voir');
-  document.getElementById('btnExporterConfig').textContent = t('reglages.export');
-  document.getElementById('btnImporterConfig').textContent = t('reglages.import');
-  document.getElementById('btnReinitialiserConfig').textContent = t('reglages.reinitialiser');
+  document.getElementById('btnOuvrirDossierReglages').textContent = t('reglages.btn_ouvrir');
+  document.getElementById('btnReanalyserReglages').textContent = t('reglages.btn_reanalyser');
+  document.getElementById('btnRapportConformite').textContent = t(
+    document.getElementById('conformiteZone').hidden ? 'reglages.btn_afficher' : 'reglages.btn_masquer',
+  );
+  document.getElementById('btnExporterConfig').textContent = t('reglages.btn_exporter');
+  document.getElementById('btnImporterConfig').textContent = t('reglages.btn_importer');
+  document.getElementById('btnReinitialiserConfig').textContent = t('reglages.btn_reinitialiser');
+  // Une recherche en cours se refait dans la nouvelle langue.
+  const recherche = document.getElementById('rgRecherche').value;
+  if (reglagesOuverts() && recherche.trim()) rechercherReglages(recherche);
 }
 
 /** Reflete `reglages` dans les commandes de l'ecran Reglages, sans rien
@@ -3395,65 +3450,19 @@ function appliquerNumerosReglages(actif) {
   if (bouton) bouton.setAttribute('aria-checked', String(!!actif));
 }
 
-/** `lib::EmplacementsProteges`, tel que lu a l'ouverture des Reglages. */
-let gardeActuelle = null;
+/* -------------------------------------------------------------------------
+   Reglages (specification §8) : une page de WinTool, pas une fenetre posee
+   dessus. La barre de titre reste active : Simple / Expert se change sans
+   quitter les reglages, et l'on reste sur la meme section — sauf si elle est
+   reservee au mode Expert et que l'on passe en Simple.
+   ------------------------------------------------------------------------- */
 
-/** Emplacements proteges (§12.4) : la liste integree, un interrupteur par
- *  emplacement, et les ajouts de l'utilisateur. Elle vit dans HKLM : sans droits
- *  administrateur, elle se lit mais ne se modifie pas. */
-async function rendreEmplacementsProteges() {
-  const liste = document.getElementById('protegesIntegres');
-  const zone = document.getElementById('protegesAjouts');
-  if (!liste || !zone) return;
-  try {
-    const p = await invoke('protected_paths');
-    gardeActuelle = p;
-    liste.innerHTML = p.integres
-      .map((i) => {
-        const badge = i.tres_sensible ? ` <span class="badge med">${esc(t('garde.tres_sensible'))}</span>` : '';
-        const chemins = i.chemins.length ? `<span class="mono muted">${esc(i.chemins.join(' · '))}</span>` : '';
-        return `<li class="protege-ligne">
-          <button class="switch" type="button" role="switch" data-protege="${esc(i.id)}"
-            aria-checked="${!p.retires.includes(i.id)}"${p.modifiable ? '' : ' disabled'}></button>
-          <span class="protege-texte"><span><b>${esc(t(`garde.id.${i.id}`))}</b>${badge}</span>${chemins}</span>
-        </li>`;
-      })
-      .join('');
-    zone.value = p.ajouts.join('\n');
-    zone.disabled = !p.modifiable;
-    document.getElementById('btnProtegesEnregistrer').hidden = !p.modifiable;
-    document.getElementById('protegesDroits').hidden = p.modifiable;
-    document.getElementById('protegesEtat').textContent = '';
-  } catch (e) {
-    console.error('Emplacements proteges :', e);
-  }
-}
+/** Section affichee : `general`, `catalogue`, `expert`, `proteges`, `outils`,
+ *  `config` ou `histo`. Gardee d'une ouverture a l'autre. */
+let sectionReglages = 'general';
 
-/** Identifiants des emplacements integres actuellement desactives. */
-function protegesRetires() {
-  return [...document.querySelectorAll('#protegesIntegres [data-protege]')]
-    .filter((b) => b.getAttribute('aria-checked') !== 'true')
-    .map((b) => b.dataset.protege);
-}
-
-async function enregistrerGarde(retires, ajouts) {
-  const etat = document.getElementById('protegesEtat');
-  try {
-    await invoke('set_protected_paths', { retires, ajouts });
-    await rendreEmplacementsProteges();
-    etat.textContent = t('reglages.proteges_enregistre');
-  } catch (e) {
-    const texte = String(e).replace(/^Error:\s*/, '');
-    if (texte.startsWith('CHEMIN_NON_ABSOLU:')) {
-      etat.textContent = t('reglages.proteges_non_absolu', { p: texte.slice('CHEMIN_NON_ABSOLU:'.length) });
-    } else if (texte === 'GARDE_SANS_DROITS') {
-      etat.textContent = t('reglages.proteges_droits');
-    } else {
-      etat.textContent = texte;
-    }
-    // L'affichage revient a ce qui est reellement enregistre.
-    await rendreEmplacementsProteges();
-  }
+function reglagesOuverts() {
+  return !document.getElementById('settingsPage').hidden;
 }
 
 function ouvrirReglages() {
@@ -3462,7 +3471,243 @@ function ouvrirReglages() {
   document.getElementById('exportResultat').hidden = true;
   document.getElementById('importResultat').hidden = true;
   document.getElementById('conformiteZone').hidden = true;
-  document.getElementById('settingsOverlay').hidden = false;
+  document.getElementById('btnRapportConformite').textContent = t('reglages.btn_afficher');
+  document.getElementById('protegesErreur').hidden = true;
+  document.getElementById('rgRecherche').value = '';
+  document.getElementById('settingsPage').hidden = false;
+  document.body.classList.add('reglages-ouverts');
+  document.getElementById('btnSettings').setAttribute('aria-pressed', 'true');
+  afficherSectionReglages(sectionReglages);
+}
+
+function fermerReglages() {
+  document.getElementById('settingsPage').hidden = true;
+  document.body.classList.remove('reglages-ouverts');
+  document.getElementById('btnSettings').setAttribute('aria-pressed', 'false');
+  // La fenetre a pu changer de taille pendant que la page couvrait la scene.
+  requestAnimationFrame(positionnerBouees);
+}
+
+/** Une section reservee au mode Expert n'existe pas en mode Simple. */
+function sectionVisible(id) {
+  const page = document.querySelector(`[data-rg-page="${id}"]`);
+  return !!page && !(modeCourant === 'simple' && page.classList.contains('only-expert'));
+}
+
+/** Affiche une section ; `ligne` (ex. « 3.2 ») la fait defiler jusqu'a ce
+ *  reglage, qui s'illumine un instant — c'est la qu'aboutit une recherche. */
+async function afficherSectionReglages(id, { ligne } = {}) {
+  if (!sectionVisible(id)) id = 'general';
+  sectionReglages = id;
+  document.querySelectorAll('[data-rg-page]').forEach((page) => {
+    page.hidden = page.dataset.rgPage !== id;
+  });
+  document.getElementById('rgResultats').hidden = true;
+  // La page du plan du disque appartient a la section 3.
+  const menu = id === 'proteges' ? 'expert' : id;
+  document.querySelectorAll('#setNav [data-rg-section]').forEach((b) => {
+    b.setAttribute('aria-current', b.dataset.rgSection === menu ? 'page' : 'false');
+  });
+  document.getElementById('setScroll').scrollTop = 0;
+  if (id === 'histo') {
+    await rafraichirHistorique();
+    rendreHistorique();
+  }
+  if (ligne) {
+    const el = document.querySelector(`[data-rg-page="${id}"] [data-num="${ligne}"]`);
+    if (el) {
+      el.scrollIntoView({ block: 'center' });
+      el.classList.remove('eclair');
+      void el.offsetWidth; // relance l'animation
+      el.classList.add('eclair');
+    }
+  }
+}
+
+const sansAccents = (texte) => texte.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/** Cherche dans les libelles et les explications des sections visibles : on
+ *  tape « journaux », on arrive au reglage 3.2. */
+function rechercherReglages(texte) {
+  const q = sansAccents(texte.trim());
+  if (!q) return void afficherSectionReglages(sectionReglages);
+  const trouves = [];
+  document.querySelectorAll('[data-rg-page]').forEach((page) => {
+    if (!sectionVisible(page.dataset.rgPage)) return;
+    const section = page.querySelector('.rg-h h1 span:not(.num)')?.textContent || '';
+    page.querySelectorAll('.setrow[data-num]').forEach((ligne) => {
+      const libelle = ligne.querySelector('.rg-libelle b')?.textContent.trim() || '';
+      const desc = ligne.querySelector('.desc')?.textContent.trim() || '';
+      if (sansAccents(`${libelle} ${desc}`).includes(q)) {
+        trouves.push({ page: page.dataset.rgPage, icone: page.dataset.rgIcone, section, num: ligne.dataset.num, libelle, desc });
+      }
+    });
+  });
+  document.querySelectorAll('[data-rg-page]').forEach((page) => {
+    page.hidden = true;
+  });
+  document.querySelectorAll('#setNav [data-rg-section]').forEach((b) => b.setAttribute('aria-current', 'false'));
+  const lignes = trouves
+    .map(
+      (r) => `
+      <button class="rg-resultat" type="button" data-rg-aller="${esc(r.page)}" data-rg-ligne="${esc(r.num)}">
+        <span class="rg-i"><svg class="ico i17" aria-hidden="true"><use href="#${esc(r.icone)}" /></svg></span>
+        <span class="rg-resultat-txt"><small>${esc(r.section)}</small>
+          <b><span class="num">${esc(r.num)}</span> ${esc(r.libelle)}</b><small>${esc(r.desc)}</small></span>
+        <svg class="ico i16" aria-hidden="true"><use href="#chevron-right" /></svg>
+      </button>`,
+    )
+    .join('');
+  const zone = document.getElementById('rgResultats');
+  zone.innerHTML = `
+    <header class="rg-h">
+      <span class="rg-gi"><svg class="ico i24" aria-hidden="true"><use href="#search" /></svg></span>
+      <div><h1>« ${esc(texte.trim())} »</h1>
+        <p>${esc(trouves.length ? PLURIEL('reglages.resultats', trouves.length) : t('reglages.resultats_aucun'))}</p></div>
+    </header>
+    <div class="rg-cartes">${lignes || `<p class="rg-vide">${esc(t('reglages.resultats_aide'))}</p>`}</div>`;
+  zone.hidden = false;
+  document.getElementById('setScroll').scrollTop = 0;
+}
+
+/** `lib::EmplacementsProteges`, tel que lu a l'ouverture des Reglages. */
+let gardeActuelle = null;
+
+/** Emplacements proteges (§12.4) : une ligne de resume dans la section 3, le
+ *  plan du disque dans sa propre page. La liste vit dans HKLM : sans droits
+ *  administrateur, elle se lit mais ne se modifie pas. */
+async function rendreEmplacementsProteges() {
+  try {
+    gardeActuelle = await invoke('protected_paths');
+  } catch (e) {
+    console.error('Emplacements proteges :', e);
+    return;
+  }
+  rendreResumeProteges();
+  rendrePlanProteges();
+}
+
+/** La ligne 3.5 : verte si tout est protege, orange — avec les noms — sinon. */
+function rendreResumeProteges() {
+  const p = gardeActuelle;
+  if (!p) return;
+  const retires = p.integres.filter((i) => p.retires.includes(i.id));
+  document.getElementById('protegesResume').classList.toggle('alerte', retires.length > 0);
+  document.getElementById('protegesResumeIcone').setAttribute('href', retires.length ? '#shield-off' : '#shield-check');
+  const ajouts = p.ajouts.length ? PLURIEL('garde.ajouts', p.ajouts.length) : t('garde.ajouts_aucun');
+  document.getElementById('protegesResumeTexte').textContent = retires.length
+    ? `${PLURIEL('garde.resume_retires', retires.length)} : ${retires.map((i) => t(`garde.court.${i.id}`)).join(', ')}`
+    : t('garde.resume_ok', { n: p.integres.length, ajouts });
+}
+
+/** Le plan du disque : ou un script peut agir, et ou il ne le peut pas. Un
+ *  bouclier par emplacement protege ; le profil de l'utilisateur et le profil
+ *  public, autorises, montrent pourquoi C:\Users est protege sans l'etre pour
+ *  lui. Les ajouts se rangent sous leur lecteur. */
+function rendrePlanProteges() {
+  const p = gardeActuelle;
+  if (!p) return;
+  const integre = Object.fromEntries(p.integres.map((i) => [i.id, i]));
+  const actif = (id) => !p.retires.includes(id);
+  const nom = (chemin) => chemin.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || chemin;
+  const icone = (n) => `<svg class="ico i14" aria-hidden="true"><use href="#${n}" /></svg>`;
+  const lignes = [];
+  const etat = (id) => {
+    const on = actif(id);
+    return `<button class="etat ${on ? 'on' : 'off'}" type="button" data-garde-bascule="${esc(id)}"
+      aria-pressed="${on}"${p.modifiable ? '' : ' disabled'}>${icone(on ? 'shield-check' : 'shield-off')}${esc(
+        t(on ? 'garde.protege' : 'garde.ouvert'),
+      )}</button>`;
+  };
+  const libre = `<span class="etat libre">${esc(t('garde.autorise'))}</span>`;
+  const noeud = (niveau, ic, titre, sous, droite, { id, cls = '' } = {}) => {
+    const off = id && !actif(id);
+    const tres = id && integre[id]?.tres_sensible;
+    lignes.push(`<li class="d-noeud n${niveau} ${cls}${off ? ' off' : ''}">
+      <span class="d-ico">${icone(off ? 'shield-off' : ic)}</span>
+      <span class="d-nom"><b>${esc(titre)}</b>${
+        tres ? `<span class="cadenas" data-tip="${esc(t('garde.tres_sensible'))}">${icone('lock')}</span>` : ''
+      }${sous ? `<span class="muted">${esc(sous)}</span>` : ''}</span>
+      <span class="d-droite">${droite}</span>
+      ${off && tres ? `<span class="d-alerte">${icone('warn')} ${esc(t('garde.alerte_ouvert'))}</span>` : ''}
+    </li>`);
+  };
+  const ajout = (chemin, k, titre) =>
+    noeud(
+      1,
+      'folder',
+      titre,
+      t('garde.votre_ajout'),
+      `<span class="etat on">${icone('shield-check')}${esc(t('garde.protege'))}</span>
+       <button class="x" type="button" data-garde-retirer="${k}" aria-label="${esc(t('garde.retirer_ajout', { p: chemin }))}"${
+         p.modifiable ? '' : ' disabled'
+       }>${icone('x')}</button>`,
+    );
+
+  const lecteur = p.lecteur || 'C:';
+  const surLecteur = (c) => c.toLowerCase().startsWith(`${lecteur.toLowerCase()}\\`);
+  noeud(0, 'hard-drive', `${lecteur}\\`, t('garde.sous_racines'), etat('racines_lecteurs'), { id: 'racines_lecteurs', cls: 'lecteur' });
+  const windows = integre.windows?.chemins[0];
+  if (windows) noeud(1, 'monitor', nom(windows), '', etat('windows'), { id: 'windows' });
+  const pf = integre.program_files?.chemins || [];
+  if (pf.length) {
+    const autres = pf.length > 1 ? t('garde.et', { x: pf.slice(1).map(nom).join(', ') }) : '';
+    noeud(1, 'package', nom(pf[0]), autres, etat('program_files'), { id: 'program_files' });
+  }
+  const installation = integre.installation?.chemins[0];
+  if (installation) {
+    const dansPf = pf.some((d) => installation.toLowerCase().startsWith(`${d.toLowerCase()}\\`));
+    noeud(dansPf ? 2 : 1, 'logo', nom(installation), dansPf ? '' : installation, etat('installation'), { id: 'installation' });
+  }
+  const programData = integre.program_data?.chemins[0];
+  if (programData) noeud(1, 'database', nom(programData), '', etat('program_data'), { id: 'program_data' });
+  const profils = integre.profils?.chemins[0];
+  if (profils) {
+    noeud(1, 'users', nom(profils), t('garde.sous_profils'), etat('profils'), { id: 'profils' });
+    if (p.profil) noeud(2, 'user', t('garde.votre_profil'), nom(p.profil), libre, { cls: 'libre' });
+    if (p.public) noeud(2, 'users', nom(p.public), '', libre, { cls: 'libre' });
+  }
+  const reserves = integre.racine_systeme?.chemins || [];
+  if (reserves.length) {
+    const exemples = `${reserves.slice(0, 2).map(nom).join(', ')}${reserves.length > 2 ? '…' : ''}`;
+    noeud(1, 'folder-lock', t('garde.dossiers_reserves'), exemples, etat('racine_systeme'), { id: 'racine_systeme' });
+  }
+  p.ajouts.forEach((c, k) => {
+    if (surLecteur(c)) ajout(c, k, c.slice(lecteur.length + 1));
+  });
+  lignes.push(`<li class="d-noeud n1 reste"><span class="d-reste">${esc(t('garde.ailleurs'))}</span></li>`);
+  const ailleurs = p.ajouts.map((c, k) => [c, k]).filter(([c]) => !surLecteur(c));
+  if (ailleurs.length) {
+    noeud(0, 'hard-drive', t('garde.autres_lecteurs'), '', '', { cls: 'lecteur' });
+    for (const [c, k] of ailleurs) ajout(c, k, c);
+  }
+  document.getElementById('protegesPlan').innerHTML = lignes.join('');
+  document.getElementById('protegesDroits').hidden = p.modifiable;
+  document.getElementById('protegesAjout').hidden = !p.modifiable;
+}
+
+/** Enregistre aussitot, comme tous les reglages. Vrai si c'est fait. */
+async function enregistrerGarde(retires, ajouts) {
+  const erreur = document.getElementById('protegesErreur');
+  try {
+    await invoke('set_protected_paths', { retires, ajouts });
+    erreur.hidden = true;
+    return true;
+  } catch (e) {
+    const texte = String(e).replace(/^Error:\s*/, '');
+    if (texte.startsWith('CHEMIN_NON_ABSOLU:')) {
+      erreur.textContent = t('reglages.proteges_non_absolu', { p: texte.slice('CHEMIN_NON_ABSOLU:'.length) });
+    } else if (texte === 'GARDE_SANS_DROITS') {
+      erreur.textContent = t('reglages.proteges_droits');
+    } else {
+      erreur.textContent = texte;
+    }
+    erreur.hidden = false;
+    return false;
+  } finally {
+    // L'affichage revient a ce qui est reellement enregistre.
+    await rendreEmplacementsProteges();
+  }
 }
 
 /** Rejoue tout ce que la langue affecte : chrome fixe, colonne Expert, detail,
@@ -3520,7 +3765,7 @@ function cablerOnboarding() {
   };
   document.getElementById('btnOnbPasser').onclick = terminerVisite;
   document.getElementById('btnRevoirVisite').onclick = () => {
-    document.getElementById('settingsOverlay').hidden = true;
+    fermerReglages();
     ouvrirVisite({ depuisReglages: true });
   };
 }
@@ -3684,10 +3929,39 @@ async function rendreVisite() {
 }
 
 function cablerReglages() {
-  document.getElementById('btnSettings').onclick = ouvrirReglages;
-  document.getElementById('btnFermerReglages').onclick = () => {
-    document.getElementById('settingsOverlay').hidden = true;
-  };
+  // La roue dentee ouvre et referme ; elle reste allumee tant que la page est
+  // ouverte. « Retour » et Echap ramenent la ou l'on etait.
+  document.getElementById('btnSettings').onclick = () => (reglagesOuverts() ? fermerReglages() : ouvrirReglages());
+  document.getElementById('btnFermerReglages').onclick = fermerReglages;
+  // Menu, fil d'Ariane du plan du disque, resultats de recherche : delegation.
+  document.getElementById('settingsPage').addEventListener('click', (ev) => {
+    const section = ev.target.closest('[data-rg-section]');
+    if (section) {
+      document.getElementById('rgRecherche').value = '';
+      return void afficherSectionReglages(section.dataset.rgSection);
+    }
+    const resultat = ev.target.closest('[data-rg-aller]');
+    if (resultat) {
+      document.getElementById('rgRecherche').value = '';
+      afficherSectionReglages(resultat.dataset.rgAller, { ligne: resultat.dataset.rgLigne });
+    }
+  });
+  document.getElementById('rgRecherche').addEventListener('input', (ev) => rechercherReglages(ev.target.value));
+  // Echap : d'abord la recherche, puis la page du plan, puis les reglages. Une
+  // fenetre ouverte par-dessus (approbation, choix d'icone…) passe avant.
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape' || !reglagesOuverts()) return;
+    if (document.querySelector('.backdrop:not([hidden])')) return;
+    const recherche = document.getElementById('rgRecherche');
+    if (recherche.value) {
+      recherche.value = '';
+      afficherSectionReglages(sectionReglages);
+    } else if (sectionReglages === 'proteges') {
+      afficherSectionReglages('expert');
+    } else {
+      fermerReglages();
+    }
+  });
 
   document.querySelectorAll('#setThemeSeg [data-set-theme]').forEach((b) => {
     b.onclick = async () => {
@@ -3723,24 +3997,51 @@ function cablerReglages() {
   document.getElementById('setPolitiqueSelect').onchange = async (ev) => {
     reglagesActuels = await invoke('set_exec_policy', { policy: ev.target.value });
   };
-  document.getElementById('btnProtegesEnregistrer').onclick = () =>
-    enregistrerGarde(protegesRetires(), document.getElementById('protegesAjouts').value.split(/\r?\n/));
-  // Un interrupteur s'enregistre aussitot, comme les autres reglages. Retirer un
-  // emplacement tres sensible se confirme : c'est le seul geste de cette liste
-  // qui affaiblit la protection.
-  document.getElementById('protegesIntegres').addEventListener('click', async (ev) => {
-    const b = ev.target.closest('[data-protege]');
-    if (!b || b.disabled) return;
-    const protege = b.getAttribute('aria-checked') === 'true';
-    const integre = gardeActuelle?.integres.find((i) => i.id === b.dataset.protege);
-    if (protege && integre?.tres_sensible) {
-      if (!confirm(t('reglages.proteges_confirmer', { nom: t(`garde.id.${integre.id}`) }))) return;
+  document.getElementById('btnProtegesGerer').onclick = () => afficherSectionReglages('proteges');
+  // Chaque geste s'enregistre aussitot, comme les autres reglages. Retirer un
+  // emplacement tres sensible se confirme : c'est le geste qui affaiblit le
+  // plus la protection.
+  document.getElementById('protegesPlan').addEventListener('click', async (ev) => {
+    const p = gardeActuelle;
+    if (!p) return;
+    const bascule = ev.target.closest('[data-garde-bascule]');
+    if (bascule && !bascule.disabled) {
+      const id = bascule.dataset.gardeBascule;
+      const protege = !p.retires.includes(id);
+      const integre = p.integres.find((i) => i.id === id);
+      if (protege && integre?.tres_sensible && !confirm(t('reglages.proteges_confirmer', { nom: t(`garde.id.${id}`) }))) {
+        return;
+      }
+      const retires = protege ? [...p.retires, id] : p.retires.filter((r) => r !== id);
+      return void (await enregistrerGarde(retires, p.ajouts));
     }
-    b.setAttribute('aria-checked', String(!protege));
-    await enregistrerGarde(protegesRetires(), gardeActuelle?.ajouts || []);
+    const retirer = ev.target.closest('[data-garde-retirer]');
+    if (retirer && !retirer.disabled) {
+      const k = Number(retirer.dataset.gardeRetirer);
+      await enregistrerGarde(p.retires, p.ajouts.filter((_, i) => i !== k));
+    }
+  });
+  document.getElementById('protegesAjout').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const p = gardeActuelle;
+    const champ = document.getElementById('protegesAjoutChemin');
+    const chemin = champ.value.trim();
+    const erreur = document.getElementById('protegesErreur');
+    if (!p || !chemin) return;
+    // Dit tout de suite, sous le champ, ce que garde::absolu refuserait.
+    let probleme = '';
+    if (!/^[A-Za-z]:[\\/]/.test(chemin)) probleme = t('reglages.proteges_non_absolu', { p: chemin });
+    else if (p.ajouts.some((a) => a.toLowerCase() === chemin.toLowerCase())) probleme = t('garde.deja', { p: chemin });
+    if (probleme) {
+      erreur.textContent = probleme;
+      erreur.hidden = false;
+      return;
+    }
+    if (await enregistrerGarde(p.retires, [...p.ajouts, chemin])) champ.value = '';
+    champ.focus();
   });
   document.getElementById('btnProtegesDroits').onclick = () => {
-    document.getElementById('settingsOverlay').hidden = true;
+    fermerReglages();
     ouvrirFenetreDroits();
   };
   document.getElementById('setNumerosToggle').onclick = async (ev) => {
@@ -3773,19 +4074,11 @@ function cablerReglages() {
     setTimeout(() => { bouton.textContent = avant; }, 2600);
   };
 
-  document.getElementById('btnRapportConformite').onclick = () => {
+  document.getElementById('btnRapportConformite').onclick = (ev) => {
     const zone = document.getElementById('conformiteZone');
     zone.hidden = !zone.hidden;
+    ev.currentTarget.textContent = t(zone.hidden ? 'reglages.btn_afficher' : 'reglages.btn_masquer');
     if (!zone.hidden) rendreRapportConformite();
-  };
-
-  document.getElementById('btnVoirHistorique').onclick = async () => {
-    const zone = document.getElementById('historiqueZone');
-    zone.hidden = !zone.hidden;
-    if (!zone.hidden) {
-      await rafraichirHistorique();
-      rendreHistorique();
-    }
   };
 
   document.getElementById('btnExporterConfig').onclick = async () => {

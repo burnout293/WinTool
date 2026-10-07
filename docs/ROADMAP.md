@@ -10,7 +10,8 @@ d'un cran (1.1, 1.2…), une version de corrections seules prend un troisième c
 | **1.0.0** | Première version publiée | Publiée le 27/09/2026 |
 | **1.1** | Mise à jour automatique de WinTool | Publiée le 06/10/2026 |
 | **1.1.1** | Simulation réglable script par script, bouées posées sur la vague, rangées multiples — et premier test réel de la mise à jour automatique | Publiée le 06/10/2026 |
-| **1.2** | Les scripts quittent WinTool : catalogue officiel dans son propre dépôt (MIT), index signé, installation et mises à jour depuis l'application (§16) ; durcissement (§12.4) ; visite du premier démarrage (§13) ; désinstallation au choix | Prête — le catalogue est publié |
+| **1.2** | Les scripts quittent WinTool : catalogue officiel dans son propre dépôt (MIT), index signé, installation et mises à jour depuis l'application (§16) ; durcissement (§12.4) ; visite du premier démarrage (§13) ; désinstallation au choix | Publiée le 06/10/2026 |
+| **1.2.1** | Réglages en page entière, une section par page, recherche, Simple / Expert sans les quitter (§8) ; emplacements protégés : résumé et plan du disque ; écran « Choisir » : le champ de bouées défile au lieu de se défaire, « Continuer » collé en bas (§15.2) | Prête |
 | **1.3** | Analyser → cocher → nettoyer (§17) | Contrat script prêt, interface à faire |
 | **1.4** | Catégories distinctes des lots, onglets Scripts / Lots en Expert | À faire |
 | **1.5** | Témoin des changements sensibles (voir ci-dessous) | À faire |
@@ -58,18 +59,6 @@ PowerShell téléchargé auprès de n'importe qui, exécuté en administrateur.
 
 ## Idées pour plus tard
 
-- **Réglages en pleine page.** Une page de WinTool comme Simple et Expert, une page par
-  section, une recherche ; la barre de titre reste active, donc Simple / Expert se change
-  sans fermer les réglages. Deux dispositions dans `docs/mockups/reglages-page.html`
-  (barre latérale ou accueil en tuiles) ; choix à faire.
-- **Refaire le réglage 3.5 (emplacements protégés) — choix : A + D.** Une ligne de résumé
-  dans les réglages, le plan du disque dans sa propre page
-  (`docs/mockups/emplacements-proteges.html`). Plus de zone de texte ni de bouton
-  « Enregistrer ».
-- **Les lots quand la place manque.** À partir d'une douzaine de lots, l'écran « Choisir »
-  repasse en rangées ordinaires derrière une vague restée en bas de la fenêtre : désordre
-  dès la taille d'ouverture. Quatre propositions, toutes avec « Continuer » collé en bas,
-  dans `docs/mockups/lots-ecrans-reduits.html` ; choix à faire.
 - **Exceptions par script aux emplacements protégés.** La liste reste la même pour tous,
   mais tel script — « vérifier les fichiers de Windows » — a le droit de recevoir
   `C:\Windows`, sans ouvrir la porte aux autres. Même rangement que la liste (`HKLM`,

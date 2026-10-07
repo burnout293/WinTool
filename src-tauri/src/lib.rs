@@ -382,20 +382,29 @@ struct EmplacementsProteges {
     /// Faux sans droits administrateur : la liste se lit, elle ne se modifie
     /// pas (elle vit dans HKLM).
     modifiable: bool,
+    /// Le lecteur du systeme (`C:`), le profil de l'utilisateur et le profil
+    /// public : le plan du disque des Reglages les montre comme autorises.
+    lecteur: String,
+    profil: Option<String>,
+    public: String,
 }
 
 /// Les emplacements proteges, pour les Reglages.
 #[tauri::command]
-fn protected_paths() -> EmplacementsProteges {
+fn protected_paths(app: tauri::AppHandle) -> EmplacementsProteges {
     let installation = std::env::current_exe()
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_path_buf()));
     let config = garde::charger();
+    let e = systeme::emplacements();
     EmplacementsProteges {
-        integres: garde::integres(systeme::emplacements(), installation.as_deref()),
+        integres: garde::integres(e, installation.as_deref()),
         retires: config.retires,
         ajouts: config.ajouts,
         modifiable: is_elevated(),
+        lecteur: e.lecteur.clone(),
+        profil: app.path().home_dir().ok().map(|p| p.display().to_string()),
+        public: e.public.display().to_string(),
     }
 }
 

@@ -573,6 +573,33 @@ réellement.
 Une personne à qui l'on a installé l'outil peut éclaircir ou agrandir son interface sans
 jamais croiser un réglage qu'elle pourrait casser.
 
+**Une page de WinTool, pas une fenêtre posée dessus** (1.2.1). Les réglages couvrent la
+scène, sous la barre de titre, qui reste active : **Simple / Expert se change sans quitter
+les réglages**, et l'on reste sur la même section — sauf si elle est réservée au mode Expert
+et que l'on passe en Simple, auquel cas on revient au Général. Jusqu'à la 1.2.0, ils
+s'ouvraient dans une fenêtre qui recouvrait la barre de titre : il fallait les fermer pour
+changer de mode, puis les rouvrir.
+
+- **Une section à la fois**, choisie dans un menu à gauche — fini la longue liste qui
+  défile, où l'on se perdait. Les sections du mode Expert n'apparaissent pas en mode Simple.
+- **Une carte par réglage** : le libellé, une phrase d'explication, la commande à droite.
+- **Une recherche** dans les libellés et les explications : « journaux » mène au réglage
+  3.2, qui s'illumine un instant.
+- **L'historique s'affiche directement** dans sa page.
+- **Retour** : le bouton, la roue dentée — allumée tant que la page est ouverte — ou Échap,
+  qui referme d'abord la recherche, puis la page du plan du disque.
+- La section 3 s'appelle **« Exécution »** : « Mode Expert » nommait la section par son
+  public, alors que le menu le dit déjà. Les numéros ne changent pas.
+
+**Emplacements protégés (3.5).** Une ligne de résumé — verte si tout est protégé, orange
+avec le nom de ce qui ne l'est plus — et un bouton « Gérer », qui ouvre **le plan du
+disque** : l'arborescence du lecteur système, un bouclier sur chaque emplacement protégé,
+« Autorisé » sur le profil de l'utilisateur et le profil public, « Partout ailleurs :
+autorisé », les ajouts rangés sous leur lecteur. On y voit pourquoi `C:\Users` est protégé
+sans l'être pour soi. Chaque geste s'enregistre aussitôt ; un chemin incomplet est refusé
+sous le champ, au moment de la saisie ; retirer un emplacement très sensible se confirme.
+Sans droits administrateur, un bandeau unique remplace les commandes.
+
 **Configuration d'usine** : l'application est livrée avec des catégories prêtes à l'emploi,
 « Entretien complet » épinglée incluse, aux noms déjà grand public.
 **Export / import** : toute la configuration tient dans un fichier, réimportable — on
@@ -954,7 +981,7 @@ Les lots étant créés librement par l'utilisateur (§4.1), leur nombre est var
   mouvement** : chaque bouée oscille à la cadence de sa vague, déphasée selon sa position
   (§15.3). Elles ne se placent jamais par rapport au titre : avant la 1.1.1, c'est ce qui
   les faisait flotter à mi-hauteur, loin de l'eau, sur un grand écran.
-- **Autant de bouées par ligne d'eau que la largeur le permet** — 150 px chacune au
+- **Autant de bouées par ligne d'eau que la largeur le permet** — 170 px chacune au
   moins —, **huit au plus**. Au-delà, une **ligne d'eau de plus apparaît derrière**, plus
   haut : les rangées s'étagent vers le large, chacune sur sa propre vague, plus lente et
   plus calme que celle de devant. L'ordre des lots se lit de haut en bas.
@@ -962,9 +989,19 @@ Les lots étant créés librement par l'utilisateur (§4.1), leur nombre est var
   devant celles de derrière. Les vagues dérivant à des vitesses différentes, tous les
   déphasages finissent par se produire ; dans le pire, une étiquette ne tombe pas sur un
   flotteur.
-- **Fenêtre trop basse** pour poser toutes les rangées sur l'eau sans recouvrir le titre
-  ni le lot épinglé : les bouées reviennent dans le flux de la page, qui défile. Rien n'est
-  jamais inaccessible, et rien ne recouvre le reste.
+- **Fenêtre trop basse** pour tout montrer : le champ ne change pas de forme. Il se pose
+  sous le lot épinglé, la page défile, et **l'eau défile avec lui** — les nappes, ancrées au
+  bas de la scène, se décalent d'autant (`translate`, qui se compose avec la dérive). Jusqu'à
+  la 1.2.0, les bouées revenaient alors en rangées ordinaires dans le flux, et la vague,
+  restée au bas de la fenêtre, passait au hasard derrière elles : désordre dès la taille
+  d'ouverture avec une douzaine de lots.
+- **« Continuer » reste collé au bas de l'écran**, avec ce qui est choisi (« Choisi : Vie
+  privée · 4 min ») : la bouée choisie peut avoir défilé hors de vue. Le bandeau ne prend un
+  fond que si quelque chose passe dessous — opaque, sans flou, qui recalculerait l'eau
+  animée à chaque image.
+- Chaque nappe arrière descend **jusqu'au bas de la scène** : posée plus haut, son bord
+  inférieur traçait une bande plate au milieu de l'eau de devant. L'eau fonce donc avec la
+  profondeur.
 
 La position de chaque bouée se calcule à partir de la fonction de la vague et de sa
 position mesurée — jamais codée en dur. Vérifié sur le banc : à trois instants espacés de

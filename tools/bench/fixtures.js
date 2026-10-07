@@ -397,6 +397,9 @@
       retires: garde.retires,
       ajouts: garde.ajouts,
       modifiable: !new URLSearchParams(location.search).has('sansadmin'),
+      lecteur: 'C:',
+      profil: 'C:\\Users\\Buly',
+      public: 'C:\\Users\\Public',
     }),
     set_protected_paths: (a) => {
       if (new URLSearchParams(location.search).has('sansadmin')) throw new Error('GARDE_SANS_DROITS');

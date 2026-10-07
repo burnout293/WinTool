@@ -56,6 +56,26 @@ const SPRITE = {
   // Bulle d'aide : sert partout ou un reglage a besoin d'etre explique sans
   // allonger son libelle (ex. la politique d'execution PowerShell).
   help: 'circle-help',
+  // Reglages en page entiere : une icone par section (specification 8).
+  'sec-general': 'sliders-horizontal',
+  'sec-catalogue': 'package',
+  'sec-execution': 'terminal',
+  'sec-outils': 'wrench',
+  'sec-config': 'save',
+  'sec-histo': 'history',
+  'chevron-right': 'chevron-right',
+  // Plan du disque des emplacements proteges (specification 12.4).
+  'shield-check': 'shield-check',
+  'shield-off': 'shield-off',
+  lock: 'lock',
+  'hard-drive': 'hard-drive',
+  monitor: 'monitor',
+  package: 'package',
+  database: 'database',
+  users: 'users',
+  user: 'user',
+  'folder-lock': 'folder-lock',
+  'folder-plus': 'folder-plus',
 };
 
 if (!existsSync(source)) {
