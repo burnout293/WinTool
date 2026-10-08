@@ -76,6 +76,14 @@ const SPRITE = {
   user: 'user',
   'folder-lock': 'folder-lock',
   'folder-plus': 'folder-plus',
+  // Ecran d'analyse (specification 17) : une icone par genre d'element trouve.
+  file: 'file',
+  globe: 'globe',
+  power: 'power',
+  'calendar-clock': 'calendar-clock',
+  cpu: 'cpu',
+  info: 'info',
+  scan: 'scan-search',
 };
 
 if (!existsSync(source)) {

@@ -324,6 +324,61 @@ pub fn preparer_environnement_enfants(
     noms_corriges
 }
 
+/// Place sur le disque du systeme (panneau « Espace disque » de l'Expert, §17).
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct EspaceDisque {
+    /// `C:`
+    pub lecteur: String,
+    pub total: u64,
+    /// Ce que le compte courant peut encore ecrire.
+    pub libre: u64,
+}
+
+#[cfg(windows)]
+#[link(name = "kernel32")]
+extern "system" {
+    fn GetDiskFreeSpaceExW(
+        dossier: *const u16,
+        libre_appelant: *mut u64,
+        total: *mut u64,
+        libre_total: *mut u64,
+    ) -> i32;
+}
+
+/// Lit la place du disque du systeme. Une lecture, rien de plus.
+pub fn espace_disque() -> Result<EspaceDisque, String> {
+    let lecteur = emplacements().lecteur.clone();
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        let racine: Vec<u16> = std::ffi::OsStr::new(&format!("{lecteur}\\"))
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        let (mut libre, mut total, mut libre_total) = (0u64, 0u64, 0u64);
+        // SAFETY : chaine UTF-16 terminee par un zero, et trois pointeurs vers des
+        // u64 vivants pendant tout l'appel ; la fonction n'en garde aucun.
+        let ok = unsafe {
+            GetDiskFreeSpaceExW(racine.as_ptr(), &mut libre, &mut total, &mut libre_total)
+        };
+        if ok == 0 {
+            return Err(format!(
+                "place du disque {lecteur} illisible : {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        Ok(EspaceDisque {
+            lecteur,
+            total,
+            libre,
+        })
+    }
+    #[cfg(not(windows))]
+    {
+        Err(format!("place du disque {lecteur} : Windows seulement"))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -398,6 +453,12 @@ mod tests {
         assert!(e.program_files.is_dir());
         assert!(e.profils.is_dir());
         assert_eq!(e.lecteur.len(), 2);
+    }
+
+    #[test]
+    fn lit_la_place_du_disque_du_systeme() {
+        let d = espace_disque().expect("place illisible");
+        assert!(d.total > 0 && d.libre <= d.total, "{d:?}");
     }
 
     #[test]

@@ -161,7 +161,14 @@ pub struct Settings {
     /// version ajoute arrivent coches ; on ne retient que les refus.
     #[serde(default)]
     pub sources_exclus: BTreeMap<String, Vec<String>>,
+    /// Graphique du resume de l'analyse en mode Simple (§17) : `donut`, `bar`,
+    /// `rows`, `treemap`, `waffle` ou `gauge`. Vide : l'anneau.
+    #[serde(default)]
+    pub analysis_chart: String,
 }
+
+/// Graphiques proposes pour le resume de l'analyse.
+pub const GRAPHIQUES_ANALYSE: [&str; 6] = ["donut", "bar", "rows", "treemap", "waffle", "gauge"];
 
 /// Valeurs admises pour `catalogue_source` une fois la decision prise.
 pub const SOURCES_CATALOGUE: [&str; 2] = ["official", "none"];
@@ -285,6 +292,7 @@ pub fn default_settings(factory: Vec<Lot>) -> Settings {
         catalogue_reminder_hidden: false,
         sources_inactives: Vec::new(),
         sources_exclus: BTreeMap::new(),
+        analysis_chart: String::new(),
     }
 }
 

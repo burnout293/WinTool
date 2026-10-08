@@ -1020,7 +1020,9 @@ fn preparer(
         titre: entree.meta.title,
         hash: entree.hash,
         engine: entree.meta.engine,
-        interruptible: entree.meta.interruptible,
+        // Une analyse ne modifie rien par contrat : elle s'arrete a tout
+        // instant, sans la precaution du §6.3 (§17.5).
+        interruptible: entree.meta.interruptible || analyse,
         analyse,
     };
     Ok(cible)

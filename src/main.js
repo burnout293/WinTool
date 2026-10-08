@@ -7,6 +7,7 @@
  */
 
 import { t, setLang, currentLang } from './i18n.js';
+import * as A from './analyse.js';
 
 const invoke = window.__TAURI__.core.invoke;
 const ecouter = window.__TAURI__.event.listen;
@@ -206,6 +207,13 @@ function scriptActif(entree) {
  *  compter, annoncer ni estimer sur les autres. */
 function scriptsActifs(groupe) {
   return groupe.scripts.filter(scriptActif);
+}
+
+/** Ceux que le mode Simple montre et lance : une action qui se declare
+ *  reservee a l'Expert (`show : expert`, §17) n'y est ni montree ni lancee —
+ *  un debutant ne lance pas ce qu'il n'a pas pu voir. */
+function scriptsSimples(groupe) {
+  return scriptsActifs(groupe).filter((s) => s.meta.show !== 'expert');
 }
 
 /** Champ de l'override correspondant a chaque booleen WinTool (specification 4.2). */
@@ -531,6 +539,10 @@ async function rendreCarte(entree, { sousBadges = '' } = {}) {
           <div class="card-path">${esc(entree.path)} · v${esc(m.version || '?')} · ${esc(entree.hash.slice(0, 8))}</div>
         </div>
         <div class="card-actions">
+          ${m.scan
+            ? `<button class="btn" type="button" data-analyser="${esc(entree.id)}"
+                       data-tip="${esc(t('an.analyser_tip'))}" ${manque ? 'disabled' : ''}>${esc(t('an.analyser'))}</button>`
+            : ''}
           <button class="btn" type="button" data-verifier="${esc(entree.id)}"
                   data-tip="${esc(t('action.verifier_tip'))}">${esc(t('action.verifier'))}</button>
           <button class="btn primary" type="button" data-run="${esc(entree.id)}"
@@ -543,6 +555,7 @@ async function rendreCarte(entree, { sousBadges = '' } = {}) {
       ${options}
       ${rendreAnomalies(m)}
       <div class="verif" id="verif-${esc(entree.id)}" hidden></div>
+      ${zoneAnalyseExpert(entree)}
     </article>`;
 }
 
@@ -2286,12 +2299,12 @@ function afficherVerdict(fin) {
     titre = t('verdict.interrompu');
   } else if (fin.success) {
     ton = 'ok';
-    titre = t('verdict.termine');
+    titre = t(fin.analysis ? 'verdict.analyse_terminee' : 'verdict.termine');
   } else {
     ton = 'bad';
     // Le verdict vient du code de sortie, jamais du fait que le script a
     // demarre. C'est le defaut de la v3 que corrige cette ligne.
-    titre = t('verdict.echec');
+    titre = t(fin.analysis ? 'verdict.analyse_echec' : 'verdict.echec');
   }
 
   // Le bloc disait « Echec — code de sortie 1 · 3 reussites · 1 erreur »
@@ -2439,7 +2452,8 @@ async function lancer(id) {
         // fichier modifie depuis, plutot que d'executer autre chose que ce
         // que l'interface a montre.
         expected_hash: entree.hash,
-        config: lireConfig(carte),
+        // Apres une analyse, ce qui est coche part avec le reste (§17).
+        config: { ...lireConfig(carte), ...configAnalysePour(entree) },
         policy: reglagesActuels?.exec_policy || null,
       },
     });
@@ -2498,6 +2512,8 @@ function journaliserRefus(entree, message) {
 function messageLancement(brut, entree) {
   const texte = String(brut).replace(/^Error:\s*/, '');
   if (texte.includes('SANS_SIMULATION')) return t('simulation.script_refuse');
+  if (texte.includes('ANALYSE_PERIMEE')) return t('an.perimee');
+  if (texte.includes('SANS_ANALYSE')) return t('an.sans_analyse');
   if (texte.includes('APPROBATION_SANS_DROITS')) return t('droits.approbation_impossible');
   // Garde des reglages (§12.4) : `REGLAGE_REFUSE:<nature>:<cle>:<detail>`. Le
   // detail peut contenir des deux-points (un chemin) : on ne coupe qu'aux trois
@@ -2562,14 +2578,32 @@ async function cablerMoteur() {
   await ecouter('script:line', ({ payload }) => {
     if (!course || payload.run_id !== course.runId) return;
     ajouterLigne(payload);
+    if (course.analyse) {
+      course.lignes.push(payload);
+      majProgressionAnalyse(payload);
+    }
     if (payload.step) {
       const [n, total] = payload.step;
       if (total > 0) term.prog.style.width = `${Math.min(100, (n / total) * 100)}%`;
     }
   });
 
+  // Ce qu'une analyse a rapporte, lu contre l'entete par le moteur (§17). Il
+  // precede toujours `script:end`.
+  await ecouter('script:analysis', ({ payload }) => {
+    if (!course?.analyse || payload.run_id !== course.runId) return;
+    const entree = catalogue.get(payload.script_id);
+    if (!entree) return;
+    A.oublier(entree.id);
+    analyses.set(entree.id, A.modele(entree, payload.analysis, payload.success));
+    heuresAnalyse.set(entree.id, new Date());
+  });
+
   await ecouter('script:end', ({ payload }) => {
     if (!course || payload.run_id !== course.runId) return;
+    // Une analyse n'ecrit rien dans l'historique : avoir regarde n'est pas
+    // avoir fait (§17.2).
+    if (course.analyse) return void finirAnalyse(payload);
     // Le verdict vient du code de sortie (afficherVerdict), pas de killed :
     // un arret propre n'est ni une reussite ni un echec a memoriser comme tel.
     if (!payload.killed) derniersResultats.set(payload.script_id, payload.success ? 'ok' : 'err');
@@ -2583,7 +2617,7 @@ async function cablerMoteur() {
 
     if (course.entretien) {
       const succes = payload.success && !payload.killed;
-      entretienEnCours.resultats.push({ id: payload.script_id, success: succes, simule: course.simule });
+      entretienEnCours.resultats.push({ id: payload.script_id, success: succes, simule: course.simule, freed: payload.freed ?? null });
       course = null;
       majEtatJournalCompact();
       // Comportement d'echec (specification §6.2, reglage Expert §8) : par
@@ -2802,6 +2836,12 @@ function cablerInteractions() {
   const detail = document.querySelector('.detail');
 
   detail.addEventListener('click', async (ev) => {
+    // Analyse (§17) : avant tout le reste, parce que ses interrupteurs et ses
+    // cases ne sont pas des reglages a enregistrer.
+    const analyse = ev.target.closest('[data-analyser], [data-relancer-an]');
+    if (analyse) return void analyserExpert(analyse.dataset.analyser || analyse.dataset.relancerAn);
+    if (ev.target.closest('.an-zone')) return void gesteAnalyseExpert(ev);
+
     // Verifier = re-analyser le contrat (§5.5) ET faire lire le fichier par
     // PowerShell sans l'executer (§6.8). Deux questions differentes, un seul
     // geste, et aucune modification de la machine.
@@ -2903,7 +2943,12 @@ function cablerInteractions() {
     }
   });
 
+  detail.addEventListener('input', (ev) => {
+    if (ev.target.closest('.an-zone')) gesteAnalyseExpert(ev);
+  });
+
   detail.addEventListener('change', async (ev) => {
+    if (ev.target.closest('.an-zone')) return void gesteAnalyseExpert(ev);
 
     // Nombres, textes et listes deroulantes de $CONFIG : `change` plutot que
     // `input`, donc une ecriture par valeur terminee et non une par frappe.
@@ -3020,7 +3065,7 @@ function afficherEtapeSimple(n) {
 /** Duree grossiere d'un lot, dans les mots de la specification 7 : un ordre de
  *  grandeur, jamais une promesse. */
 function minutesLot(groupe) {
-  const total = scriptsActifs(groupe).reduce((n, s) => n + (MINUTES_PAR_DUREE[s.meta.duration] || 2), 0);
+  const total = scriptsSimples(groupe).reduce((n, s) => n + (MINUTES_PAR_DUREE[s.meta.duration] || 2), 0);
   return Math.max(1, total);
 }
 
@@ -3030,7 +3075,7 @@ async function rendreEtapeChoisir() {
 
   // Un lot dont tous les scripts sont desactives n'a rien a proposer : il ne
   // s'affiche pas plutot que de mener a un entretien vide.
-  const dispo = etatGroupes ? etatGroupes.lots.filter((g) => scriptsActifs(g).length > 0) : [];
+  const dispo = etatGroupes ? etatGroupes.lots.filter((g) => scriptsSimples(g).length > 0) : [];
   const zoneReco = document.getElementById('recoCard');
   const zoneBuoys = document.getElementById('buoysZone');
   const sectAutres = document.getElementById('sectAutres');
@@ -3358,10 +3403,13 @@ function selectionnerChoix(id) {
 
 async function choisirLot(id) {
   const groupe = etatGroupes?.lots.find((g) => g.lot.id === id);
-  if (!groupe || !scriptsActifs(groupe).length) return;
-  entretienEnCours = { lotId: id, total: scriptsActifs(groupe).length, resultats: [] };
+  if (!groupe || !scriptsSimples(groupe).length) return;
+  entretienEnCours = { lotId: id, total: scriptsSimples(groupe).length, resultats: [] };
   afficherEtapeSimple(2);
-  await rendreEtapeVerifier(groupe);
+  // L'etape 2 devient l'analyse des que le lot compte une action qui sait
+  // analyser (§17.2) ; sinon elle reste le recapitulatif d'avant.
+  if (scriptsSimples(groupe).some((s) => s.meta.scan)) await rendreEtapeAnalyse(groupe);
+  else await rendreEtapeVerifier(groupe);
 }
 
 /** Etape 2 : recapitulatif, reglages replies, annonce du point de
@@ -3473,11 +3521,12 @@ function marqueSimulation(entree) {
 }
 
 async function rendreEtapeVerifier(groupe) {
+  basculerEtape2(false);
   document.getElementById('recapTitre').textContent = nomLot(groupe.lot);
   document.getElementById('recapBoxTitre').textContent = t('simple.recap_titre');
 
   const lignes = await Promise.all(
-    scriptsActifs(groupe).map(async (s) => {
+    scriptsSimples(groupe).map(async (s) => {
       const tr = s.meta.translations?.[currentLang()];
       const titre = tr?.title || s.meta.title || s.path;
       const icone = (await iconeSVG(s.meta.icon)) || '';
@@ -3508,7 +3557,7 @@ async function rendreEtapeVerifier(groupe) {
   document.getElementById('recapZone').innerHTML = lignes.join('');
 
   const note = document.getElementById('restoreNote');
-  const besoinRestauration = scriptsActifs(groupe).some(besoinPointRestauration);
+  const besoinRestauration = scriptsSimples(groupe).some(besoinPointRestauration);
   note.hidden = !besoinRestauration;
   if (besoinRestauration) note.textContent = t('simple.point_restauration_annonce');
 
@@ -3516,11 +3565,425 @@ async function rendreEtapeVerifier(groupe) {
   // source est la case de la 4.2, pas `meta.reboot` : si l'utilisateur a
   // decoche, on ne lui annonce pas un redemarrage qu'il a refuse.
   const noteRedemarrage = document.getElementById('rebootNote');
-  const besoinRedemarrer = scriptsActifs(groupe).some(besoinRedemarrage);
+  const besoinRedemarrer = scriptsSimples(groupe).some(besoinRedemarrage);
   noteRedemarrage.hidden = !besoinRedemarrer;
   if (besoinRedemarrer) noteRedemarrage.textContent = t('simple.redemarrage_annonce');
 
   document.getElementById('btnLancerEntretien').textContent = t('simple.lancer');
+}
+
+/* -------------------------------------------------------------------------
+   Analyser avant d'agir (specification §17)
+
+   Un script qui se declare analysable (`scan : true`) est lance une premiere
+   fois avec WINTOOL_MODE=scan : il mesure et decrit, sans rien modifier. Le
+   moteur lit ce qu'il ecrit contre son entete (analyse.rs) ; src/analyse.js en
+   fait l'ecran et tient la selection, qui repart vers le script a l'action.
+   Une analyse ne vaut que pour la session, et pour le contenu exact du
+   fichier qu'elle a lu.
+   ------------------------------------------------------------------------- */
+
+/** Les analyses de la session : id de script -> modele (analyse.js). */
+const analyses = new Map();
+/** Lignes du dernier passage de chaque analyse : le panneau « Progression ». */
+const journauxAnalyse = new Map();
+/** Heure de chaque analyse, pour l'entete du detail Expert. */
+const heuresAnalyse = new Map();
+/** Analyse attendue : { runId, scriptId, resoudre }. Une a la fois, comme les executions. */
+let attenteAnalyse = null;
+/** Analyse du lot en cours en mode Simple : { lotId, ids, echecs, jeton }. */
+let analyseSimple = null;
+
+/** L'analyse d'un script vaut tant que son fichier n'a pas change. */
+function analyseValide(entree) {
+  const m = analyses.get(entree.id);
+  return m && m.entree.hash === entree.hash ? m : null;
+}
+
+/** Ce que l'analyse ajoute a la configuration d'une action : la selection. */
+function configAnalysePour(entree) {
+  if (!entree.meta.scan) return {};
+  const m = analyseValide(entree);
+  return m && m.succes ? A.configAnalyse(m) : {};
+}
+
+/**
+ * Lance l'analyse d'un script et attend sa fin. Renvoie { succes, refus } ;
+ * le modele, lui, arrive dans `analyses` par `script:analysis`.
+ * `simple` : sans ouvrir le journal, que le mode Simple cache (§2).
+ */
+async function analyser(entree, { simple = false } = {}) {
+  if (course) return { succes: false, refus: t('an.occupe') };
+  const ok = await assurerApprobation(entree);
+  if (!ok) return { succes: false, refus: t('verdict.approbation_refusee') };
+  let demarre;
+  try {
+    demarre = await invoke('scan_script', {
+      req: {
+        script_id: entree.id,
+        expected_hash: entree.hash,
+        // Les reglages figes valent aussi pour l'analyse : ses [scan] et le
+        // reste de sa configuration.
+        config: configFigee(entree.id),
+        policy: reglagesActuels?.exec_policy || null,
+      },
+    });
+  } catch (e) {
+    const raison = messageLancement(e, entree);
+    journaliserRefus(entree, raison);
+    if (!simple) alerterEchecLancement(entree, raison);
+    return { succes: false, refus: raison };
+  }
+  departCourse = Date.now();
+  course = { runId: demarre.run_id, id: entree.id, logPath: demarre.log_path, analyse: true, lignes: [] };
+  if (simple) {
+    viderJournalCompact();
+    term.corps.innerHTML = '';
+    term.titre.textContent = A.titreAction(entree);
+  } else {
+    ouvrirTerminal(entree, demarre);
+  }
+  majEtatJournalCompact();
+  document.querySelectorAll('[data-run], [data-analyser]').forEach((b) => (b.disabled = true));
+  return new Promise((resoudre) => {
+    attenteAnalyse = { runId: demarre.run_id, scriptId: entree.id, resoudre };
+  });
+}
+
+function finirAnalyse(fin) {
+  const lignes = course?.lignes || [];
+  course = null;
+  journauxAnalyse.set(fin.script_id, lignes);
+  majEtatJournalCompact();
+  document.querySelectorAll('[data-run], [data-analyser]').forEach((b) => (b.disabled = false));
+  term.stop.dataset.force = '';
+  if (!document.getElementById('simple').hidden) {
+    term.stop.hidden = true;
+  } else {
+    afficherVerdict(fin);
+  }
+  const a = attenteAnalyse;
+  attenteAnalyse = null;
+  a?.resoudre({ succes: fin.success && !fin.killed, tue: fin.killed });
+  rafraichirZonesAnalyse();
+}
+
+/* --- Mode Simple : l'etape 2 devient l'analyse ------------------------- */
+
+/** Etape 2 : recapitulatif (scripts sans analyse) ou analyse (§17.2). */
+function basculerEtape2(analyse) {
+  document.getElementById('crumb2').textContent = t(analyse ? 'crumb.analyser' : 'crumb.verifier');
+  document.getElementById('analyseZone').hidden = !analyse;
+  document.getElementById('recapBox').hidden = analyse;
+  if (!analyse) {
+    analyseSimple = null;
+    const bouton = document.getElementById('btnLancerEntretien');
+    bouton.hidden = false;
+    bouton.disabled = false;
+    document.getElementById('anTotal').textContent = '';
+  }
+}
+
+/** Les scripts que l'entretien lancera : ceux du mode Simple, moins les
+ *  analysables dont rien n'est coche ou dont l'analyse n'a pas abouti. */
+function scriptsALancer(groupe) {
+  return scriptsSimples(groupe).filter((s) => {
+    if (!s.meta.scan) return true;
+    const m = analyseValide(s);
+    return !!m && m.succes && A.aFaire(m);
+  });
+}
+
+/** Les scripts de l'entretien en cours, dans l'ordre ou il les lance. */
+function scriptsEntretien(groupe) {
+  const ids = entretienEnCours?.lances;
+  return ids ? ids.map((id) => catalogue.get(id)).filter(Boolean) : scriptsSimples(groupe);
+}
+
+async function rendreEtapeAnalyse(groupe) {
+  basculerEtape2(true);
+  document.getElementById('recapTitre').textContent = nomLot(groupe.lot);
+  const visibles = scriptsSimples(groupe);
+  const analysables = visibles.filter((s) => s.meta.scan && !moteurManquant(s.meta));
+  const jeton = Symbol('analyse');
+  analyseSimple = { lotId: groupe.lot.id, ids: analysables.map((s) => s.id), echecs: [], jeton, rang: 0 };
+  A.etatUi().ouverts.clear();
+
+  document.getElementById('anTitre').textContent = t('simple.analyse_titre_encours');
+  document.getElementById('anSous').textContent = t('simple.analyse_sous_encours');
+  document.getElementById('anProgression').hidden = false;
+  document.getElementById('anResume').innerHTML = '';
+  document.getElementById('anAutres').innerHTML = '';
+  document.getElementById('restoreNote').hidden = true;
+  document.getElementById('rebootNote').hidden = true;
+  const bouton = document.getElementById('btnLancerEntretien');
+  bouton.hidden = true;
+  majProgressionAnalyse(null);
+
+  for (const [i, s] of analysables.entries()) {
+    if (analyseSimple?.jeton !== jeton) return;
+    analyseSimple.rang = i;
+    majProgressionAnalyse(null);
+    const r = await analyser(s, { simple: true });
+    if (analyseSimple?.jeton !== jeton) return;
+    if (!r.succes) analyseSimple.echecs.push({ id: s.id, raison: r.refus || t('an.analyse_echouee') });
+  }
+  if (analyseSimple?.jeton !== jeton) return;
+  analyseSimple.rang = analysables.length;
+  document.getElementById('anProgression').hidden = true;
+  document.getElementById('anTitre').textContent = t('simple.analyse_titre');
+  document.getElementById('anSous').textContent = t('simple.analyse_sous');
+  rendreResumeAnalyse(groupe);
+}
+
+/** La barre de l'analyse en cours, en mode Simple : le rang de l'action et,
+ *  dans l'action, son [STEP] ou son [PROGRESS]. Jamais le texte anglais. */
+function majProgressionAnalyse(ligne) {
+  if (!analyseSimple || document.getElementById('anProgression').hidden) return;
+  const n = analyseSimple.ids.length || 1;
+  const etat = analyseSimple.dansAction ?? 0;
+  let dans = etat;
+  if (ligne === null) dans = 0;
+  else if (ligne.step && ligne.step[1] > 0) dans = Math.min(1, (ligne.step[0] - 1) / ligne.step[1]);
+  else if (ligne.marker === 'PROGRESS') dans = Math.min(1, (Number(String(ligne.text).replace(/^\s*\[PROGRESS\]\s*/, '')) || 0) / 100);
+  analyseSimple.dansAction = dans;
+  const pct = Math.round(((analyseSimple.rang + dans) / n) * 100);
+  document.getElementById('anBarre').style.width = `${Math.min(100, pct)}%`;
+  const s = catalogue.get(analyseSimple.ids[Math.min(analyseSimple.rang, n - 1)]);
+  document.getElementById('anEtape').textContent = s ? A.titreAction(s) : '';
+  document.getElementById('anRang').textContent = t('simple.analyse_rang', { n: Math.min(analyseSimple.rang + 1, n), total: n });
+  document.getElementById('anPct').textContent = `${Math.min(100, pct)} %`;
+}
+
+async function arreterAnalyseSimple() {
+  if (!analyseSimple) return;
+  analyseSimple.jeton = null;
+  // Une analyse ne modifie rien par contrat : elle s'arrete tout de suite.
+  if (course?.analyse) {
+    try {
+      await invoke('cancel_script', { runId: course.runId, force: true });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+}
+
+function rendreResumeAnalyse(groupe) {
+  const g = groupe || etatGroupes?.lots.find((x) => x.lot.id === analyseSimple?.lotId);
+  if (!g || !analyseSimple) return;
+  const modeles = analyseSimple.ids.map((id) => {
+    const s = catalogue.get(id);
+    const m = s && analyseValide(s);
+    return m && m.succes ? m : null;
+  }).filter(Boolean);
+  const zone = document.getElementById('anResume');
+  // Une action seule a l'ecran garde la vue que son script a choisie ; un lot
+  // de plusieurs actions est resume par WinTool, en postes.
+  zone.innerHTML = modeles.length === 1 && modeles[0].entree.meta.view
+    ? `<div class="an-carte">${A.vue(modeles[0], 'simple', { historique: historiqueDe(modeles[0].entree.id) })}</div>`
+    : `<div class="an-carte">${A.resume(modeles, { graphe: reglagesActuels?.analysis_chart || 'donut', ...A.etatUi() })}</div>`;
+  A.poserPartiels(zone);
+
+  const visibles = scriptsSimples(g);
+  const telsQuels = visibles.filter((s) => !s.meta.scan);
+  const reserves = scriptsActifs(g).filter((s) => s.meta.show === 'expert');
+  const echecs = analyseSimple.echecs;
+  const autres = [];
+  if (telsQuels.length) {
+    autres.push(`<div class="an-autres-bloc"><b>${esc(t('simple.tels_quels'))}</b><span class="muted">${esc(t('simple.tels_quels_desc'))}</span>
+      <ul>${telsQuels.map((s) => `<li>${esc(A.titreAction(s))}</li>`).join('')}</ul></div>`);
+  }
+  for (const e of echecs) {
+    const s = catalogue.get(e.id);
+    autres.push(`<p class="an-masques">${esc(t('simple.analyse_echec', { titre: s ? A.titreAction(s) : e.id }))}</p>`);
+  }
+  if (reserves.length) {
+    autres.push(`<p class="an-masques">${esc(t(reserves.length > 1 ? 'simple.reservees_expert' : 'simple.reservee_expert', {
+      n: reserves.length, liste: reserves.map((s) => `« ${A.titreAction(s)} »`).join(', '),
+    }))}</p>`);
+  }
+  document.getElementById('anAutres').innerHTML = autres.join('');
+
+  const aLancer = scriptsALancer(g);
+  const note = document.getElementById('restoreNote');
+  note.hidden = !aLancer.some(besoinPointRestauration);
+  if (!note.hidden) note.textContent = t('simple.point_restauration_annonce');
+  const noteRedemarrage = document.getElementById('rebootNote');
+  noteRedemarrage.hidden = !aLancer.some(besoinRedemarrage);
+  if (!noteRedemarrage.hidden) noteRedemarrage.textContent = t('simple.redemarrage_annonce');
+
+  const tot = A.totalResume(modeles);
+  const morceaux = [];
+  if (tot.choisi) morceaux.push(t('simple.a_liberer', { taille: A.taille(tot.choisi) }));
+  if (tot.reglages) morceaux.push(PLURIEL('an.n_reglages', tot.reglages));
+  document.getElementById('anTotal').textContent = morceaux.join(' · ');
+  const bouton = document.getElementById('btnLancerEntretien');
+  bouton.hidden = false;
+  bouton.disabled = aLancer.length === 0;
+  bouton.textContent = aLancer.length ? t('simple.lancer') : t('simple.rien_a_lancer');
+}
+
+/* --- Mode Expert : « Analyser » sur la fiche d'un script ---------------- */
+
+/** Une icone du sprite (src/icons.svg). */
+const ico = (nom, classe = '') => `<svg class="ico ${classe}" aria-hidden="true"><use href="#${nom}" /></svg>`;
+
+const PANNEAUX_AN = ['config', 'progress', 'plan', 'payload', 'attention', 'history', 'origin', 'disk'];
+/** Panneaux ouverts, par script : ceux que le script propose (## panels), puis
+ *  ce que l'utilisateur ajoute ou retire. Retenu pour la session. */
+const panneauxOuverts = new Map();
+const filtresJournal = new Map();
+let espaceDisque = null;
+
+function panneauxDe(entree) {
+  if (!panneauxOuverts.has(entree.id)) {
+    const proposes = (entree.meta.panels || []).filter((p) => PANNEAUX_AN.includes(p));
+    panneauxOuverts.set(entree.id, new Set(proposes.length ? proposes : ['plan']));
+  }
+  return panneauxOuverts.get(entree.id);
+}
+
+function historiqueDe(id) {
+  return (historiqueActuel.scripts || []).filter((r) => r.script_id === id);
+}
+
+function zoneAnalyseExpert(entree) {
+  if (!entree.meta.scan) return '';
+  return `<div class="an-zone" id="an-${esc(entree.id)}">${contenuAnalyseExpert(entree)}</div>`;
+}
+
+function contenuAnalyseExpert(entree) {
+  const m = analyseValide(entree);
+  if (!m) return `<p class="an-invite">${ico('scan')}${esc(t('an.invite'))}</p>`;
+  const ouverts = panneauxDe(entree);
+  const heure = heuresAnalyse.get(entree.id);
+  const tete = `<div class="an-tete">
+      <span class="an-tete-t"><b>${esc(t('an.analyse_de', { heure: heure ? heure.toLocaleTimeString(currentLang() === 'en' ? 'en-US' : 'fr-FR', { hour: '2-digit', minute: '2-digit' }) : '' }))}</b>
+        <span>${esc(A.resumeTotaux(A.totaux(m), m))}</span></span>
+      <button class="btn compact" type="button" data-relancer-an="${esc(entree.id)}">${esc(t('an.relancer'))}</button>
+    </div>
+    ${m.succes ? '' : `<p class="card-warn">${esc(t('an.analyse_echouee'))}</p>`}
+    ${m.tronque ? `<p class="card-warn">${esc(t('an.tronquee'))}</p>` : ''}`;
+  const puces = PANNEAUX_AN.map((k) => `<button type="button" class="chip${ouverts.has(k) ? ' on' : ''}" data-panneau-an="${esc(entree.id)}|${k}" aria-pressed="${ouverts.has(k)}">${esc(t(`an.p.${k}`))}</button>`).join('');
+  const panneaux = PANNEAUX_AN.filter((k) => ouverts.has(k)).map((k) => panneauAnalyse(entree, m, k)).join('');
+  return `${tete}<div class="an-grille">
+      <div class="an-vue-zone">${A.vue(m, 'expert', { historique: historiqueDe(entree.id) })}</div>
+      <aside class="an-panneaux"><div class="an-puces">${puces}</div>${panneaux}</aside>
+    </div>`;
+}
+
+function valeurAffichee(v) {
+  if (Array.isArray(v)) return v.length ? v.join(', ') : '—';
+  if (v === true) return t('an.oui');
+  if (v === false) return t('an.non');
+  return v == null || v === '' ? '—' : String(v);
+}
+
+function panneauAnalyse(entree, m, cle) {
+  let corps = '';
+  if (cle === 'config') {
+    const lignes = (entree.meta.options || []).filter((o) => o.kind !== 'items').map((o) => {
+      const fige = optionFigee(entree, o.key);
+      return `<span>${esc(libelleOption(entree, o).label)}</span><span class="${fige ? 'an-mod' : ''}">${esc(valeurAffichee(valeurOption(entree, o)))}</span>`;
+    });
+    corps = lignes.length ? `<div class="an-kv">${lignes.join('')}</div>` : `<span class="muted">${esc(t('an.aucun_reglage'))}</span>`;
+  } else if (cle === 'progress') {
+    const lignes = journauxAnalyse.get(entree.id) || [];
+    const filtre = filtresJournal.get(entree.id) || 'tout';
+    const canal = (l) => /^\s*\[LOG\]\s+([A-Za-z][\w-]*)/.exec(l.text)?.[1];
+    const canaux = [...new Set(lignes.map(canal).filter(Boolean))];
+    const garde = (l) => filtre === 'tout'
+      || (filtre === 'etapes' && ['STEP', 'OK', 'WARN', 'ERR'].includes(l.marker))
+      || (filtre === 'constats' && ['FIND', 'ITEM', 'METRIC', 'NOTE'].includes(l.marker))
+      || canal(l) === filtre;
+    const puces = ['tout', 'etapes', 'constats', ...canaux].map((f) => `<button type="button" class="chip${filtre === f ? ' on' : ''}" data-journal-an="${esc(entree.id)}|${esc(f)}" aria-pressed="${filtre === f}">${esc(['tout', 'etapes', 'constats'].includes(f) ? t(`an.j.${f}`) : f)}</button>`).join('');
+    const texte = lignes.filter(garde).map((l) => `<span class="an-j-h">${esc(heureLigne(l.at_ms))}</span> <span class="m-${esc((l.marker || '').toLowerCase())}">${esc(l.text)}</span>`).join('\n');
+    corps = `<div class="an-puces">${puces}</div><div class="an-journal">${texte || esc(t('an.journal_vide'))}</div>`;
+  } else if (cle === 'plan') {
+    corps = A.plan(m);
+  } else if (cle === 'payload') {
+    const cfg = { ...lireConfigCarte(entree), ...configAnalysePour(entree) };
+    corps = `<div class="an-journal">WINTOOL_CONFIG = ${esc(JSON.stringify(cfg, null, 2))}</div>`;
+  } else if (cle === 'attention') {
+    const points = entree.attention || [];
+    corps = points.length
+      ? `${points.map((p) => `<div class="an-attention">${ico('warn', 'i14')}<span><code>${esc(p.extrait || p.code)}</code> — ${esc(t('an.ligne', { n: p.ligne }))}</span></div>`).join('')}<p class="muted an-petit">${esc(t('an.attention_note'))}</p>`
+      : `<span class="muted">${esc(t('an.attention_vide'))}</span>`;
+  } else if (cle === 'history') {
+    const h = historiqueDe(entree.id);
+    const lignes = h.slice(-6).reverse().map((r) => `<span>${esc(r.at.slice(0, 10))}</span><span>${esc(r.freed != null ? A.taille(r.freed) : r.success ? t('tache.reussi') : t('tache.echoue'))}${r.simulated ? ` · ${esc(t('simulation.marque'))}` : ''}</span>`);
+    corps = `${A.historique(h)}${lignes.length ? `<div class="an-kv an-espace">${lignes.join('')}</div>` : ''}`;
+  } else if (cle === 'origin') {
+    const origine = { official: t('an.origine_officiel'), tierce: t('an.origine_tierce', { source: nomSource(entree.source) || entree.source || '' }), user: t('an.origine_perso') }[entree.origin] || entree.origin;
+    corps = `<div class="an-kv"><span>${esc(t('an.source'))}</span><span>${esc(origine)}</span><span>${esc(t('an.fichier'))}</span><span>${esc(entree.path)}</span>
+      <span>${esc(t('an.empreinte'))}</span><span>${esc(entree.hash.slice(0, 16))}…</span>
+      <span>${esc(t('an.accord'))}</span><span>${esc(t(entree.verified ? 'an.accord_signe' : 'an.accord_approuve'))}</span></div>`;
+  } else if (cle === 'disk') {
+    if (!espaceDisque) {
+      invoke('disk_space').then((d) => { espaceDisque = d; rafraichirZonesAnalyse(); }).catch(() => {});
+      corps = `<span class="muted">…</span>`;
+    } else {
+      const choisi = A.totaux(m).choisi;
+      const pc = (v) => `${(v / espaceDisque.total) * 100}%`;
+      const utilise = espaceDisque.total - espaceDisque.libre;
+      corps = `<div class="an-disque"><i class="utilise" style="width:${pc(Math.max(0, utilise - choisi))}"></i><i class="libere" style="width:${pc(Math.min(choisi, utilise))}"></i><i class="libre" style="width:${pc(espaceDisque.libre)}"></i></div>
+        <p class="muted an-petit">${esc(t('an.disque_apres', { lecteur: espaceDisque.lecteur, libre: A.taille(espaceDisque.libre), apres: A.taille(espaceDisque.libre + choisi) }))}</p>`;
+    }
+  }
+  return `<section class="an-panneau"><div class="an-panneau-h">${esc(t(`an.p.${cle}`))}</div><div class="an-panneau-b">${corps}</div></section>`;
+}
+
+/** La configuration que la fiche montre, comme `lireConfig` au lancement. */
+function lireConfigCarte(entree) {
+  const carte = document.querySelector(`.card[data-id="${CSS.escape(entree.id)}"]`);
+  return carte ? lireConfig(carte) : configFigee(entree.id);
+}
+
+/** Redessine ce qui montre une analyse : le resume Simple, la fiche Expert. */
+function rafraichirZonesAnalyse({ garderFocus = false } = {}) {
+  const champ = garderFocus && document.activeElement?.matches?.('[data-a-cherche]') ? document.activeElement : null;
+  const position = champ?.selectionStart;
+  if (analyseSimple && !document.getElementById('analyseZone').hidden && document.getElementById('anProgression').hidden) {
+    rendreResumeAnalyse();
+  }
+  document.querySelectorAll('.an-zone[id^="an-"]').forEach((z) => {
+    const entree = catalogue.get(z.id.slice(3));
+    if (!entree) return;
+    z.innerHTML = contenuAnalyseExpert(entree);
+    A.poserPartiels(z);
+  });
+  if (champ) {
+    const nouveau = document.querySelector('[data-a-cherche]');
+    nouveau?.focus();
+    if (nouveau && position != null) nouveau.setSelectionRange(position, position);
+  }
+}
+
+async function analyserExpert(id) {
+  const entree = catalogue.get(id);
+  if (!entree) return;
+  await analyser(entree);
+  rafraichirZonesAnalyse();
+}
+
+/** Un geste dans une zone d'analyse de l'Expert. */
+function gesteAnalyseExpert(ev) {
+  const panneau = ev.target.closest('[data-panneau-an]');
+  if (panneau && ev.type === 'click') {
+    const [id, cle] = panneau.dataset.panneauAn.split('|');
+    const entree = catalogue.get(id);
+    if (!entree) return;
+    const ouverts = panneauxDe(entree);
+    ouverts.has(cle) ? ouverts.delete(cle) : ouverts.add(cle);
+    return void rafraichirZonesAnalyse();
+  }
+  const journal = ev.target.closest('[data-journal-an]');
+  if (journal && ev.type === 'click') {
+    const [id, filtre] = journal.dataset.journalAn.split('|');
+    filtresJournal.set(id, filtre);
+    return void rafraichirZonesAnalyse();
+  }
+  if (A.agir(ev, analyses)) rafraichirZonesAnalyse({ garderFocus: ev.type === 'input' });
 }
 
 /** Message honnete pour chacun des refus attendus (specification 6.4) —
@@ -3548,7 +4011,7 @@ function messageRestauration(resultat) {
 const MINUTES_PAR_DUREE = { fast: 1, medium: 3, slow: 8 };
 function estimerMinutesRestantes(groupe) {
   const faits = new Set(entretienEnCours.resultats.map((r) => r.id));
-  const restants = scriptsActifs(groupe).filter((s) => !faits.has(s.id));
+  const restants = scriptsEntretien(groupe).filter((s) => !faits.has(s.id));
   return Math.max(1, restants.reduce((total, s) => total + (MINUTES_PAR_DUREE[s.meta.duration] || 2), 0));
 }
 
@@ -3569,17 +4032,20 @@ async function lancerEntretien() {
   document.getElementById('tasksBilan').hidden = false;
   document.getElementById('tasksBilanDetail').textContent = nomLot(groupe.lot);
   document.getElementById('term').hidden = true;
-  fileEntretien = scriptsActifs(groupe);
+  const aLancer = scriptsALancer(groupe);
+  entretienEnCours.lances = aLancer.map((s) => s.id);
+  entretienEnCours.total = aLancer.length;
+  fileEntretien = [...aLancer];
   etapeEntretienActuelle = null;
   majProgression();
 
   invoke('record_lot_run', {
     lotId: groupe.lot.id,
     lotName: nomLot(groupe.lot),
-    scriptIds: scriptsActifs(groupe).map((s) => s.id),
+    scriptIds: aLancer.map((s) => s.id),
   }).catch((e) => console.error("Enregistrement de l'historique impossible :", e));
 
-  const besoinRestauration = scriptsActifs(groupe).some(besoinPointRestauration);
+  const besoinRestauration = aLancer.some(besoinPointRestauration);
   if (besoinRestauration) {
     try {
       const resultat = await invoke('create_restore_point', {
@@ -3619,7 +4085,8 @@ async function lancerScriptEntretien(entree) {
         // Le mode Expert est le panneau de configuration du mode Simple : ce
         // que l'utilisateur avance y a fige s'applique ici aussi, sinon
         // l'entretien tournerait avec d'autres reglages que ceux affiches.
-        config: configFigee(entree.id),
+        // Et apres l'analyse, ce qui est coche (§17).
+        config: { ...configFigee(entree.id), ...configAnalysePour(entree) },
         policy: reglagesActuels?.exec_policy || null,
       },
     });
@@ -3662,7 +4129,27 @@ function terminerEntretien() {
   document.getElementById('tasksBilan').textContent = t('simple.bilan_titre');
   const simules = entretienEnCours.resultats.filter((r) => r.simule).length;
   document.getElementById('tasksBilanDetail').textContent = t('simple.bilan_detail', { ok, total })
-    + (simules ? ` ${t('simulation.bilan', { n: simules })}` : '');
+    + (simules ? ` ${t('simulation.bilan', { n: simules })}` : '')
+    + bilanLibere();
+}
+
+/**
+ * Ce qui a ete libere (§17.2) : le chiffre que les scripts ont annonce par
+ * `[FREED]` ; a defaut, l'estimation de l'analyse, precedee de « environ ».
+ * Un chiffre estime n'est jamais presente comme mesure.
+ */
+function bilanLibere() {
+  let mesure = 0, estime = 0, aMesure = false, aEstime = false;
+  for (const r of entretienEnCours.resultats) {
+    if (!r.success || r.simule) continue;
+    if (r.freed != null) { mesure += r.freed; aMesure = true; continue; }
+    const m = analyses.get(r.id);
+    const choisi = m ? A.totaux(m).choisi : 0;
+    if (choisi) { estime += choisi; aEstime = true; }
+  }
+  if (!aMesure && !aEstime) return '';
+  if (aMesure && !aEstime) return ` · ${t('bilan.libere', { taille: A.taille(mesure) })}`;
+  return ` · ${t('bilan.libere_environ', { taille: A.taille(mesure + estime) })}`;
 }
 
 /** Icone d'etat d'une tache : coche (reussi), point d'exclamation (echoue),
@@ -3672,7 +4159,7 @@ function terminerEntretien() {
 function rendreTachesEntretien() {
   const groupe = etatGroupes?.lots.find((g) => g.lot.id === entretienEnCours?.lotId);
   if (!groupe) return;
-  const lignes = scriptsActifs(groupe).map((s, i) => {
+  const lignes = scriptsEntretien(groupe).map((s, i) => {
     const tr = s.meta.translations?.[currentLang()];
     const titre = tr?.title || s.meta.title || s.path;
     const resultat = entretienEnCours.resultats.find((r) => r.id === s.id);
@@ -3744,11 +4231,20 @@ function cablerModeEtSimple() {
     if (buoy) return void selectionnerChoix(buoy.dataset.lot);
 
     if (ev.target.closest('#btnContinuerChoix')) return void choisirLot(selectionSimpleId);
-    if (ev.target.closest('[data-s-back]')) return void afficherEtapeSimple(1);
+    if (ev.target.closest('[data-s-back]')) {
+      arreterAnalyseSimple();
+      return void afficherEtapeSimple(1);
+    }
+    // Les gestes du resume de l'analyse (§17) : cases, chevrons, interrupteurs.
+    if (ev.target.closest('#anResume') && A.agir(ev, analyses)) return void rendreResumeAnalyse();
     if (ev.target.closest('#btnLancerEntretien')) return void lancerEntretien();
     if (ev.target.closest('#btnArreterEntretien')) return void arreterEntretien();
     if (ev.target.closest('#btnRetourAccueil')) return void afficherEtapeSimple(1);
     if (ev.target.closest('#btnDetailTechnique')) return void basculerDetailTechnique();
+  });
+
+  document.getElementById('anResume').addEventListener('change', (ev) => {
+    if (A.agir(ev, analyses)) rendreResumeAnalyse();
   });
 
   afficherJournal(false);
@@ -3808,6 +4304,7 @@ async function enregistrerExecution(payload, titre, simule) {
       killed: payload.killed,
       durationMs: payload.duration_ms,
       simulated: !!simule,
+      freed: payload.freed ?? null,
     });
     await invoke('enforce_log_cap');
   } catch (e) {
@@ -3883,6 +4380,8 @@ function appliquerTraductionsReglages() {
   document.querySelector('#setThemeSeg [data-set-theme="system"]').textContent = t('onb.theme_systeme');
   document.getElementById('setLangueLabel').textContent = t('reglages.langue');
   document.getElementById('setMajLabel').textContent = t('reglages.maj_comportement');
+  document.getElementById('setGrapheLabel').textContent = t('reglages.graphique');
+  document.querySelectorAll('#setGrapheSelect option').forEach((o) => { o.textContent = t(`graphe.${o.value}`); });
   document.querySelector('#setMajSelect [value="propose"]').textContent = t('reglages.maj_proposer');
   document.querySelector('#setMajSelect [value="never"]').textContent = t('reglages.maj_jamais');
   document.getElementById('setMajVerifLabel').textContent = t('reglages.maj_verifier');
@@ -3955,6 +4454,7 @@ function remplirFormulaireReglages(reglages) {
     b.setAttribute('aria-pressed', String(b.dataset.setLang === reglages.lang));
   });
   document.getElementById('setMajSelect').value = reglages.update_policy;
+  document.getElementById('setGrapheSelect').value = reglages.analysis_chart || 'donut';
   document.getElementById('setCatalogueSelect').value = reglages.catalogue_check || 'startup';
   rendreReglagesCatalogue();
   document.getElementById('setEchecSelect').value = reglages.failure_policy;
@@ -4545,6 +5045,9 @@ function cablerReglages() {
     };
   });
 
+  document.getElementById('setGrapheSelect').onchange = async (ev) => {
+    reglagesActuels = await invoke('set_analysis_chart', { chart: ev.target.value });
+  };
   document.getElementById('setMajSelect').onchange = async (ev) => {
     reglagesActuels = await invoke('set_update_policy', { policy: ev.target.value });
   };

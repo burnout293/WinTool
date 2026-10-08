@@ -1250,6 +1250,25 @@ fn set_ui_scale(app: tauri::AppHandle, value: f32) -> Result<Settings, String> {
     })
 }
 
+/// Graphique du resume de l'analyse en mode Simple (§17).
+#[tauri::command]
+fn set_analysis_chart(app: tauri::AppHandle, chart: String) -> Result<Settings, String> {
+    if !settings::GRAPHIQUES_ANALYSE.contains(&chart.as_str()) {
+        return Err(format!("graphique inconnu : {chart}"));
+    }
+    with_settings(&app, |s| {
+        s.analysis_chart = chart;
+        Ok(())
+    })
+}
+
+/// Place libre sur le disque du systeme, pour le panneau « Espace disque » de
+/// l'Expert (§17). Une lecture, rien de plus.
+#[tauri::command]
+fn disk_space() -> Result<systeme::EspaceDisque, String> {
+    systeme::espace_disque()
+}
+
 /// Affiche ou masque la numerotation des reglages (« 2.3 »).
 #[tauri::command]
 fn set_show_setting_numbers(app: tauri::AppHandle, value: bool) -> Result<Settings, String> {
@@ -1435,6 +1454,8 @@ pub fn run() {
             engines,
             run_script,
             scan_script,
+            set_analysis_chart,
+            disk_space,
             simulation_state,
             set_simulation_all,
             check_script,

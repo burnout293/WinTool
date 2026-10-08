@@ -96,9 +96,13 @@
         reboot: !!extra.reboot,
         engine: 'auto',
         options: extra.options || [],
-        translations: { fr: { title: titre, desc, options: {}, choices: {} } },
+        translations: { fr: { title: titre, desc, options: {}, choices: {}, report: {} } },
         findings: extra.findings || [],
+        // Struct `contract::Script`, champs de la 1.4 (§17).
+        scan: false, show: '', view: '', view_expert: '', panels: [], report: {},
+        ...(extra.meta || {}),
       },
+      attention: extra.attention || [],
     };
   };
 
@@ -164,6 +168,210 @@
       script('schedule', 'Planifier un entretien', 'Chaque mois, automatiquement', 'tools', 'calendar-clock'),
     ],
   };
+
+  // --- Analyse (§17) --------------------------------------------------------
+  // Cinq actions analysables, decrites comme contract.rs les lit : options
+  // etiquetees ([group:], [show:], [view:]), bloc REPORT, traductions. Leur
+  // analyse est rejouee par `scan_script`, au format de `analyse::Analyse`.
+  const optA = (key, kind, label, desc, def, extra = {}) => ({
+    key, kind, label, desc, choices: [], default: def, hidden: false,
+    keep_one: false, scan: false, group: '', show: '', view: '', ...extra,
+  });
+  const choixA = (value, label, extra = {}) => ({ value, label, desc: '', group: '', show: '', ...extra });
+  const trA = (title, desc, options = {}, choices = {}, report = {}) => ({ fr: { title, desc, options, choices, report } });
+
+  const ANALYSABLES = [
+    script('free-space', 'Free up disk space', 'Removes temporary files, downloaded updates and browser caches', 'cleaning', 'trash-2', {
+      duration: 'medium', reversible: false,
+      options: [
+        optA('Targets', 'multi', 'Temporary files', '', ['user', 'windows'], { choices: [
+          choixA('user', 'Your temporary files', { group: 'Junk' }),
+          choixA('windows', 'Windows temporary files', { group: 'Junk', show: 'expert' }),
+          choixA('update', 'Downloaded Windows updates', { group: 'OldUpdates' }),
+        ] }),
+        optA('RecycleBin', 'bool', 'Empty the recycle bin', '', false, { group: 'Junk' }),
+        optA('Browsers', 'items', 'Browser caches', '', [], { view: 'tree' }),
+        optA('SafeTest', 'bool', 'Simulate', 'shows what would be done, changes nothing', false),
+      ],
+      meta: {
+        scan: true, view: 'donut', panels: ['plan', 'progress'],
+        report: {
+          Junk: { kind: 'group', level: '', label: 'Junk files', desc: 'Temporary files and the recycle bin' },
+          OldUpdates: { kind: 'group', level: '', label: 'Old Windows updates', desc: 'What Windows keeps after installing them' },
+          Cache: { kind: 'label', level: '', label: 'Cache', desc: '' },
+          FreeSpace: { kind: 'label', level: '', label: 'Free space on drive C:', desc: '' },
+          UpdateNote: { kind: 'note', level: 'warn', label: 'If an update is waiting to be installed, Windows will download it again.', desc: '' },
+          Untouched: { kind: 'note', level: 'info', label: 'Your passwords, bookmarks and history are not touched.', desc: '' },
+        },
+        translations: trA('Faire de la place', 'Supprime les fichiers temporaires, les mises à jour téléchargées et le cache des navigateurs', {
+          Targets: ['Fichiers temporaires', ''], RecycleBin: ['Vider la corbeille', ''], Browsers: ['Cache des navigateurs', ''],
+        }, {
+          'Targets/user': ['Vos fichiers temporaires', ''], 'Targets/windows': ['Fichiers temporaires de Windows', ''],
+          'Targets/update': ['Mises à jour de Windows téléchargées', ''],
+        }, {
+          Junk: ['Fichiers inutiles', 'Fichiers temporaires et corbeille'],
+          OldUpdates: ['Anciennes mises à jour de Windows', 'Ce que Windows garde après les avoir installées'],
+          Cache: ['Fichiers en cache', ''], FreeSpace: ['Espace libre sur le disque C:', ''],
+          UpdateNote: ['Si une mise à jour attend d’être installée, Windows la téléchargera de nouveau.', ''],
+          Untouched: ['Vos mots de passe, vos favoris et votre historique ne sont pas touchés.', ''],
+        }),
+      },
+    }),
+    script('leftovers', 'Remove leftovers of uninstalled programs', 'Folders and keys left behind', 'cleaning', 'package-x', {
+      options: [optA('Leftovers', 'items', 'Leftovers of uninstalled programs', '', [])],
+      meta: {
+        scan: true, panels: ['plan', 'attention'],
+        report: { LowConfidence: { kind: 'note', level: 'info', label: 'Items “to check” may still be used by another program: they are not ticked.', desc: '' } },
+        translations: trA('Retirer les restes de programmes', 'Dossiers et clés laissés derrière eux', { Leftovers: ['Restes de programmes désinstallés', ''] }, {}, {
+          LowConfidence: ['Les éléments « À vérifier » servent peut-être encore à un autre programme : ils ne sont pas cochés.', ''],
+        }),
+      },
+    }),
+    script('duplicates', 'Find duplicate files', 'Keeps one copy of each', 'cleaning', 'copy', {
+      options: [optA('Duplicates', 'items', 'Duplicate files', '', [], { keep_one: true })],
+      meta: { scan: true, show: 'expert', translations: trA('Trouver les fichiers en double', 'Garde un exemplaire de chacun', { Duplicates: ['Fichiers en double', ''] }) },
+    }),
+    script('privacy-check', 'Protect my privacy', 'Limits what Windows shares', 'privacy', 'shield', {
+      options: [
+        optA('Telemetry', 'bool', 'Limit what Windows sends to Microsoft', '', true),
+        optA('AdId', 'bool', 'Turn off the advertising ID', '', true),
+        optA('Activity', 'bool', 'Do not keep the activity history', '', true),
+      ],
+      meta: {
+        scan: true, view: 'compare', translations: trA('Protéger ma vie privée', 'Limite ce que Windows partage', {
+          Telemetry: ['Limiter ce que Windows envoie à Microsoft', ''], AdId: ['Désactiver l’identifiant publicitaire', ''], Activity: ['Ne pas garder l’historique d’activité', ''],
+        }),
+      },
+    }),
+    script('disk-health', 'Check disk health', 'Reads the drives’ health indicators', 'health', 'hard-drive', {
+      options: [],
+      meta: {
+        scan: true, view: 'light', panels: ['history'],
+        report: {
+          Health: { kind: 'label', level: '', label: 'Overall health', desc: '' },
+          Temperature: { kind: 'label', level: '', label: 'Temperature', desc: '' },
+          Hours: { kind: 'label', level: '', label: 'Power-on hours', desc: '' },
+          Backup: { kind: 'note', level: 'warn', label: 'A drive “to watch” can fail without warning: back up what matters.', desc: '' },
+        },
+        translations: trA('Vérifier la santé des disques', 'Lit les indicateurs de santé des disques', {}, {}, {
+          Health: ['État général', ''], Temperature: ['Température', ''], Hours: ['Heures d’utilisation', ''],
+          Backup: ['Un disque « à surveiller » peut lâcher sans prévenir : sauvegardez ce qui compte.', ''],
+        }),
+      },
+    }),
+  ];
+  SCRIPTS.cleaning.push(...ANALYSABLES.slice(0, 3));
+  SCRIPTS.privacy.push(ANALYSABLES[3]);
+  SCRIPTS.health.push(ANALYSABLES[4]);
+
+  /** Ce que chaque analyse rapporte, au format de `analyse::Analyse`. */
+  const ANALYSES = {
+    'free-space': {
+      lignes: ['[STEP] 1/3 Measuring temporary folders', '[STEP] 2/3 Measuring downloaded Windows updates', '[STEP] 3/3 Looking for browser caches',
+        '[LOG] Browsers Google Chrome / Default: 1240 files', '[LOG] Browsers Mozilla Firefox / default-release: 13481 files'],
+      analyse: {
+        finds: [
+          { option: 'Targets', choice: 'user', fields: { size: '647362687', count: '2002' } },
+          { option: 'Targets', choice: 'windows', fields: { size: '125829120', count: '1840' } },
+          { option: 'RecycleBin', choice: '', fields: { size: '278921216', count: '58' } },
+          { option: 'Targets', choice: 'update', fields: { size: '1181116006', count: '96', checked: 'false' } },
+        ],
+        items: [
+          { option: 'Browsers', fields: { id: 'chrome', name: 'Google Chrome', kind: 'browser' } },
+          { option: 'Browsers', fields: { id: 'chrome-Default', parent: 'chrome', kind: 'folder', label: 'Cache', name: 'Default', path: 'C:\\Users\\Buly\\AppData\\Local\\Google\\Chrome\\User Data\\Default\\Cache', size: '335544320' } },
+          { option: 'Browsers', fields: { id: 'chrome-Profile-1', parent: 'chrome', kind: 'folder', label: 'Cache', name: 'Profile 1', path: 'C:\\Users\\Buly\\AppData\\Local\\Google\\Chrome\\User Data\\Profile 1\\Cache', size: '524288', show: 'expert' } },
+          { option: 'Browsers', fields: { id: 'firefox', name: 'Mozilla Firefox', kind: 'browser', locked: 'open' } },
+          { option: 'Browsers', fields: { id: 'firefox-default-release', parent: 'firefox', kind: 'folder', label: 'Cache', name: 'default-release', path: 'C:\\Users\\Buly\\AppData\\Local\\Mozilla\\Firefox\\Profiles\\x.default-release\\cache2', size: '183500800', locked: 'open' } },
+        ],
+        metrics: [{ key: 'FreeSpace', fields: { value: '9', unit: 'pct', health: 'warn', max: '100' } }],
+        notes: [{ key: 'UpdateNote', target: 'Targets.update', show: '' }, { key: 'Untouched', target: 'Browsers', show: 'simple' }],
+        steps: ['Measuring temporary folders', 'Measuring downloaded Windows updates', 'Looking for browser caches'],
+        anomalies: [], truncated: false,
+      },
+    },
+    leftovers: {
+      lignes: ['[STEP] 1/2 Listing uninstalled programs', '[LOG] Registry 214 uninstall entries read', '[STEP] 2/2 Looking for leftovers'],
+      analyse: {
+        finds: [],
+        items: [
+          { option: 'Leftovers', fields: { id: 'adobe', name: 'Adobe Acrobat Reader DC', kind: 'app' } },
+          { option: 'Leftovers', fields: { id: 'adobe-1', parent: 'adobe', kind: 'folder', name: 'ARM', path: 'C:\\ProgramData\\Adobe\\ARM', size: '48234496', confidence: 'high' } },
+          { option: 'Leftovers', fields: { id: 'adobe-2', parent: 'adobe', kind: 'registry', name: 'Acrobat Reader', path: 'HKLM\\SOFTWARE\\Adobe\\Acrobat Reader', confidence: 'high', show: 'expert' } },
+          { option: 'Leftovers', fields: { id: 'steam', name: 'Steam', kind: 'app' } },
+          { option: 'Leftovers', fields: { id: 'steam-1', parent: 'steam', kind: 'folder', name: 'steamapps', path: 'C:\\Program Files (x86)\\Steam\\steamapps', size: '734003200', confidence: 'low' } },
+          { option: 'Leftovers', fields: { id: 'steam-2', parent: 'steam', kind: 'folder', name: 'Steam', path: 'C:\\Users\\Buly\\AppData\\Local\\Steam', size: '12582912', confidence: 'high' } },
+        ],
+        metrics: [], notes: [{ key: 'LowConfidence', target: 'Leftovers', show: '' }],
+        steps: ['Listing uninstalled programs', 'Looking for leftovers'], anomalies: ['[ITEM] Leftovers : champ « colour » inconnu — ignoré'], truncated: false,
+      },
+    },
+    duplicates: {
+      lignes: ['[STEP] 1/1 Comparing contents'],
+      analyse: {
+        finds: [],
+        items: [
+          { option: 'Duplicates', fields: { id: 'd1', group: 'g1', name: 'vacances-001.jpg', path: 'C:\\Users\\Buly\\Pictures', size: '4404019', keep: 'true' } },
+          { option: 'Duplicates', fields: { id: 'd2', group: 'g1', name: 'vacances-001.jpg', path: 'C:\\Users\\Buly\\Downloads', size: '4404019' } },
+        ],
+        metrics: [], notes: [], steps: ['Comparing contents'], anomalies: [], truncated: false,
+      },
+    },
+    'privacy-check': {
+      lignes: [],
+      analyse: {
+        finds: [
+          { option: 'Telemetry', choice: '', fields: { state: 'todo' } },
+          { option: 'AdId', choice: '', fields: { state: 'ok' } },
+          { option: 'Activity', choice: '', fields: { state: 'todo' } },
+        ],
+        items: [], metrics: [], notes: [], steps: [], anomalies: [], truncated: false,
+      },
+    },
+    'disk-health': {
+      lignes: [],
+      analyse: {
+        finds: [], items: [],
+        metrics: [
+          { key: 'Health', fields: { value: 'ok', health: 'ok', group: 'Samsung SSD 980' } },
+          { key: 'Temperature', fields: { value: '38', unit: 'celsius', health: 'ok', max: '70', group: 'Samsung SSD 980' } },
+          { key: 'Hours', fields: { value: '8412', unit: 'hours', group: 'Samsung SSD 980', show: 'expert' } },
+          { key: 'Health', fields: { value: 'warn', health: 'warn', group: 'WD Blue' } },
+          { key: 'Temperature', fields: { value: '58', unit: 'celsius', health: 'warn', max: '70', group: 'WD Blue' } },
+        ],
+        notes: [{ key: 'Backup', target: '', show: '' }], steps: [], anomalies: [], truncated: false,
+      },
+    },
+  };
+
+  function analyserBanc(req) {
+    const s = TOUS.find((x) => x.id === req?.script_id);
+    if (!s?.meta.scan) throw new Error('SANS_ANALYSE');
+    const a = ANALYSES[s.id];
+    compteur += 1;
+    const run_id = `run-${compteur}`;
+    enCours = { run_id, script_id: s.id, arrete: false };
+    const lignes = a.lignes.length ? a.lignes : ['[STEP] 1/1 Measuring'];
+    lignes.forEach((texte, i) => {
+      setTimeout(() => {
+        if (!enCours || enCours.run_id !== run_id) return;
+        const marker = /^\[([A-Z]+)\]/.exec(texte)?.[1] || null;
+        const step = /^\[STEP\]\s+(\d+)\/(\d+)/.exec(texte);
+        emettre('script:line', { run_id, stream: 'stdout', seq: i, at_ms: i * 300, marker, step: step ? [Number(step[1]), Number(step[2])] : null, text: texte });
+      }, 80 + i * 120);
+    });
+    setTimeout(() => {
+      if (!enCours || enCours.run_id !== run_id) return;
+      const tue = enCours.arrete;
+      enCours = null;
+      emettre('script:analysis', { run_id, script_id: s.id, success: !tue, analysis: a.analyse });
+      emettre('script:end', {
+        run_id, script_id: s.id, exit_code: tue ? null : 0, success: !tue, killed: tue, duration_ms: 900,
+        checkpoint_reached: false, reboot_requested: false, freed: null, analysis: true,
+        counts_ok: 0, counts_warn: 0, counts_err: 0, log_path: `C:\\Users\\Buly\\AppData\\Local\\WinTool\\logs\\${s.id}-analyse.log`,
+      });
+    }, 80 + lignes.length * 120 + 200);
+    return { run_id, script_id: s.id, engine: 'winps', engine_path: 'powershell.exe', policy: 'Bypass', log_path: '', pid: 4343, simulated: false };
+  }
 
   const TOUT = Object.values(SCRIPTS).flat();
   /** Les scripts presents sur le disque : aucun tant que le catalogue n'est
@@ -311,6 +519,9 @@
 
   function lancer(req) {
     const s = TOUS.find((x) => x.id === req?.script_id);
+    // Ce que chaque script aurait recu dans WINTOOL_CONFIG : pour verifier
+    // depuis la console que la selection de l'analyse part bien avec.
+    (window.__BENCH_CONFIGS ||= []).push({ id: req?.script_id, config: req?.config });
     if (s && !simulable(s) && bilanSimulation().etat === 'activee') throw new Error('SANS_SIMULATION');
     // ?garde : la garde des reglages refuse un « dossier » qui vise Windows.
     if (s?.id === 'clean-temp' && new URLSearchParams(location.search).has('garde')) {
@@ -342,6 +553,9 @@
         duration_ms: 1420,
         checkpoint_reached: true,
         reboot_requested: false,
+        // `[FREED]` : seule l'action « Faire de la place » l'annonce sur le banc.
+        freed: script_id === 'free-space' ? 917504000 : null,
+        analysis: false,
         counts_ok: 2, counts_warn: 1, counts_err: 1,
         log_path: 'C:\\Users\\Buly\\AppData\\Local\\WinTool\\logs\\2026-09-24_101200-set-dns.log',
       });
@@ -549,11 +763,16 @@
     list_scripts_grouped: () => groupes(),
     get_history: () => JSON.parse(JSON.stringify(historique)),
     run_script: (a) => lancer(a?.req),
+    scan_script: (a) => analyserBanc(a?.req),
+    disk_space: () => ({ lecteur: 'C:', total: 511_101_108_224, libre: 46_170_898_432 }),
+    set_analysis_chart: (a) => { reglages.analysis_chart = a.chart; return JSON.parse(JSON.stringify(reglages)); },
     cancel_script: () => {
       if (enCours) enCours.arrete = true;
       return { killed: true, needs_confirmation: false, message: 'Exécution interrompue.' };
     },
-    preparer_approbation: () => ({
+    // Comme approval.rs : un script officiel dont l'empreinte est celle de
+    // l'index signe est approuve d'office (§16.4) — rien a demander.
+    preparer_approbation: (a) => (TOUS.find((x) => x.id === a?.scriptId)?.verified ? null : {
       script_id: 'set-dns',
       title: 'Configurer DNS',
       path: 'Default/102_SET-DNS.ps1',

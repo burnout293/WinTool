@@ -156,13 +156,29 @@
                 </button>
                 <h2 id="recapTitre"></h2>
               </div>
-              <div class="box">
+              <!-- Analyse (specification §17) : quand le lot compte une action
+                   qui sait analyser, l'etape 2 devient « Voici ce que j'ai
+                   trouve » — on coche, puis on lance. -->
+              <div id="analyseZone" hidden>
+                <div class="s-head-center an-entete">
+                  <h1 id="anTitre"></h1>
+                  <p class="muted" id="anSous"></p>
+                </div>
+                <div class="an-progression" id="anProgression" hidden>
+                  <div class="an-prog-barre"><i id="anBarre"></i></div>
+                  <div class="an-prog-t"><span id="anEtape"></span><span id="anRang"></span><span id="anPct"></span></div>
+                </div>
+                <div id="anResume"></div>
+                <div id="anAutres"></div>
+              </div>
+              <div class="box" id="recapBox">
                 <div class="box-h" id="recapBoxTitre"></div>
                 <div class="box-b list" id="recapZone"></div>
               </div>
               <p class="restore-note" id="restoreNote" hidden></p>
               <p class="restore-note" id="rebootNote" hidden></p>
               <div class="s-nav center">
+                <span class="an-total-bas" id="anTotal"></span>
                 <button class="btn primary big lancer" type="button" id="btnLancerEntretien"></button>
               </div>
             </div>
@@ -354,6 +370,17 @@
                 <div class="setrow" data-num="1.5">
                   <span class="setrow-txt"><span class="num">1.5</span><span class="rg-libelle"><b id="setMajVerifLabel"></b><span class="desc" data-i18n="reglages.d_maj_verifier"></span><span class="maj-etat" id="majEtat" aria-live="polite"></span></span></span>
                   <button class="btn compact" type="button" id="btnVerifierMaj"></button>
+                </div>
+                <div class="setrow" data-num="1.7">
+                  <span class="setrow-txt"><span class="num">1.7</span><span class="rg-libelle"><b id="setGrapheLabel"></b><span class="desc" data-i18n="reglages.d_graphique"></span></span></span>
+                  <select class="cat-select" id="setGrapheSelect">
+                    <option value="donut"></option>
+                    <option value="bar"></option>
+                    <option value="rows"></option>
+                    <option value="treemap"></option>
+                    <option value="waffle"></option>
+                    <option value="gauge"></option>
+                  </select>
                 </div>
                 <div class="setrow" data-num="1.6">
                   <span class="setrow-txt"><span class="num">1.6</span><span class="rg-libelle"><b id="setVisiteLabel"></b><span class="desc" data-i18n="reglages.d_visite"></span></span></span>
