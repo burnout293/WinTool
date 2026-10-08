@@ -1,7 +1,7 @@
 //! Historique des exécutions (specification §9/§14).
 //!
 //! Granularité retenue par défaut (§14, "hypothèse... pour pouvoir être
-//! contestée, pas dissimulée") : **une entrée par catégorie lancée et une par
+//! contestée, pas dissimulée") : **une entrée par lot lancé et une par
 //! script exécuté**. Rétention **maximale** — contrairement aux journaux
 //! techniques (plafonnés par taille, §9), rien n'est jamais purgé ici. C'est
 //! ce qui alimente les affichages "Fait le 18 septembre" (§7) : une date de
@@ -33,20 +33,29 @@ pub struct ScriptRunRecord {
     /// la simulation n'y etait jamais persistante.
     #[serde(default)]
     pub simulated: bool,
+    /// Octets reellement liberes, tels que le script les a annonces par
+    /// `[FREED]` (§17). Absent si le script ne l'a pas dit : l'historique ne
+    /// remplace jamais un chiffre mesure par une estimation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub freed: Option<u64>,
 }
 
+/// `alias` : jusqu'a la 1.2.1, un lot s'appelait une categorie, et l'historique
+/// l'ecrivait `category_id` / `category_name` dans `categories`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CategoryRunRecord {
-    pub category_id: String,
-    pub category_name: String,
+pub struct LotRunRecord {
+    #[serde(alias = "category_id")]
+    pub lot_id: String,
+    #[serde(alias = "category_name")]
+    pub lot_name: String,
     pub at: String,
     pub script_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct History {
-    #[serde(default)]
-    pub categories: Vec<CategoryRunRecord>,
+    #[serde(default, alias = "categories")]
+    pub lots: Vec<LotRunRecord>,
     #[serde(default)]
     pub scripts: Vec<ScriptRunRecord>,
 }
@@ -90,12 +99,12 @@ pub fn record_script_run<R: Runtime>(
     save(app, &h)
 }
 
-pub fn record_category_run<R: Runtime>(
+pub fn record_lot_run<R: Runtime>(
     app: &AppHandle<R>,
-    record: CategoryRunRecord,
+    record: LotRunRecord,
 ) -> Result<(), String> {
     let mut h = load(app)?;
-    h.categories.push(record);
+    h.lots.push(record);
     save(app, &h)
 }
 
@@ -121,11 +130,13 @@ mod tests {
             killed: false,
             duration_ms: 1_420,
             simulated: true,
+            freed: Some(795_278_422),
         };
         // `to_value` puis `from_value` : exactement le chemin d'une commande.
         let valeur = serde_json::to_value(&record).expect("serialisation");
         let relu: ScriptRunRecord = serde_json::from_value(valeur).expect("deserialisation");
         assert_eq!(relu.duration_ms, 1_420);
+        assert_eq!(relu.freed, Some(795_278_422));
         assert_eq!(relu.script_id, "set-dns");
         assert!(
             relu.simulated,
@@ -146,9 +157,20 @@ mod tests {
     }
 
     #[test]
+    fn un_historique_de_la_1_2_relit_ses_categories_comme_des_lots() {
+        let ancien = r#"{"scripts":[],"categories":[{"category_id":"cleaning",
+                        "category_name":"Faire le ménage","at":"2026-10-01 10:00:00","script_ids":["s1"]}]}"#;
+        let h: History = serde_json::from_str(ancien).expect("historique 1.2 illisible");
+        assert_eq!(h.lots.len(), 1);
+        assert_eq!(h.lots[0].lot_id, "cleaning");
+        assert_eq!(h.lots[0].lot_name, "Faire le ménage");
+        assert!(h.scripts.is_empty());
+    }
+
+    #[test]
     fn un_historique_absent_est_vide_pas_une_erreur() {
         let h = load_from(Path::new("D:/chemin/qui/n/existe/pas/history.json"));
-        assert!(h.scripts.is_empty() && h.categories.is_empty());
+        assert!(h.scripts.is_empty() && h.lots.is_empty());
     }
 
     #[test]
@@ -167,6 +189,7 @@ mod tests {
             killed: false,
             duration_ms: 100,
             simulated: false,
+            freed: None,
         });
         save_to(&chemin, &h).unwrap();
 
@@ -179,6 +202,7 @@ mod tests {
             killed: false,
             duration_ms: 50,
             simulated: false,
+            freed: None,
         });
         save_to(&chemin, &h2).unwrap();
 

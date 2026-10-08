@@ -654,8 +654,8 @@ body[data-console="complet"] .term-crest { display: none; }
 
 /* ==========================================================================
    Mode Expert — master-detail (specification 2)
-   Colonne gauche filtrable melant Lots (les categories) et Scripts, detail a
-   droite, journal ancre en bas.
+   Colonne gauche filtrable a deux onglets, Scripts (ranges par categorie) et
+   Lots, detail a droite, journal ancre en bas.
    ========================================================================== */
 
 .problems-bar { position: relative; z-index: 2; }
@@ -733,6 +733,25 @@ body:not([data-console="compact"]) .lots-journal { display: none; }
 .ghead .iconbtn { width: 22px; height: 22px; border: none; }
 .ghead .iconbtn svg { width: 14px; height: 14px; }
 
+/* Deux onglets en tete de colonne (§2, §4.1) : les scripts ranges par
+   categorie, ou les lots. Meme rail que le selecteur Simple / Expert. */
+.lots-onglets {
+  display: flex; gap: 2px; margin: 8px 12px 4px; padding: 3px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px;
+}
+.lots-onglets button {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 6px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: var(--text-3);
+}
+.lots-onglets button[aria-selected="true"] { background: var(--surface); color: var(--text); box-shadow: var(--sh); }
+.lots-onglets .rc { font-size: 11px; font-weight: 600; color: var(--text-3); }
+/* Une rubrique par categorie dans l'onglet Scripts : un entete discret avec
+   son icone et son compte, les scripts dessous. */
+.rubrique-h { padding-top: 14px; }
+.rubrique-t { display: inline-flex; align-items: center; gap: 7px; }
+.rubrique-t svg { width: 13px; height: 13px; }
+.rubrique-h .rc { font-size: 10.5px; letter-spacing: 0; }
+
 .row {
   display: flex; align-items: center; gap: 11px; padding: 9px 14px;
   cursor: pointer; color: var(--text-2); position: relative;
@@ -767,12 +786,12 @@ body:not([data-console="compact"]) .lots-journal { display: none; }
 .row.drop-before { box-shadow: inset 0 2px 0 var(--acc); }
 .row.drop-after { box-shadow: inset 0 -2px 0 var(--acc); }
 
-#ligneNouvelleCategorie input {
+#ligneNouveauLot input {
   width: 100%; font-family: inherit; font-size: 13px; color: var(--text);
   background: var(--surface-2); border: 1px solid var(--border-2); border-radius: 8px;
   padding: 5px 8px;
 }
-#ligneNouvelleCategorie input:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+#ligneNouveauLot input:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
 
 /* Pastille de statut : seulement pour ce qu'on sait vraiment avoir constate
    cette session (specification 7 — « fait le 18 septembre » ne veut dire que
@@ -897,7 +916,7 @@ body[data-mode="expert"] .only-simple { display: none; }
    deux alors que la maquette y pose la marque a meme le fond. */
 body[data-mode="simple"] .titlebar { background: none; border-bottom: none; }
 
-/* Etape 1 : la categorie epinglee en grand, puis les autres en bouees. */
+/* Etape 1 : le lot epingle en grand, puis les autres en bouees. */
 /* La carte epinglee epouse son contenu et reste centree : pleine largeur,
    elle se lisait comme un bandeau vide (maquette : une seule carte compacte,
    posee au centre, qui appelle le clic). */
@@ -1298,7 +1317,7 @@ body[data-mode="simple"] .only-expert { display: none; }
 #cheminsScripts b { color: var(--text-2); font-weight: 650; }
 
 
-/* --- Composer une categorie ------------------------------------------------
+/* --- Composer un lot -------------------------------------------------------
    Tous les scripts connus, un interrupteur par ligne. Un script coche ici
    peut l'etre ailleurs aussi : l'appartenance est multiple (§4.1). */
 .row.membre { display: flex; align-items: center; gap: 10px; padding: 5px 12px; }
@@ -1308,7 +1327,7 @@ body[data-mode="simple"] .only-expert { display: none; }
 .box-h-note { margin-left: auto; font-weight: 400; color: var(--text-3); font-size: 10.5px; }
 .box-h { display: flex; align-items: baseline; gap: 8px; }
 
-/* Puces de categorie sur la fiche d'un script : plusieurs peuvent etre
+/* Puces de lots sur la fiche d'un script : plusieurs peuvent etre
    allumees en meme temps, contrairement a l'ancienne liste deroulante. */
 .cat-puces { display: flex; flex-wrap: wrap; gap: 6px; }
 .cat-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }

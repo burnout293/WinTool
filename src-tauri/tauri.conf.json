@@ -41,7 +41,8 @@
       }
     },
     "resources": {
-      "../tools/categories.json": "categories.json"
+      "../tools/categories.json": "categories.json",
+      "../tools/lots.json": "lots.json"
     },
     "icon": [
       "icons/32x32.png",

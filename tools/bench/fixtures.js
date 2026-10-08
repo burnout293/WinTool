@@ -39,8 +39,18 @@
     { id: 'tools', fr: 'Entretien automatique', en: 'Tools', icon: 'wrench', pinned: false, aggregate: false },
   ];
 
-  /** Struct `settings::Category`. */
-  const categorie = (c) => ({
+  /** `tools/categories.json` : les categories, qui rangent l'onglet Scripts. */
+  const CATEGORIES = [
+    { id: 'cleaning', fr: 'Nettoyage', en: 'Cleaning', icon: 'broom' },
+    { id: 'performance', fr: 'Performance', en: 'Performance', icon: 'zap' },
+    { id: 'privacy', fr: 'Vie privée', en: 'Privacy', icon: 'shield' },
+    { id: 'apps', fr: 'Applications', en: 'Applications', icon: 'app-window' },
+    { id: 'health', fr: 'Santé', en: 'Health', icon: 'activity' },
+    { id: 'tools', fr: 'Outillage', en: 'Tools', icon: 'wrench' },
+  ];
+
+  /** Struct `settings::Lot`. */
+  const lot = (c) => ({
     id: c.id,
     name: { fr: c.fr, en: c.en },
     description: '',
@@ -176,32 +186,45 @@
    * Struct `lib::GroupedResult` — PAS `settings::GroupedScripts`.
    *
    * La commande enrichit le regroupement des deux racines, des anomalies de
-   * dossier et des overrides. Une premiere version de cette fixture ne
-   * renvoyait que `categories` et `unclassified` : le pied du panneau affichait
-   * alors « Livrés : {chemin} », et le substituant non remplace ressemblait a
-   * un defaut d'i18n de l'application. Il ne venait que d'ici.
+   * dossier, des overrides et du rangement par categorie. Une premiere version
+   * de cette fixture ne renvoyait que les lots et `unclassified` : le pied du
+   * panneau affichait alors « Livrés : {chemin} », et le substituant non
+   * remplace ressemblait a un defaut d'i18n de l'application. Il ne venait que
+   * d'ici.
    */
   // Appartenances modifiees pendant la session de banc : id de script ->
-  // ensemble d'id de categories. Reproduit `ScriptOverride.categories`.
+  // ensemble d'id de lots. Reproduit `ScriptOverride.lots`.
   const appartenances = new Map();
-  const categoriesDe = (s) => {
+  const lotsDe = (s) => {
     if (appartenances.has(s.id)) return appartenances.get(s.id);
     const d = Object.entries(SCRIPTS).find(([, liste]) => liste.some((x) => x.id === s.id));
     return d ? [d[0]] : [];
+  };
+
+  /** Struct `settings::CategoryBucket` : par categorie, les id de scripts. */
+  const rubriques = () => {
+    const seaux = CATEGORIES.map((c) => ({
+      category: { id: c.id, name: { fr: c.fr, en: c.en }, icon: c.icon, aliases: [c.id] },
+      scripts: TOUS.filter((s) => s.meta.category === c.id).map((s) => s.id),
+    }));
+    const autres = TOUS.filter((s) => !CATEGORIES.some((c) => c.id === s.meta.category)).map((s) => s.id);
+    seaux.push({ category: { id: 'other', name: { fr: 'Autres', en: 'Other' }, icon: 'folder', aliases: [] }, scripts: autres });
+    return seaux.filter((b) => b.scripts.length);
   };
 
   const groupes = () => ({
     root: 'C:\\Users\\Buly\\AppData\\Local\\WinTool\\scripts',
     catalogue_root: CATALOGUE_ROOT,
     problems: [],
-    categories: CATS.map((c) => ({
-      category: categorie(c),
+    lots: CATS.map((c) => ({
+      lot: lot(c),
       scripts: c.aggregate
-        ? TOUS.filter((s) => categoriesDe(s).length > 0)
-        : TOUS.filter((s) => categoriesDe(s).includes(c.id)),
+        ? TOUS.filter((s) => lotsDe(s).length > 0)
+        : TOUS.filter((s) => lotsDe(s).includes(c.id)),
       missing: [],
     })),
-    unclassified: [],
+    unclassified: TOUS.filter((s) => lotsDe(s).length === 0),
+    categories: rubriques(),
     overrides: {},
   });
 
@@ -213,7 +236,7 @@
     failure_policy: 'continue',
     log_cap_mb: 200,
     exec_policy: 'bypass',
-    categories: CATS.map(categorie),
+    lots: CATS.map(lot),
     overrides: {},
     show_setting_numbers: false,
     ui_scale: 1,
@@ -228,8 +251,8 @@
 
   /** Struct `history::History` — un objet, jamais un tableau. */
   const historique = {
-    categories: [
-      { category_id: 'cleaning', category_name: 'Faire le ménage', at: '2026-09-18T10:12:00Z', script_ids: ['clean-temp'] },
+    lots: [
+      { lot_id: 'cleaning', lot_name: 'Faire le ménage', at: '2026-09-18T10:12:00Z', script_ids: ['clean-temp'] },
     ],
     scripts: SCENARIO === 'neuf' ? [] : [
       { script_id: 'clean-temp', title: 'Nettoyer les fichiers temporaires', at: '2026-09-18T10:12:00Z', success: true, killed: false, duration_ms: 4200 },
@@ -541,10 +564,10 @@
     }),
     // Enum `restore::RestoreOutcome` : 'created' | 'throttled_recent'
     // | 'protection_disabled' | { failed: "..." }. Jamais un objet libre.
-    set_category_script: (a) => {
-      const actuelles = categoriesDe({ id: a.scriptId });
-      const liste = actuelles.filter((c) => c !== a.categoryId);
-      if (a.member) liste.push(a.categoryId);
+    set_lot_script: (a) => {
+      const actuelles = lotsDe({ id: a.scriptId });
+      const liste = actuelles.filter((c) => c !== a.lotId);
+      if (a.member) liste.push(a.lotId);
       appartenances.set(a.scriptId, liste);
       return JSON.parse(JSON.stringify(reglages));
     },
@@ -552,6 +575,7 @@
       historique.scripts.push({
         script_id: a.scriptId, title: a.title, at: '2026-09-25T00:00:00Z',
         success: a.success, killed: a.killed, duration_ms: a.durationMs, simulated: !!a.simulated,
+        ...(a.freed != null ? { freed: a.freed } : {}),
       });
       return null;
     },
@@ -579,21 +603,21 @@
       return JSON.parse(JSON.stringify(reglages));
     },
     // Mode test : etat de session, comme cote Rust.
-    set_category_icon: (a) => {
+    set_lot_icon: (a) => {
       const c = CATS.find((x) => x.id === a.id);
       if (c) c.icon = a.icon;
-      reglages.categories = CATS.map(categorie);
+      reglages.lots = CATS.map(lot);
       return JSON.parse(JSON.stringify(reglages));
     },
-    rename_category: (a) => {
+    rename_lot: (a) => {
       const c = CATS.find((x) => x.id === a.id);
       if (c) { c.fr = a.name; c.en = a.name; }
-      reglages.categories = CATS.map(categorie);
+      reglages.lots = CATS.map(lot);
       return JSON.parse(JSON.stringify(reglages));
     },
-    set_category_pinned: (a) => {
+    set_lot_pinned: (a) => {
       CATS.forEach((c) => { c.pinned = !!a.pinned && c.id === a.id; });
-      reglages.categories = CATS.map(categorie);
+      reglages.lots = CATS.map(lot);
       return JSON.parse(JSON.stringify(reglages));
     },
     set_ui_scale: (a) => { reglages.ui_scale = a.value; return JSON.parse(JSON.stringify(reglages)); },
@@ -615,7 +639,7 @@
   const invoke = async (cmd, args) => {
     const f = REPONSES[cmd];
     if (f) return f(args);
-    // Tout le reste (set_theme, reorder_categories…) n'a pas de retour utile :
+    // Tout le reste (set_theme, reorder_lots…) n'a pas de retour utile :
     // renvoyer `null` plutot que rejeter evite de masquer un vrai defaut
     // d'interface derriere une erreur du banc.
     return null;

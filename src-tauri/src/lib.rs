@@ -14,7 +14,7 @@ mod systeme;
 mod update;
 
 use serde::Serialize;
-use settings::{Category, Settings};
+use settings::{Lot, Settings};
 use std::collections::HashSet;
 use std::sync::Arc;
 use tauri::Manager;
@@ -66,15 +66,16 @@ fn list_scripts(app: tauri::AppHandle) -> Result<discovery::DiscoveryResult, Str
     discovery::discover(&app)
 }
 
-/// Scripts decouverts, regroupes par categorie resolue (mode Expert, §2/§4.2).
+/// Scripts decouverts, regroupes par lot et par categorie (mode Expert, §2/§4.1).
 /// Combine la decouverte (`discovery::discover`) et les reglages utilisateur
 /// (`settings::load`) : les deux sont necessaires pour savoir dans quel lot
 /// ranger chaque script, donc c'est ici que la jointure se fait, pas cote JS —
-/// un seul endroit sait resoudre une categorie.
+/// un seul endroit sait resoudre un lot ou une categorie.
 #[tauri::command]
 fn list_scripts_grouped(app: tauri::AppHandle) -> Result<GroupedResult, String> {
     let decouverte = discovery::discover(&app)?;
     let reglages = settings::load(&app)?;
+    let categories = settings::group_by_category(&settings::read_categories(&app)?, &decouverte.scripts);
     let groupes = settings::group_scripts(&reglages, decouverte.scripts);
     let mut problems = systeme::alertes();
     problems.extend(decouverte.problems);
@@ -82,8 +83,9 @@ fn list_scripts_grouped(app: tauri::AppHandle) -> Result<GroupedResult, String> 
         root: decouverte.root,
         catalogue_root: decouverte.catalogue_root,
         problems,
-        categories: groupes.categories,
+        lots: groupes.lots,
         unclassified: groupes.unclassified,
+        categories,
         overrides: reglages.overrides,
     })
 }
@@ -93,8 +95,11 @@ struct GroupedResult {
     root: String,
     catalogue_root: String,
     problems: Vec<String>,
-    categories: Vec<settings::CategoryGroup>,
+    lots: Vec<settings::LotGroup>,
+    /// Scripts rangés dans aucun lot.
     unclassified: Vec<discovery::ScriptEntry>,
+    /// Les memes scripts, ranges par categorie (onglet « Scripts » de l'Expert).
+    categories: Vec<settings::CategoryBucket>,
     /// Ce que l'utilisateur a fige, script par script (§4.2). Envoye **a cote**
     /// des metadonnees, jamais fusionne dedans : l'interface a besoin des deux
     /// pour distinguer « le script dit 5 » de « vous avez impose 5 », et pour
@@ -540,7 +545,7 @@ fn check_script(app: tauri::AppHandle, script_id: String) -> Result<Verification
 }
 
 /// Historique (specification §9/§14) : une entree par script execute et une
-/// par categorie lancee. L'horodatage vient du serveur, pas du client — le
+/// par lot lance. L'horodatage vient du serveur, pas du client — le
 /// frontend fournit les faits constates, jamais l'heure.
 #[tauri::command]
 fn record_script_run(
@@ -552,6 +557,8 @@ fn record_script_run(
     duration_ms: u64,
     // `Option` : un appel qui l'omettrait reste valide, et vaut « reel ».
     simulated: Option<bool>,
+    // Ce que le script a annonce par `[FREED]`, s'il l'a fait (§17).
+    freed: Option<u64>,
 ) -> Result<(), String> {
     history::record_script_run(
         &app,
@@ -562,23 +569,24 @@ fn record_script_run(
             killed,
             duration_ms,
             simulated: simulated.unwrap_or(false),
+            freed,
             at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         },
     )
 }
 
 #[tauri::command]
-fn record_category_run(
+fn record_lot_run(
     app: tauri::AppHandle,
-    category_id: String,
-    category_name: String,
+    lot_id: String,
+    lot_name: String,
     script_ids: Vec<String>,
 ) -> Result<(), String> {
-    history::record_category_run(
+    history::record_lot_run(
         &app,
-        history::CategoryRunRecord {
-            category_id,
-            category_name,
+        history::LotRunRecord {
+            lot_id,
+            lot_name,
             script_ids,
             at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         },
@@ -599,9 +607,9 @@ fn enforce_log_cap(app: tauri::AppHandle) -> Result<(), String> {
     runner::appliquer_plafond_journaux(&app, reglages.log_cap_mb)
 }
 
-/// Point de restauration avant le lancement d'une categorie (specification
-/// §6.4). C'est l'app qui decide de le creer (le frontend sait deja, via
-/// `reversible` sur chaque script, si la categorie en a besoin) ; cette
+/// Point de restauration avant le lancement d'un lot (specification §6.4).
+/// C'est l'app qui decide de le creer (le frontend sait deja, via
+/// `reversible` sur chaque script, si le lot en a besoin) ; cette
 /// commande ne fait qu'executer l'operation Windows et rapporter ce qui s'est
 /// reellement passe.
 #[tauri::command]
@@ -629,10 +637,10 @@ fn get_settings(app: tauri::AppHandle) -> Result<Settings, String> {
     settings::load(&app)
 }
 
-/// Nouvelle categorie utilisateur (§4.1) : un seul nom, dans la langue actuelle de
-/// l'interface — pas de traduction automatique, contrairement aux categories d'usine.
+/// Nouveau lot utilisateur (§4.1) : un seul nom, dans la langue actuelle de
+/// l'interface — pas de traduction automatique, contrairement aux lots d'usine.
 #[tauri::command]
-fn create_category(app: tauri::AppHandle, name: String, icon: String) -> Result<Settings, String> {
+fn create_lot(app: tauri::AppHandle, name: String, icon: String) -> Result<Settings, String> {
     with_settings(&app, |s| {
         let lang = s.lang.clone();
         let id = format!(
@@ -642,7 +650,7 @@ fn create_category(app: tauri::AppHandle, name: String, icon: String) -> Result<
                 .map_err(|e| e.to_string())?
                 .as_millis()
         );
-        s.categories.push(Category {
+        s.lots.push(Lot {
             id,
             name: std::collections::BTreeMap::from([(lang, name)]),
             description: String::new(),
@@ -656,30 +664,30 @@ fn create_category(app: tauri::AppHandle, name: String, icon: String) -> Result<
     })
 }
 
-/// Renomme une categorie dans la langue actuelle. Une categorie d'usine perd alors
-/// sa traduction dans l'autre langue : un nom tape a la main ne se traduit pas tout
-/// seul (meme regle que pour une categorie creee par l'utilisateur, §10).
+/// Renomme un lot dans la langue actuelle. Un lot d'usine perd alors sa traduction
+/// dans l'autre langue : un nom tape a la main ne se traduit pas tout seul (meme
+/// regle que pour un lot cree par l'utilisateur, §10).
 #[tauri::command]
-fn rename_category(app: tauri::AppHandle, id: String, name: String) -> Result<Settings, String> {
+fn rename_lot(app: tauri::AppHandle, id: String, name: String) -> Result<Settings, String> {
     with_settings(&app, |s| {
         let lang = s.lang.clone();
         let cat = s
-            .categories
+            .lots
             .iter_mut()
             .find(|c| c.id == id)
-            .ok_or_else(|| format!("categorie introuvable : {id}"))?;
+            .ok_or_else(|| format!("lot introuvable : {id}"))?;
         cat.name = std::collections::BTreeMap::from([(lang, name)]);
         Ok(())
     })
 }
 
-/// Reordonne la liste des categories (glisser-deposer en mode Expert). Les ids absents
+/// Reordonne la liste des lots (glisser-deposer en mode Expert). Les ids absents
 /// de `order` gardent leur position relative a la fin, par tolerance envers un appel
 /// fait a partir d'une liste legerement perimee cote frontend.
 #[tauri::command]
-fn reorder_categories(app: tauri::AppHandle, order: Vec<String>) -> Result<Settings, String> {
+fn reorder_lots(app: tauri::AppHandle, order: Vec<String>) -> Result<Settings, String> {
     with_settings(&app, |s| {
-        let mut reste: Vec<Category> = std::mem::take(&mut s.categories);
+        let mut reste: Vec<Lot> = std::mem::take(&mut s.lots);
         let mut classees = Vec::with_capacity(reste.len());
         for id in &order {
             if let Some(pos) = reste.iter().position(|c| &c.id == id) {
@@ -687,50 +695,50 @@ fn reorder_categories(app: tauri::AppHandle, order: Vec<String>) -> Result<Setti
             }
         }
         classees.append(&mut reste);
-        s.categories = classees;
+        s.lots = classees;
         Ok(())
     })
 }
 
-/// Supprime une categorie sans jamais supprimer de fichier de script (§14, hypothese
-/// retenue). Les scripts qui la referencaient retombent en "Non classe" a la prochaine
-/// resolution, sans bookkeeping supplementaire a faire ici.
+/// Supprime un lot sans jamais supprimer de fichier de script (§14, hypothese
+/// retenue). Les scripts qui le referencaient retombent en "Non classe" a la
+/// prochaine resolution, sans bookkeeping supplementaire a faire ici.
 #[tauri::command]
-fn delete_category(app: tauri::AppHandle, id: String) -> Result<Settings, String> {
+fn delete_lot(app: tauri::AppHandle, id: String) -> Result<Settings, String> {
     with_settings(&app, |s| {
-        s.categories.retain(|c| c.id != id);
+        s.lots.retain(|c| c.id != id);
         Ok(())
     })
 }
 
-/// Classement manuel d'un script dans une categorie (§4.2/§5.1) : fige definitivement
-/// ce rangement, plus aucune Re-analyse ni changement de `category:` ne le deplacera.
+/// Rangement manuel d'un script dans un lot (§4.2/§5.1) : fige definitivement ce
+/// rangement, plus aucune Re-analyse ni changement de `category:` ne le deplacera.
 #[tauri::command]
-fn assign_script_category(
+fn assign_script_lot(
     app: tauri::AppHandle,
     script_id: String,
-    category_id: String,
+    lot_id: String,
 ) -> Result<Settings, String> {
     with_settings(&app, |s| {
         let over = s.overrides.entry(script_id).or_default();
         // Rangement exclusif : remplace toute la liste. Conserve pour les
         // appelants qui veulent « deplacer » plutot que « cocher ».
-        over.categories = Some(if category_id == settings::NON_CLASSE {
+        over.lots = Some(if lot_id == settings::NON_CLASSE {
             Vec::new()
         } else {
-            vec![category_id]
+            vec![lot_id]
         });
-        over.category_locked = None;
+        over.lot_locked = None;
         Ok(())
     })
 }
 
-/// Coche ou decoche un script dans une categorie (§4.1) sans toucher a ses
+/// Coche ou decoche un script dans un lot (§4.1) sans toucher a ses
 /// autres appartenances. C'est ce qu'appelle la liste a bascule du mode Expert.
 #[tauri::command]
-fn set_category_script(
+fn set_lot_script(
     app: tauri::AppHandle,
-    category_id: String,
+    lot_id: String,
     script_id: String,
     member: bool,
 ) -> Result<Settings, String> {
@@ -746,7 +754,7 @@ fn set_category_script(
         .unwrap_or_default();
 
     with_settings(&app, |s| {
-        settings::set_script_category_membership(s, &script_id, &declaree, &category_id, member);
+        settings::set_script_lot_membership(s, &script_id, &declaree, &lot_id, member);
         Ok(())
     })
 }
@@ -780,7 +788,7 @@ fn set_script_flag(
 }
 
 /// Rend au script toutes ses valeurs de `$CONFIG` et ses trois booleens (§4.2).
-/// Le classement en categorie survit : c'est une autre decision.
+/// Le rangement dans les lots survit : c'est une autre decision.
 #[tauri::command]
 fn reset_script_config(app: tauri::AppHandle, script_id: String) -> Result<Settings, String> {
     with_settings(&app, |s| {
@@ -1221,16 +1229,14 @@ fn import_settings(app: tauri::AppHandle, json: String) -> Result<Settings, Stri
     settings::import_from_str(&app, &json)
 }
 
-/// Epingle ou detache une categorie (« Entretien complet » n'est pas un cas
-/// special de code, §4.1 : n'importe quelle categorie peut l'etre).
-/// Change l'icone d'une categorie.
+/// Change l'icone d'un lot.
 ///
 /// Le nom est valide contre la forme d'un identifiant Lucide, la meme que
 /// celle appliquee cote interface : le champ finit dans une requete de fichier
 /// (`icons/<nom>.svg`) dont le resultat est insere dans la page, et un nom
 /// libre ouvrirait la porte a un chemin remontant hors du dossier.
 #[tauri::command]
-fn set_category_icon(app: tauri::AppHandle, id: String, icon: String) -> Result<Settings, String> {
+fn set_lot_icon(app: tauri::AppHandle, id: String, icon: String) -> Result<Settings, String> {
     let forme_valide = !icon.is_empty()
         && icon.len() <= 64
         && icon
@@ -1244,51 +1250,53 @@ fn set_category_icon(app: tauri::AppHandle, id: String, icon: String) -> Result<
 
     with_settings(&app, |s| {
         let cat = s
-            .categories
+            .lots
             .iter_mut()
             .find(|c| c.id == id)
-            .ok_or_else(|| format!("categorie introuvable : {id}"))?;
+            .ok_or_else(|| format!("lot introuvable : {id}"))?;
         cat.icon = icon;
         Ok(())
     })
 }
 
+/// Epingle ou detache un lot (« Entretien complet » n'est pas un cas special
+/// de code, §4.1 : n'importe quel lot peut l'etre).
 #[tauri::command]
-fn set_category_pinned(
+fn set_lot_pinned(
     app: tauri::AppHandle,
     id: String,
     pinned: bool,
 ) -> Result<Settings, String> {
     with_settings(&app, |s| {
-        if !s.categories.iter().any(|c| c.id == id) {
-            return Err(format!("categorie introuvable : {id}"));
+        if !s.lots.iter().any(|c| c.id == id) {
+            return Err(format!("lot introuvable : {id}"));
         }
         // EXCLUSIF. Le mode Simple n'affiche qu'une seule grande carte, et il
-        // la choisit par `find(pinned)` : avec deux categories principales,
+        // la choisit par `find(pinned)` : avec deux lots principaux,
         // c'est l'ordre de la liste qui tranchait en silence. Designer une
         // principale retire donc le drapeau a toutes les autres.
-        for c in s.categories.iter_mut() {
+        for c in s.lots.iter_mut() {
             c.pinned = pinned && c.id == id;
         }
         Ok(())
     })
 }
 
-/// Reordonne les scripts d'une seule categorie (glisser-deposer, §6.1 : l'ordre
-/// est par categorie, pas global — un script dans deux lots peut y avoir une
+/// Reordonne les scripts d'un seul lot (glisser-deposer, §6.1 : l'ordre est
+/// par lot, pas global — un script dans deux lots peut y avoir une
 /// position differente).
 #[tauri::command]
-fn reorder_category_scripts(
+fn reorder_lot_scripts(
     app: tauri::AppHandle,
-    category_id: String,
+    lot_id: String,
     order: Vec<String>,
 ) -> Result<Settings, String> {
     with_settings(&app, |s| {
         let cat = s
-            .categories
+            .lots
             .iter_mut()
-            .find(|c| c.id == category_id)
-            .ok_or_else(|| format!("categorie introuvable : {category_id}"))?;
+            .find(|c| c.id == lot_id)
+            .ok_or_else(|| format!("lot introuvable : {lot_id}"))?;
         cat.scripts = order;
         Ok(())
     })
@@ -1363,22 +1371,22 @@ pub fn run() {
             approve_script,
             create_restore_point,
             record_script_run,
-            record_category_run,
+            record_lot_run,
             get_history,
             enforce_log_cap,
             get_settings,
-            create_category,
-            rename_category,
-            reorder_categories,
-            delete_category,
-            assign_script_category,
-            set_category_script,
+            create_lot,
+            rename_lot,
+            reorder_lots,
+            delete_lot,
+            assign_script_lot,
+            set_lot_script,
             set_script_config,
             set_script_flag,
             reset_script_config,
-            reorder_category_scripts,
-            set_category_pinned,
-            set_category_icon,
+            reorder_lot_scripts,
+            set_lot_pinned,
+            set_lot_icon,
             set_theme,
             set_lang,
             set_update_policy,

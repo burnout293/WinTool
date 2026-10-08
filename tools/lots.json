@@ -1,0 +1,10 @@
+[
+  { "id": "cleaning",    "name_fr": "Faire le ménage",   "name_en": "Cleaning",         "icon": "broom",              "categories": ["cleaning"] },
+  { "id": "performance", "name_fr": "Performance",       "name_en": "Performance",      "icon": "zap",                "categories": ["performance"] },
+  { "id": "privacy",     "name_fr": "Vie privée",        "name_en": "Privacy",          "icon": "shield",             "categories": ["privacy"] },
+  { "id": "apps",        "name_fr": "Applications",      "name_en": "Applications",     "icon": "app-window",         "categories": ["apps"] },
+  { "id": "health",      "name_fr": "Santé",             "name_en": "Health",           "icon": "activity",           "categories": ["health"] },
+  { "id": "tools",       "name_fr": "Outillage",         "name_en": "Tools",            "icon": "wrench",             "categories": ["tools"] },
+  { "id": "customize",   "name_fr": "Personnalisation",  "name_en": "Customize",        "icon": "sliders-horizontal", "categories": ["customize"] },
+  { "id": "maintenance", "name_fr": "Entretien complet", "name_en": "Full maintenance", "icon": "sparkles",           "pinned": true, "aggregate": true }
+]

@@ -113,7 +113,8 @@ let departCourse = 0;
    Mode Expert — master-detail (specification 2)
    ------------------------------------------------------------------------- */
 
-/** Dernier resultat de `list_scripts_grouped` : categories + Non classe. */
+/** Dernier resultat de `list_scripts_grouped` : lots, Non classe, et le
+ *  rangement par categorie de l'onglet Scripts. */
 let etatGroupes = null;
 /** Ligne selectionnee dans la colonne de gauche : { type: 'lot'|'script', id }. */
 let selection = null;
@@ -128,9 +129,9 @@ const NON_CLASSE = 'unclassified';
  *  casser silencieusement la detection de ce cas precis. */
 const NON_APPROUVE_MARQUEUR = 'NON_APPROUVE';
 
-/** Nom affiche d'une categorie : langue courante, sinon la base disponible —
+/** Nom affiche d'un lot ou d'une categorie : langue courante, sinon la base disponible —
  *  meme regle de repli que les traductions de script. */
-function nomCategorie(cat) {
+function nomLot(cat) {
   return cat.name[currentLang()] || cat.name.fr || cat.name.en || Object.values(cat.name)[0] || cat.id;
 }
 
@@ -211,7 +212,7 @@ function scriptsActifs(groupe) {
 const CHAMP_BOOLEEN = { restore: 'reversible_ack', reboot: 'reboot_ack', enabled: 'enabled' };
 
 /** Vrai des que quelque chose est fige pour ce script — hors classement en
- *  categorie, qui se defait par sa propre liste deroulante. */
+ *  lot, qui se defait par ses propres puces. */
 function aDesReglagesFiges(entree) {
   const o = reglagesScript(entree.id);
   return (
@@ -554,7 +555,7 @@ function statutScript(id) {
 
 async function rendreRowLot(cat, count, { draggable = true } = {}) {
   const icone = (await iconeSVG(cat.icon)) || '';
-  const nom = nomCategorie(cat);
+  const nom = nomLot(cat);
   const actif = selection?.type === 'lot' && selection.id === cat.id;
   return `
     <div class="row lot" data-lot="${esc(cat.id)}" data-nom="${esc(nom.toLowerCase())}"
@@ -601,37 +602,96 @@ function rendreRowManquant(id) {
     </div>`;
 }
 
-/** Reconstruit toute la colonne de gauche (Lots puis Scripts a plat) et
- *  reapplique le filtre en cours, s'il y en a un. */
-async function rendreLots() {
-  const zone = document.getElementById('lotsRows');
+/* -------------------------------------------------------------------------
+   Colonne de gauche : deux onglets (specification §2, §4.1)
 
+   « Scripts » range chaque script dans sa categorie — celle de son entete,
+   pour s'y retrouver quand la liste s'allonge. « Lots » montre les groupes de
+   scripts que le mode Simple propose et que l'on compose ici. Deux notions
+   distinctes depuis la 1.4 : une categorie ne lance rien, un lot ne range rien.
+   ------------------------------------------------------------------------- */
+
+/** Onglet affiche dans la colonne de gauche. Une commodite de session, retenue
+ *  par l'interface seule — rien qui doive survivre a un autre poste. */
+let ongletExpert = (() => {
+  try {
+    return localStorage.getItem('wintool.onglet') === 'lots' ? 'lots' : 'scripts';
+  } catch {
+    return 'scripts';
+  }
+})();
+
+function choisirOnglet(onglet) {
+  ongletExpert = onglet === 'lots' ? 'lots' : 'scripts';
+  try {
+    localStorage.setItem('wintool.onglet', ongletExpert);
+  } catch {
+    // Stockage indisponible : l'onglet reviendra aux scripts au prochain lancement.
+  }
+  rendreLots();
+}
+
+/** L'onglet « Scripts » : une rubrique par categorie, dans l'ordre de
+ *  tools/categories.json, « Autres » en dernier. */
+async function rendreOngletScripts() {
+  const rubriques = await Promise.all(
+    (etatGroupes.categories || []).map(async (b) => {
+      const icone = (await iconeSVG(b.category.icon)) || '';
+      const lignes = b.scripts
+        .map((id) => catalogue.get(id))
+        .filter(Boolean)
+        .map((s) => rendreRowScript(s))
+        .join('');
+      return `
+        <div class="rubrique" data-rubrique="${esc(b.category.id)}">
+          <div class="ghead rubrique-h">
+            <span class="rubrique-t">${icone}${esc(nomLot(b.category))}</span>
+            <span class="rc">${b.scripts.length}</span>
+          </div>
+          ${lignes}
+        </div>`;
+    })
+  );
+  return rubriques.join('') || `<div class="empty">${esc(t('chrome.aucun_script'))}</div>`;
+}
+
+/** L'onglet « Lots » : les lots, puis ceux qui ne sont dans aucun. */
+async function rendreOngletLots() {
   const lignesLots = await Promise.all(
-    etatGroupes.categories.map((g) => rendreRowLot(g.category, scriptsActifs(g).length))
+    etatGroupes.lots.map((g) => rendreRowLot(g.lot, scriptsActifs(g).length))
   );
   const lotNonClasse = { id: NON_CLASSE, icon: 'folder', name: { [currentLang()]: t('expert.non_classe') } };
   const ligneNonClasse = await rendreRowLot(lotNonClasse, etatGroupes.unclassified.length, { draggable: false });
-
-  const scriptsAPlat = [];
-  for (const g of etatGroupes.categories) scriptsAPlat.push(...g.scripts);
-  scriptsAPlat.push(...etatGroupes.unclassified);
-  const lignesScripts = scriptsAPlat.map((s) => rendreRowScript(s));
-
-  zone.innerHTML = `
+  return `
     <div class="ghead">
       <span>${esc(t('expert.lots'))}</span>
-      <button class="iconbtn" id="btnAjouterCategorie" type="button" data-tip="${esc(t('expert.ajouter_categorie'))}">
+      <button class="iconbtn" id="btnAjouterLot" type="button" data-tip="${esc(t('expert.ajouter_lot'))}">
         <svg class="ico" aria-hidden="true"><use href="#plus" /></svg>
       </button>
     </div>
-    <div class="row" id="ligneNouvelleCategorie" hidden>
-      <input type="text" id="nomNouvelleCategorie" placeholder="${esc(t('expert.nom_categorie_invite'))}" />
+    <div class="row" id="ligneNouveauLot" hidden>
+      <input type="text" id="nomNouveauLot" placeholder="${esc(t('expert.nom_lot_invite'))}" />
     </div>
     ${lignesLots.join('')}
-    ${ligneNonClasse}
-    <div class="ghead ghead-2"><span>${esc(t('expert.scripts'))}</span></div>
-    ${lignesScripts.join('')}`;
+    ${ligneNonClasse}`;
+}
 
+/** Reconstruit toute la colonne de gauche et reapplique le filtre en cours,
+ *  s'il y en a un. */
+async function rendreLots() {
+  const zone = document.getElementById('lotsRows');
+  const corps = ongletExpert === 'lots' ? await rendreOngletLots() : await rendreOngletScripts();
+  const nbScripts = catalogue.size;
+  zone.innerHTML = `
+    <div class="lots-onglets" role="tablist" aria-label="${esc(t('expert.onglets'))}">
+      <button type="button" role="tab" data-onglet-expert="scripts" aria-selected="${ongletExpert === 'scripts'}">
+        ${esc(t('expert.onglet_scripts'))}<span class="rc">${nbScripts}</span>
+      </button>
+      <button type="button" role="tab" data-onglet-expert="lots" aria-selected="${ongletExpert === 'lots'}">
+        ${esc(t('expert.onglet_lots'))}<span class="rc">${etatGroupes.lots.length}</span>
+      </button>
+    </div>
+    <div role="tabpanel">${corps}</div>`;
   appliquerFiltre();
 }
 
@@ -641,11 +701,16 @@ function appliquerFiltre() {
   document.querySelectorAll('#lotsRows .row[data-nom]').forEach((el) => {
     el.hidden = q.length > 0 && !el.dataset.nom.includes(q);
   });
+  // Une rubrique dont aucun script ne correspond disparait avec son entete :
+  // un titre seul au-dessus de rien ferait croire a une categorie vide.
+  document.querySelectorAll('#lotsRows .rubrique').forEach((r) => {
+    r.hidden = q.length > 0 && !r.querySelector('.row[data-nom]:not([hidden])');
+  });
 }
 
 async function rendreDetailLot(id) {
   const estNonClasse = id === NON_CLASSE;
-  const groupe = estNonClasse ? null : etatGroupes.categories.find((g) => g.category.id === id);
+  const groupe = estNonClasse ? null : etatGroupes.lots.find((g) => g.lot.id === id);
   if (!estNonClasse && !groupe) {
     selection = null;
     return `<div class="empty-detail">${esc(t('expert.aucune_selection'))}</div>`;
@@ -653,11 +718,11 @@ async function rendreDetailLot(id) {
 
   const cat = estNonClasse
     ? { id: NON_CLASSE, icon: 'folder', name: { [currentLang()]: t('expert.non_classe') }, pinned: false }
-    : groupe.category;
+    : groupe.lot;
   const scripts = estNonClasse ? etatGroupes.unclassified : groupe.scripts;
   const manquants = estNonClasse ? [] : groupe.missing;
   const icone = (await iconeSVG(cat.icon)) || '';
-  const nom = nomCategorie(cat);
+  const nom = nomLot(cat);
 
   const actions = estNonClasse
     ? ''
@@ -747,7 +812,7 @@ async function rendreDetailLot(id) {
 }
 
 /**
- * Icones proposees pour une categorie.
+ * Icones proposees pour un lot.
  *
  * Une selection, pas les 2112 de Lucide : un choix trop large fait perdre plus
  * de temps qu'il n'en fait gagner, et toutes ne se lisent pas a 16 px. Celles
@@ -828,37 +893,43 @@ async function ouvrirChoixIcone(id) {
 }
 
 async function rendreDetailScript(entree) {
-  const groupeActuel = etatGroupes.categories.find((g) => g.scripts.some((s) => s.id === entree.id));
-  const actuelle = groupeActuel ? groupeActuel.category.id : NON_CLASSE;
-
   // Une liste deroulante ne peut exprimer qu'un seul rangement ; la §4.1 en
-  // autorise plusieurs. Chaque categorie est donc une puce a bascule, et
-  // l'etat « dans aucune » se lit a l'absence de puce allumee.
+  // autorise plusieurs. Chaque lot est donc une puce a bascule, et
+  // l'etat « dans aucun » se lit a l'absence de puce allumee.
   const dedans = new Set(
-    etatGroupes.categories
-      .filter((g) => !g.category.aggregate && g.scripts.some((x) => x.id === entree.id))
-      .map((g) => g.category.id)
+    etatGroupes.lots
+      .filter((g) => !g.lot.aggregate && g.scripts.some((x) => x.id === entree.id))
+      .map((g) => g.lot.id)
   );
 
-  const puces = etatGroupes.categories
-    .filter((g) => !g.category.aggregate)
+  const puces = etatGroupes.lots
+    .filter((g) => !g.lot.aggregate)
     .map(
       (g) => `
-      <button class="chip" type="button" aria-pressed="${dedans.has(g.category.id)}"
-              data-membre="${esc(entree.id)}" data-lot="${esc(g.category.id)}">
-        ${esc(nomCategorie(g.category))}
+      <button class="chip" type="button" aria-pressed="${dedans.has(g.lot.id)}"
+              data-membre="${esc(entree.id)}" data-lot="${esc(g.lot.id)}">
+        ${esc(nomLot(g.lot))}
       </button>`
     )
     .join('');
 
-  const ligneCategorie = `
+  // La categorie, elle, se lit seulement : elle vient de l'entete du script.
+  const categorie = (etatGroupes.categories || []).find((b) => b.scripts.includes(entree.id))?.category;
+  const ligneCategorie = categorie
+    ? `<div class="cat-row">
+         <label>${esc(t('expert.categorie_label'))}</label>
+         <span class="badge" data-tip="${esc(t('expert.categorie_tip'))}">${esc(nomLot(categorie))}</span>
+       </div>`
+    : '';
+
+  const ligneLots = `
     <div class="cat-row">
-      <label>${esc(t('expert.categories_label'))}</label>
+      <label>${esc(t('expert.lots_label'))}</label>
       <div class="cat-puces">${puces}</div>
       ${dedans.size === 0 ? `<span class="muted">${esc(t('expert.non_classe'))}</span>` : ''}
     </div>`;
 
-  return rendreCarte(entree, { sousBadges: ligneCategorie });
+  return rendreCarte(entree, { sousBadges: ligneCategorie + ligneLots });
 }
 
 async function rendreDetail() {
@@ -906,17 +977,17 @@ async function chargerLots() {
         .join('');
     }
 
-    for (const g of etatGroupes.categories) for (const s of g.scripts) catalogue.set(s.id, s);
+    for (const g of etatGroupes.lots) for (const s of g.scripts) catalogue.set(s.id, s);
     for (const s of etatGroupes.unclassified) catalogue.set(s.id, s);
 
-    // Une categorie supprimee, ou un script disparu, invalide une selection
+    // Un lot supprime, ou un script disparu, invalide une selection
     // qui pointait dessus : on retombe sur l'etat neutre plutot que de garder
     // une reference perimee.
     if (selection?.type === 'script' && !catalogue.has(selection.id)) selection = null;
     if (
       selection?.type === 'lot' &&
       selection.id !== NON_CLASSE &&
-      !etatGroupes.categories.some((g) => g.category.id === selection.id)
+      !etatGroupes.lots.some((g) => g.lot.id === selection.id)
     ) {
       selection = null;
     }
@@ -1981,7 +2052,7 @@ async function basculerSimulation() {
   rendreDetail();
   // L'etape 2 du mode Simple affiche quels scripts seront simules.
   if (entretienEnCours && !entretienActif && document.querySelector('[data-script-recap]')) {
-    const groupe = etatGroupes?.categories.find((g) => g.category.id === entretienEnCours.categorieId);
+    const groupe = etatGroupes?.lots.find((g) => g.lot.id === entretienEnCours.lotId);
     if (groupe) await rendreEtapeVerifier(groupe);
   }
 }
@@ -2517,7 +2588,7 @@ async function cablerMoteur() {
       majEtatJournalCompact();
       // Comportement d'echec (specification §6.2, reglage Expert §8) : par
       // defaut on continue les autres scripts, mais "stop" vide la file pour
-      // ne pas enchainer sur la suite d'une categorie qui vient d'echouer.
+      // ne pas enchainer sur la suite d'un lot qui vient d'echouer.
       if (!succes && reglagesActuels?.failure_policy === 'stop') fileEntretien = [];
       majProgression();
       avancerEntretien();
@@ -2583,15 +2654,15 @@ async function selectionner(type, id) {
   await rendreDetail();
 }
 
-/** Fait apparaitre le champ de saisie d'une nouvelle categorie. */
-function ouvrirCreationCategorie() {
-  const ligne = document.getElementById('ligneNouvelleCategorie');
+/** Fait apparaitre le champ de saisie d'un nouveau lot. */
+function ouvrirCreationLot() {
+  const ligne = document.getElementById('ligneNouveauLot');
   ligne.hidden = !ligne.hidden;
-  if (!ligne.hidden) document.getElementById('nomNouvelleCategorie').focus();
+  if (!ligne.hidden) document.getElementById('nomNouveauLot').focus();
 }
 
 /** Remplace le titre d'un lot par un champ de saisie (specification 4.1 :
- *  le mode Expert permet de renommer une categorie, y compris « Entretien
+ *  le mode Expert permet de renommer un lot, y compris « Entretien
  *  complet », qui n'est pas un cas special). */
 function demarrerRenommageLot(id) {
   const h2 = document.querySelector(`h2[data-nom-lot="${CSS.escape(id)}"]`);
@@ -2605,8 +2676,8 @@ function demarrerRenommageLot(id) {
 /**
  * Reordonnancement par glisser-deposer : des Lots dans la colonne de gauche,
  * ou des Scripts d'un meme lot dans le detail (specification 6.1 — l'ordre
- * est par categorie, glisser un script d'un lot vers un autre n'est pas pris
- * en charge ici, seul le classement via le selecteur de categorie l'est).
+ * est par lot, glisser un script d'un lot vers un autre n'est pas pris
+ * en charge ici, seul le rangement par les puces de lots l'est).
  */
 function cablerGlisserDeposer() {
   let dragId = null;
@@ -2674,15 +2745,15 @@ function cablerGlisserDeposer() {
     if (dragKind === 'lot') {
       const cibleId = cible.dataset.lot;
       if (!cibleId || cibleId === dragId || cibleId === NON_CLASSE) return;
-      const ordre = etatGroupes.categories.map((g) => g.category.id);
+      const ordre = etatGroupes.lots.map((g) => g.lot.id);
       ordre.splice(ordre.indexOf(dragId), 1);
       const dest = ordre.indexOf(cibleId);
       ordre.splice(avant ? dest : dest + 1, 0, dragId);
-      await invoke('reorder_categories', { order: ordre });
+      await invoke('reorder_lots', { order: ordre });
     } else {
       const lotId = cible.dataset.lotDrag;
       if (!lotId || lotId !== dragLotId) return;
-      const groupe = etatGroupes.categories.find((g) => g.category.id === lotId);
+      const groupe = etatGroupes.lots.find((g) => g.lot.id === lotId);
       if (!groupe) return;
       const ordre = groupe.scripts.map((s) => s.id);
       const source = ordre.indexOf(dragId);
@@ -2691,7 +2762,7 @@ function cablerGlisserDeposer() {
       const dest = ordre.indexOf(cible.dataset.script);
       if (dest < 0) return;
       ordre.splice(avant ? dest : dest + 1, 0, dragId);
-      await invoke('reorder_category_scripts', { categoryId: lotId, order: ordre });
+      await invoke('reorder_lot_scripts', { lotId: lotId, order: ordre });
     }
     await chargerLots();
   });
@@ -2701,7 +2772,10 @@ function cablerInteractions() {
   document.getElementById('filtreLots').addEventListener('input', appliquerFiltre);
 
   document.querySelector('.lots').addEventListener('click', (ev) => {
-    if (ev.target.closest('#btnAjouterCategorie')) return void ouvrirCreationCategorie();
+    const onglet = ev.target.closest('[data-onglet-expert]');
+    if (onglet) return void choisirOnglet(onglet.dataset.ongletExpert);
+
+    if (ev.target.closest('#btnAjouterLot')) return void ouvrirCreationLot();
 
     const lot = ev.target.closest('.row.lot');
     if (lot) return void selectionner('lot', lot.dataset.lot);
@@ -2711,17 +2785,17 @@ function cablerInteractions() {
   });
 
   document.querySelector('.lots').addEventListener('keydown', async (ev) => {
-    if (ev.target.id !== 'nomNouvelleCategorie') return;
+    if (ev.target.id !== 'nomNouveauLot') return;
     if (ev.key === 'Enter') {
       const nom = ev.target.value.trim();
       if (nom) {
-        await invoke('create_category', { name: nom, icon: 'folder' });
+        await invoke('create_lot', { name: nom, icon: 'folder' });
         await chargerLots();
       } else {
-        document.getElementById('ligneNouvelleCategorie').hidden = true;
+        document.getElementById('ligneNouveauLot').hidden = true;
       }
     } else if (ev.key === 'Escape') {
-      document.getElementById('ligneNouvelleCategorie').hidden = true;
+      document.getElementById('ligneNouveauLot').hidden = true;
     }
   });
 
@@ -2752,16 +2826,16 @@ function cablerInteractions() {
       return;
     }
 
-    // Appartenance d'un script a une categorie (§4.1) : puce sur la fiche du
-    // script, interrupteur dans la composition d'une categorie. Les deux
+    // Appartenance d'un script a un lot (§4.1) : puce sur la fiche du
+    // script, interrupteur dans la composition d'un lot. Les deux
     // portent `data-membre` + `data-lot` et passent par la meme commande.
     const bascule = ev.target.closest('[data-membre][data-lot]');
     if (bascule) {
       const etait = bascule.getAttribute('aria-checked') === 'true' ||
                     bascule.getAttribute('aria-pressed') === 'true';
       try {
-        await invoke('set_category_script', {
-          categoryId: bascule.dataset.lot,
+        await invoke('set_lot_script', {
+          lotId: bascule.dataset.lot,
           scriptId: bascule.dataset.membre,
           member: !etait,
         });
@@ -2811,18 +2885,18 @@ function cablerInteractions() {
     const epingler = ev.target.closest('[data-epingler-lot]');
     if (epingler) {
       const id = epingler.dataset.epinglerLot;
-      const groupe = etatGroupes.categories.find((g) => g.category.id === id);
-      if (groupe) await invoke('set_category_pinned', { id, pinned: !groupe.category.pinned });
+      const groupe = etatGroupes.lots.find((g) => g.lot.id === id);
+      if (groupe) await invoke('set_lot_pinned', { id, pinned: !groupe.lot.pinned });
       return void chargerLots();
     }
 
     const supprimer = ev.target.closest('[data-supprimer-lot]');
     if (supprimer) {
       const id = supprimer.dataset.supprimerLot;
-      const groupe = etatGroupes.categories.find((g) => g.category.id === id);
-      const nom = groupe ? nomCategorie(groupe.category) : id;
+      const groupe = etatGroupes.lots.find((g) => g.lot.id === id);
+      const nom = groupe ? nomLot(groupe.lot) : id;
       if (confirm(t('expert.confirmer_suppression', { nom }))) {
-        await invoke('delete_category', { id });
+        await invoke('delete_lot', { id });
         selection = null;
         await chargerLots();
       }
@@ -2855,7 +2929,7 @@ function cablerInteractions() {
     const annule = ev.target.dataset.annule === '1';
     const id = ev.target.dataset.id;
     const nom = ev.target.value.trim();
-    if (!annule && nom) await invoke('rename_category', { id, name: nom });
+    if (!annule && nom) await invoke('rename_lot', { id, name: nom });
     await chargerLots();
   });
 
@@ -2882,14 +2956,14 @@ function cablerInteractions() {
 let modeCourant = 'simple';
 /** Scripts restants a lancer dans l'entretien en cours, dans l'ordre. */
 let fileEntretien = [];
-/** { categorieId, total, resultats: [{id, success}] }, ou null hors entretien. */
+/** { lotId, total, resultats: [{id, success}] }, ou null hors entretien. */
 let entretienEnCours = null;
 /** Vrai du lancement d'un entretien a son bilan, enchainements compris. Ni
  *  `course`, nul le temps de lancer le script suivant, ni `entretienEnCours`,
  *  garde pour le bilan et jamais remis a nul, ne le disent. La mise a jour
  *  s'en sert : son installeur ferme l'application. */
 let entretienActif = false;
-/** Categorie actuellement selectionnee a l'etape 1 — un clic choisit, il ne
+/** Lot actuellement selectionne a l'etape 1 — un clic choisit, il ne
  *  fait pas avancer tout seul (le mockup de reference confirme ce modele :
  *  choisir puis Continuer, pas un saut immediat). */
 let selectionSimpleId = null;
@@ -2938,10 +3012,10 @@ function afficherEtapeSimple(n) {
   }
 }
 
-/** Etape 1 : la categorie epinglee en grand, les autres en bouees sur une
+/** Etape 1 : le lot epingle en grand, les autres en bouees sur une
  *  ligne d'eau (max 6 par ligne, specification 15.2 — le flex-wrap ci-dessous
- *  fait naturellement une deuxieme ligne au-dela). Une categorie vide est
- *  masquee en mode Simple (specification 14). Un clic selectionne ; Continuer
+ *  fait naturellement une deuxieme ligne au-dela). Un lot vide est
+ *  masque en mode Simple (specification 14). Un clic selectionne ; Continuer
  *  fait avancer. */
 /** Duree grossiere d'un lot, dans les mots de la specification 7 : un ordre de
  *  grandeur, jamais une promesse. */
@@ -2956,7 +3030,7 @@ async function rendreEtapeChoisir() {
 
   // Un lot dont tous les scripts sont desactives n'a rien a proposer : il ne
   // s'affiche pas plutot que de mener a un entretien vide.
-  const dispo = etatGroupes ? etatGroupes.categories.filter((g) => scriptsActifs(g).length > 0) : [];
+  const dispo = etatGroupes ? etatGroupes.lots.filter((g) => scriptsActifs(g).length > 0) : [];
   const zoneReco = document.getElementById('recoCard');
   const zoneBuoys = document.getElementById('buoysZone');
   const sectAutres = document.getElementById('sectAutres');
@@ -2972,7 +3046,7 @@ async function rendreEtapeChoisir() {
   if (catalogue.size === 0 && !etatCatalogue?.installe) return void (await rendreOffreCatalogue());
 
   if (!dispo.length) {
-    zoneReco.innerHTML = `<p class="muted">${esc(t('simple.aucune_categorie'))}</p>`;
+    zoneReco.innerHTML = `<p class="muted">${esc(t('simple.aucun_lot'))}</p>`;
     zoneBuoys.innerHTML = '';
     positionnerBouees();
     sectAutres.hidden = true;
@@ -2980,19 +3054,19 @@ async function rendreEtapeChoisir() {
     return;
   }
 
-  const epinglee = dispo.find((g) => g.category.pinned) || dispo[0];
+  const epinglee = dispo.find((g) => g.lot.pinned) || dispo[0];
   const autres = dispo.filter((g) => g !== epinglee);
-  if (!selectionSimpleId || !dispo.some((g) => g.category.id === selectionSimpleId)) {
-    selectionSimpleId = epinglee.category.id;
+  if (!selectionSimpleId || !dispo.some((g) => g.lot.id === selectionSimpleId)) {
+    selectionSimpleId = epinglee.lot.id;
   }
 
-  const iconeReco = (await iconeSVG(epinglee.category.icon)) || '';
+  const iconeReco = (await iconeSVG(epinglee.lot.icon)) || '';
   zoneReco.innerHTML = `
-    <div class="reco" data-lot="${esc(epinglee.category.id)}" aria-current="${selectionSimpleId === epinglee.category.id}">
+    <div class="reco" data-lot="${esc(epinglee.lot.id)}" aria-current="${selectionSimpleId === epinglee.lot.id}">
       <div class="ri">${iconeReco}</div>
       <div>
-        <div class="rt">${esc(nomCategorie(epinglee.category))} <span class="badge acc">${esc(t('simple.recommande'))}</span></div>
-        <div class="rd">${esc(epinglee.category.description || t('simple.on_s_occupe_de_tout'))} — ${esc(PLURIEL('simple.duree_estimee', minutesLot(epinglee)))}</div>
+        <div class="rt">${esc(nomLot(epinglee.lot))} <span class="badge acc">${esc(t('simple.recommande'))}</span></div>
+        <div class="rd">${esc(epinglee.lot.description || t('simple.on_s_occupe_de_tout'))} — ${esc(PLURIEL('simple.duree_estimee', minutesLot(epinglee)))}</div>
       </div>
     </div>`;
 
@@ -3001,13 +3075,13 @@ async function rendreEtapeChoisir() {
 
   const buoys = await Promise.all(
     autres.map(async (g, i) => {
-      const icone = (await iconeSVG(g.category.icon)) || '';
-      const actif = selectionSimpleId === g.category.id;
+      const icone = (await iconeSVG(g.lot.icon)) || '';
+      const actif = selectionSimpleId === g.lot.id;
       return `
-        <button class="buoy" type="button" data-lot="${esc(g.category.id)}" aria-current="${actif}">
+        <button class="buoy" type="button" data-lot="${esc(g.lot.id)}" aria-current="${actif}">
           <span class="bi">${icone}</span>
           <span class="blabel">
-            <span class="bt">${esc(nomCategorie(g.category))}</span>
+            <span class="bt">${esc(nomLot(g.lot))}</span>
             <span class="bd">${esc(t('simple.duree_courte', { n: minutesLot(g) }))}</span>
           </span>
         </button>`;
@@ -3017,9 +3091,9 @@ async function rendreEtapeChoisir() {
   positionnerBouees();
   // La barre rappelle ce qui est choisi : utile quand le champ a defile et
   // que la bouee choisie n'est plus a l'ecran.
-  const choisi = dispo.find((g) => g.category.id === selectionSimpleId) || epinglee;
+  const choisi = dispo.find((g) => g.lot.id === selectionSimpleId) || epinglee;
   document.getElementById('s1Choisi').innerHTML =
-    `${esc(t('s1.choisi'))} <b>${esc(nomCategorie(choisi.category))}</b> · ` +
+    `${esc(t('s1.choisi'))} <b>${esc(nomLot(choisi.lot))}</b> · ` +
     esc(t('simple.duree_courte', { n: minutesLot(choisi) }));
   barre.hidden = false;
 }
@@ -3282,10 +3356,10 @@ function selectionnerChoix(id) {
   rendreEtapeChoisir();
 }
 
-async function choisirCategorie(id) {
-  const groupe = etatGroupes?.categories.find((g) => g.category.id === id);
+async function choisirLot(id) {
+  const groupe = etatGroupes?.lots.find((g) => g.lot.id === id);
   if (!groupe || !scriptsActifs(groupe).length) return;
-  entretienEnCours = { categorieId: id, total: scriptsActifs(groupe).length, resultats: [] };
+  entretienEnCours = { lotId: id, total: scriptsActifs(groupe).length, resultats: [] };
   afficherEtapeSimple(2);
   await rendreEtapeVerifier(groupe);
 }
@@ -3399,7 +3473,7 @@ function marqueSimulation(entree) {
 }
 
 async function rendreEtapeVerifier(groupe) {
-  document.getElementById('recapTitre').textContent = nomCategorie(groupe.category);
+  document.getElementById('recapTitre').textContent = nomLot(groupe.lot);
   document.getElementById('recapBoxTitre').textContent = t('simple.recap_titre');
 
   const lignes = await Promise.all(
@@ -3480,7 +3554,7 @@ function estimerMinutesRestantes(groupe) {
 
 async function lancerEntretien() {
   document.getElementById('riseFill')?.classList.remove('termine');
-  const groupe = etatGroupes?.categories.find((g) => g.category.id === entretienEnCours?.categorieId);
+  const groupe = etatGroupes?.lots.find((g) => g.lot.id === entretienEnCours?.lotId);
   if (!groupe) return;
   entretienActif = true;
   rendreBandeauMaj();
@@ -3493,15 +3567,15 @@ async function lancerEntretien() {
   document.getElementById('btnArreterEntretien').textContent = t('simple.arreter_apres');
   document.getElementById('btnRetourAccueil').hidden = true;
   document.getElementById('tasksBilan').hidden = false;
-  document.getElementById('tasksBilanDetail').textContent = nomCategorie(groupe.category);
+  document.getElementById('tasksBilanDetail').textContent = nomLot(groupe.lot);
   document.getElementById('term').hidden = true;
   fileEntretien = scriptsActifs(groupe);
   etapeEntretienActuelle = null;
   majProgression();
 
-  invoke('record_category_run', {
-    categoryId: groupe.category.id,
-    categoryName: nomCategorie(groupe.category),
+  invoke('record_lot_run', {
+    lotId: groupe.lot.id,
+    lotName: nomLot(groupe.lot),
     scriptIds: scriptsActifs(groupe).map((s) => s.id),
   }).catch((e) => console.error("Enregistrement de l'historique impossible :", e));
 
@@ -3509,7 +3583,7 @@ async function lancerEntretien() {
   if (besoinRestauration) {
     try {
       const resultat = await invoke('create_restore_point', {
-        description: `WinTool - ${nomCategorie(groupe.category)}`,
+        description: `WinTool - ${nomLot(groupe.lot)}`,
       });
       document.getElementById('tasksBilanDetail').textContent = messageRestauration(resultat);
     } catch (e) {
@@ -3596,7 +3670,7 @@ function terminerEntretien() {
  *  symbole qui pretendrait en savoir plus que ce que `derniersResultats` sait
  *  vraiment (specification §7). */
 function rendreTachesEntretien() {
-  const groupe = etatGroupes?.categories.find((g) => g.category.id === entretienEnCours?.categorieId);
+  const groupe = etatGroupes?.lots.find((g) => g.lot.id === entretienEnCours?.lotId);
   if (!groupe) return;
   const lignes = scriptsActifs(groupe).map((s, i) => {
     const tr = s.meta.translations?.[currentLang()];
@@ -3635,7 +3709,7 @@ function rendreTachesEntretien() {
 }
 
 function majProgression() {
-  const groupe = etatGroupes?.categories.find((g) => g.category.id === entretienEnCours?.categorieId);
+  const groupe = etatGroupes?.lots.find((g) => g.lot.id === entretienEnCours?.lotId);
   const total = entretienEnCours?.total || 1;
   const fait = entretienEnCours?.resultats.length || 0;
   const pct = Math.round((fait / total) * 100);
@@ -3669,7 +3743,7 @@ function cablerModeEtSimple() {
     const buoy = ev.target.closest('.buoy[data-lot]');
     if (buoy) return void selectionnerChoix(buoy.dataset.lot);
 
-    if (ev.target.closest('#btnContinuerChoix')) return void choisirCategorie(selectionSimpleId);
+    if (ev.target.closest('#btnContinuerChoix')) return void choisirLot(selectionSimpleId);
     if (ev.target.closest('[data-s-back]')) return void afficherEtapeSimple(1);
     if (ev.target.closest('#btnLancerEntretien')) return void lancerEntretien();
     if (ev.target.closest('#btnArreterEntretien')) return void arreterEntretien();
@@ -3691,7 +3765,7 @@ let reglagesActuels = null;
 
 /** Dernier historique connu (§9/§14) : rafraichi apres chaque script execute,
  *  pour que "Fait le ..." (§7) reste a jour sans le recharger a chaque rendu. */
-let historiqueActuel = { categories: [], scripts: [] };
+let historiqueActuel = { lots: [], scripts: [] };
 
 /** Le plus recent enregistrement pour ce script, ou undefined. Les entrees
  *  sont ajoutees dans l'ordre chronologique : le dernier du tableau est le
@@ -3745,19 +3819,19 @@ async function enregistrerExecution(payload, titre, simule) {
 function rendreHistorique() {
   const zone = document.getElementById('historiqueZone');
   const totalScripts = historiqueActuel.scripts.length;
-  const totalCategories = historiqueActuel.categories.length;
-  if (!totalScripts && !totalCategories) {
+  const totalLots = historiqueActuel.lots.length;
+  if (!totalScripts && !totalLots) {
     zone.innerHTML = `<div class="box-b"><p class="muted">${esc(t('histo.vide'))}</p></div>`;
     return;
   }
 
-  const lignesCategories = [...historiqueActuel.categories]
+  const lignesLots = [...historiqueActuel.lots]
     .reverse()
     .slice(0, 20)
     .map(
       (c) => `
       <div class="rrow">
-        <div class="rt">${esc(t('histo.categorie_lancee', { nom: c.category_name, n: c.script_ids.length }))}</div>
+        <div class="rt">${esc(t('histo.lot_lance', { nom: c.lot_name, n: c.script_ids.length }))}</div>
         <span class="muted mono">${esc(c.at)}</span>
       </div>`
     )
@@ -3779,7 +3853,7 @@ function rendreHistorique() {
 
   zone.innerHTML = `
     <div class="box-h">${esc(t('histo.titre'))}</div>
-    <div class="box-b list">${lignesCategories}${lignesScripts}</div>`;
+    <div class="box-b list">${lignesLots}${lignesScripts}</div>`;
 }
 
 function appliquerTraductionsReglages() {
@@ -4558,7 +4632,7 @@ function cablerReglages() {
     bouton.disabled = true;
     await chargerLots();
     const n = etatGroupes
-      ? etatGroupes.categories.reduce((somme, g) => somme + g.scripts.length, 0) +
+      ? etatGroupes.lots.reduce((somme, g) => somme + g.scripts.length, 0) +
         etatGroupes.unclassified.length
       : 0;
     bouton.disabled = false;
@@ -4627,7 +4701,7 @@ function rendreRapportConformite() {
   // contient tous : sans dedoublonnage, chaque script en anomalie etait liste
   // au moins deux fois.
   const vus = new Set();
-  const tous = [...etatGroupes.categories.flatMap((g) => g.scripts), ...etatGroupes.unclassified]
+  const tous = [...etatGroupes.lots.flatMap((g) => g.scripts), ...etatGroupes.unclassified]
     .filter((s) => !vus.has(s.id) && vus.add(s.id));
   const avecAnomalies = tous.filter((s) => s.meta.findings?.length);
   const explication = `<p class="muted conformite-expl">${esc(t('reglages.conformite_explication'))}</p>`;
@@ -4770,7 +4844,7 @@ async function demarrer() {
 
     const overlay = document.getElementById('iconesOverlay');
     try {
-      await invoke('set_category_icon', { id: overlay.dataset.pour, icon: choisie.dataset.choisirIcone });
+      await invoke('set_lot_icon', { id: overlay.dataset.pour, icon: choisie.dataset.choisirIcone });
     } catch (e) {
       // On laisse le calque ouvert : un refus qui ferme la fenetre sans rien dire
       // se lit comme un enregistrement reussi.
