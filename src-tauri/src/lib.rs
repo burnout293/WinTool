@@ -1,3 +1,4 @@
+mod analyse;
 mod approval;
 mod catalogue;
 mod contract;
@@ -220,12 +221,65 @@ fn set_simulation_all(app: tauri::AppHandle, value: bool) -> Result<Settings, St
 /// puisse l'expliquer plutot que d'afficher un message technique.
 const SANS_SIMULATION: &str = "SANS_SIMULATION";
 
+/// Sentinelle : on demande l'analyse d'un script qui ne se declare pas
+/// analysable (`scan : true`, §17).
+const SANS_ANALYSE: &str = "SANS_ANALYSE";
+
+/// Analyse un script (§17) : WinTool lui demande ce qu'il ferait, avec
+/// `WINTOOL_MODE=scan`. Rend la main immediatement ; la suite arrive par
+/// `script:line`, puis `script:analysis` et `script:end`.
+///
+/// Analyser, c'est executer (§17.4) : l'approbation et la garde des reglages
+/// s'appliquent exactement comme pour l'action. Que l'analyse ne modifie rien
+/// est une promesse de l'auteur, que WinTool ne peut pas verifier.
+#[tauri::command]
+fn scan_script(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<runner::Runner>>,
+    memoire: tauri::State<'_, Arc<analyse::Memoire>>,
+    mut req: runner::RunRequest,
+) -> Result<runner::RunStarted, String> {
+    let decouverte = discovery::discover(&app)?;
+    let entree = decouverte
+        .scripts
+        .iter()
+        .find(|s| s.id == req.script_id)
+        .cloned()
+        .ok_or_else(|| format!("Script introuvable : {}", req.script_id))?;
+    if !entree.meta.scan {
+        return Err(SANS_ANALYSE.to_string());
+    }
+    if !script_approuve(&entree)? {
+        return Err(NON_APPROUVE.to_string());
+    }
+    // Une liste [items] n'existe qu'apres l'analyse : rien a lui transmettre.
+    req.config.retain(|cle, _| {
+        entree
+            .meta
+            .options
+            .iter()
+            .any(|o| &o.key == cle && o.kind != "items")
+    });
+    let zones = zones_protegees(&app)?;
+    let e = systeme::emplacements();
+    req.config = garde::verifier_config(&entree.meta, &req.config, &zones, e, &e.system32())
+        .map_err(|r| r.message())?;
+    runner::run_analysis(
+        &app,
+        state.inner().clone(),
+        req,
+        entree,
+        memoire.inner().clone(),
+    )
+}
+
 /// Lance un script. Rend la main immediatement : la suite arrive par les
 /// evenements `script:line` puis `script:end`.
 #[tauri::command]
 fn run_script(
     app: tauri::AppHandle,
     state: tauri::State<'_, Arc<runner::Runner>>,
+    memoire: tauri::State<'_, Arc<analyse::Memoire>>,
     mut req: runner::RunRequest,
 ) -> Result<runner::RunStarted, String> {
     // La seule exception au principe "constater, jamais bloquer" (§5.4,
@@ -263,6 +317,24 @@ fn run_script(
     let e = systeme::emplacements();
     req.config = garde::verifier_config(&entree.meta, &req.config, &zones, e, &e.system32())
         .map_err(|r| r.message())?;
+
+    // Une selection [items] (§17) : des ids que le script interpretera lui-meme
+    // — un chemin, une application. Seuls ceux que sa derniere analyse, sur ce
+    // contenu exact du fichier, a annonces lui sont renvoyes : un id fabrique
+    // ailleurs que par l'analyse n'atteint jamais un script eleve.
+    for o in entree.meta.options.iter().filter(|o| o.kind == "items") {
+        if let Some(v) = req.config.get(&o.key) {
+            let ids: Vec<String> = v
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_str().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_default();
+            memoire.verifier(&entree.id, &entree.hash, &o.key, &ids)?;
+        }
+    }
 
     // Simulation (§6.9). Ce sont les reglages enregistres qui decident, pas
     // la configuration envoyee par l'interface : la valeur de `SafeTest`
@@ -1335,6 +1407,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             app.manage(Arc::new(runner::Runner::default()));
+            app.manage(Arc::new(analyse::Memoire::default()));
 
             // Environnement de chaque script : variables du systeme retablies
             // depuis HKLM, dossiers de l'utilisateur ramenes dans son profil
@@ -1361,6 +1434,7 @@ pub fn run() {
             scripts_root,
             engines,
             run_script,
+            scan_script,
             simulation_state,
             set_simulation_all,
             check_script,

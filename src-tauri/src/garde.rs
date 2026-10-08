@@ -569,11 +569,12 @@ mod tests {
                 .map(|v| Choice {
                     value: v.to_string(),
                     label: v.to_string(),
-                    desc: String::new(),
+                    ..Default::default()
                 })
                 .collect(),
             default: defaut,
             hidden: kind == "hidden",
+            ..Default::default()
         }
     }
 

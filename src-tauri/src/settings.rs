@@ -723,6 +723,7 @@ mod tests {
                 options: Vec::new(),
                 translations: BTreeMap::new(),
                 findings: Vec::new(),
+                ..Default::default()
             },
         }
     }

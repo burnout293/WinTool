@@ -62,13 +62,45 @@ $VALEURS_ADMISES = @{
     reboot        = @('true', 'false')
     # Facultatif : absent vaut false. Voir « Le mode analyse » dans FORMAT_SCRIPT.md.
     scan          = @('true', 'false')
+    # Facultatif : l'action entiere n'apparait qu'en Expert — ni montree ni lancee
+    # en mode Simple. Voir « Ce qui ne s'affiche que dans un mode ».
+    show          = @('expert')
 }
 
-$MARQUEURS = @('INFO', 'OK', 'WARN', 'ERR', 'STEP', 'CKPT', 'REBOOT', 'DONE', 'FIND', 'FREED')
+$MARQUEURS = @('INFO', 'OK', 'WARN', 'ERR', 'STEP', 'CKPT', 'REBOOT', 'DONE', 'FIND', 'FREED',
+               'ITEM', 'METRIC', 'NOTE', 'LOG', 'PROGRESS')
 
 # Types d'option. 'select' et 'multi' exigent des choix déclarés en sous-lignes.
-$TYPES_OPTION     = @('bool', 'number', 'string', 'hidden', 'select', 'multi')
+# 'items' est une liste trouvée par l'analyse : ses éléments n'existent pas dans
+# l'entête. Variante : [items:keep-one], des groupes dont on garde un exemplaire.
+$TYPES_OPTION     = @('bool', 'number', 'string', 'hidden', 'select', 'multi', 'items')
 $TYPES_AVEC_CHOIX = @('select', 'multi')
+
+# Le mode analyse : vues, panneaux, et les champs que chaque ligne peut porter.
+# Doit rester d'accord avec src-tauri/src/contract.rs et src-tauri/src/analyse.rs.
+$VUES      = @('minimal', 'light', 'gauge', 'checklist', 'bars', 'donut', 'tiles', 'compare',
+               'tree', 'table', 'treemap', 'timeline', 'chart', 'history')
+$PANNEAUX  = @('config', 'progress', 'plan', 'payload', 'attention', 'history', 'origin', 'disk')
+$CHAMPS_FIND   = @('size', 'count', 'state', 'checked', 'ms', 'current', 'recommended', 'show')
+$CHAMPS_ITEM   = @('id', 'parent', 'group', 'name', 'path', 'publisher', 'label', 'kind', 'confidence',
+                   'impact', 'risk', 'locked', 'version', 'to', 'date', 'keep', 'size', 'count',
+                   'state', 'checked', 'show')
+$CHAMPS_METRIC = @('value', 'unit', 'health', 'max', 'group', 'show')
+$VALEURS_CHAMP = @{
+    state       = @('todo', 'ok')
+    checked     = @('true', 'false')
+    current     = @('true', 'false')
+    recommended = @('true', 'false')
+    keep        = @('true', 'false')
+    show        = @('simple', 'expert')
+    kind        = @('folder', 'file', 'registry', 'app', 'startup', 'service', 'task', 'driver', 'browser')
+    confidence  = @('high', 'medium', 'low')
+    impact      = @('high', 'medium', 'low')
+    risk        = @('high', 'medium', 'low')
+    locked      = @('open', 'system', 'protected', 'inuse')
+    unit        = @('celsius', 'pct', 'hours', 'days', 's', 'count', 'cycles')
+    health      = @('ok', 'warn', 'crit')
+}
 
 # Catégories d'usine : un id anglais ET un id français par domaine, les deux acceptés
 # dans `category:` (un script écrit en `lang: en` comme en `lang: fr` doit pouvoir viser
@@ -272,16 +304,76 @@ function Read-BlocOptions {
         }
 
         $type = ''
+        $variante = ''
         if ($AvecType) {
-            if ($reste -match '^\[([a-z]+)\]\s*(.*)$') {
-                $type  = $Matches[1]
-                $reste = $Matches[2].Trim()
+            if ($reste -match '^\[([a-z]+)(?::([a-z-]+))?\]\s*(.*)$') {
+                $type     = $Matches[1]
+                $variante = $Matches[2]
+                $reste    = $Matches[3].Trim()
             }
         }
-        $options[$nom] = @{ Type = $type; Libelle = $reste; Ligne = $i + 1; Choix = [ordered]@{} }
+        $options[$nom] = @{ Type = $type; Variante = $variante; Libelle = $reste; Ligne = $i + 1; Choix = [ordered]@{} }
         $derniere = $nom
     }
     return $options
+}
+
+function Split-Etiquettes {
+    <#
+      Retire les étiquettes posées en tête d'un libellé — [scan], [group:Junk],
+      [show:expert], [view:tree] — et les renvoie à part. Une étiquette inconnue
+      est signalée, puis retirée quand même : sinon elle s'afficherait dans le
+      libellé, crochets compris.
+    #>
+    param([string] $Fichier, [int] $Ligne, [string] $Texte, [string[]] $Admises)
+
+    $etiquettes = @{}
+    while ($Texte -match '^\[([a-z]+)(?::([^\]\s]+))?\]\s*(.*)$') {
+        $nom = $Matches[1]; $valeur = $Matches[2]; $Texte = $Matches[3]
+        if ($Admises -notcontains $nom) {
+            Add-Constat $Fichier $Ligne 'erreur' 'ETIQUETTE_INCONNUE' "Étiquette '[$nom]' inconnue ici ; admises : $(($Admises | ForEach-Object { "[$_]" }) -join ' ')."
+            continue
+        }
+        $etiquettes[$nom] = if ($valeur) { $valeur } else { $true }
+    }
+    return @{ Etiquettes = $etiquettes; Texte = $Texte.Trim() }
+}
+
+function Test-Rapport {
+    <#
+      Le bloc REPORT : les libellés de ce que l'analyse nomme par un jeton (label=,
+      [METRIC]), les notes ([note:info|warn]) et les groupes du résumé ([group]).
+      Tout y est du texte à traduire, comme les options.
+    #>
+    param([string] $Fichier, [string[]] $Lignes)
+
+    $rapport = [ordered]@{}
+    $bloc = Find-Bloc $Lignes '^\s*##\s*WINTOOL:REPORT\s*$'
+    if (-not $bloc) { return $rapport }
+    if ($bloc.Fin -lt 0) {
+        Add-Constat $Fichier ($bloc.Debut + 1) 'erreur' 'RAPPORT_NON_FERME' 'Bloc WINTOOL:REPORT jamais refermé par WINTOOL:END.'
+        return $rapport
+    }
+    for ($i = $bloc.Debut + 1; $i -lt $bloc.Fin; $i++) {
+        if ($Lignes[$i] -notmatch '^\s*##\s+(\S+)\s*:\s*(.*?)\s*$') { continue }
+        $cle = $Matches[1]; $reste = $Matches[2]
+        $genre = 'label'; $niveau = ''
+        if ($reste -match '^\[note:([a-z]+)\]\s*(.*)$') {
+            $genre = 'note'; $niveau = $Matches[1]; $reste = $Matches[2]
+            if (@('info', 'warn') -cnotcontains $niveau) {
+                Add-Constat $Fichier ($i + 1) 'erreur' 'NOTE_NIVEAU' "La note '$cle' est de niveau '$niveau' ; niveaux admis : info | warn."
+            }
+        } elseif ($reste -match '^\[group\]\s*(.*)$') {
+            $genre = 'group'; $reste = $Matches[1]
+        } elseif ($reste -match '^\[([a-z]+)[:\]]') {
+            Add-Constat $Fichier ($i + 1) 'erreur' 'ETIQUETTE_INCONNUE' "Étiquette '[$($Matches[1])]' inconnue dans REPORT ; admises : [note:info], [note:warn], [group]."
+        }
+        if (-not $reste) {
+            Add-Constat $Fichier ($i + 1) 'erreur' 'LIBELLE_VIDE' "'$cle' est déclarée dans REPORT sans texte."
+        }
+        $rapport[$cle] = @{ Genre = $genre; Niveau = $niveau; Texte = $reste; Ligne = $i + 1 }
+    }
+    return $rapport
 }
 
 function Test-Options {
@@ -302,11 +394,33 @@ function Test-Options {
     foreach ($nom in $options.Keys) {
         $o = $options[$nom]
 
+        # Les étiquettes d'une option, puis celles de ses choix. Elles quittent le
+        # libellé : c'est le libellé nu qui s'affiche.
+        $lu = Split-Etiquettes $Fichier $o.Ligne $o.Libelle @('scan', 'group', 'show', 'view')
+        $o.Etiquettes = $lu.Etiquettes
+        $o.Libelle = $lu.Texte
+        foreach ($c in @($o.Choix.Keys)) {
+            $luc = Split-Etiquettes $Fichier $o.Choix[$c].Ligne $o.Choix[$c].Libelle @('group', 'show')
+            $o.Choix[$c].Etiquettes = $luc.Etiquettes
+            $o.Choix[$c].Libelle = $luc.Texte
+        }
+        foreach ($porteur in @(@{ E = $o.Etiquettes; L = $o.Ligne }) + @($o.Choix.Values | ForEach-Object { @{ E = $_.Etiquettes; L = $_.Ligne } })) {
+            if ($porteur.E.ContainsKey('show') -and @('simple', 'expert') -cnotcontains $porteur.E['show']) {
+                Add-Constat $Fichier $porteur.L 'erreur' 'VALEUR_INVALIDE' "[show:$($porteur.E['show'])] ; valeurs admises : simple | expert."
+            }
+        }
+        if ($o.Etiquettes.ContainsKey('view') -and $VUES -cnotcontains $o.Etiquettes['view']) {
+            Add-Constat $Fichier $o.Ligne 'erreur' 'VUE_INCONNUE' "[view:$($o.Etiquettes['view'])] : vue inconnue ; vues admises : $($VUES -join ' ')."
+        }
+
         if (-not $o.Type) {
             Add-Constat $Fichier $o.Ligne 'erreur' 'TYPE_ABSENT' "L'option '$nom' n'a pas de type. Attendu : # [type] Libellé — Description."
         }
         elseif ($TYPES_OPTION -notcontains $o.Type) {
             Add-Constat $Fichier $o.Ligne 'erreur' 'TYPE_INVALIDE' "Type '[$($o.Type)]' inconnu pour '$nom' ; types admis : $($TYPES_OPTION -join ' | ')."
+        }
+        elseif ($o.Variante -and -not ($o.Type -eq 'items' -and $o.Variante -eq 'keep-one')) {
+            Add-Constat $Fichier $o.Ligne 'erreur' 'TYPE_INVALIDE' "Type '[$($o.Type):$($o.Variante)]' inconnu pour '$nom' ; seule variante admise : [items:keep-one]."
         }
 
         if (-not $o.Libelle) {
@@ -407,6 +521,11 @@ function Test-Coherence {
                     }
                 }
             }
+            'items' {
+                if (-not $c.EstTableau) {
+                    Add-Constat $Fichier $c.Ligne 'erreur' 'DEFAUT_INVALIDE' "'$nom' est [items] : sa valeur par défaut doit être un tableau, en général @() — ses éléments n'existent qu'après l'analyse."
+                }
+            }
             'multi' {
                 if (-not $c.EstTableau) {
                     Add-Constat $Fichier $c.Ligne 'erreur' 'DEFAUT_INVALIDE' "'$nom' est [multi] : sa valeur par défaut doit être un tableau, par exemple @(`"temp`", `"cache`") ou @() pour aucun."
@@ -423,7 +542,7 @@ function Test-Coherence {
 }
 
 function Test-Traduction {
-    param([string] $Fichier, [string[]] $Lignes, $Options, [string] $LangBase)
+    param([string] $Fichier, [string[]] $Lignes, $Options, [string] $LangBase, $Rapport)
 
     # On exige une traduction vers une langue DIFFÉRENTE de celle de l'entête — et non
     # un bloc 'en' en dur : les scripts officiels sont rédigés en anglais et traduits
@@ -469,11 +588,19 @@ function Test-Traduction {
         }
     }
 
+    # Les textes du bloc REPORT se traduisent comme les options.
+    foreach ($cle in $Rapport.Keys) {
+        if (-not $traduits.Contains($cle)) {
+            Add-Constat $Fichier ($debut + 1) 'avertissement' 'TRADUCTION_RAPPORT' "'$cle' (bloc REPORT) n'a pas de texte '$langTrouvee' ; il s'affichera en '$LangBase'."
+        }
+    }
+
     # Sens 2 : toute traduction doit correspondre à quelque chose. C'est ce contrôle
     # qui manquait et par lequel la dérive s'installait — une clé renommée d'un côté
     # laissait derrière elle une traduction orpheline que rien ne signalait.
     foreach ($nom in $traduits.Keys) {
         if ($nom -in @('title', 'desc')) { continue }
+        if ($Rapport.Contains($nom)) { continue }
         if (-not $Options.Contains($nom)) {
             $meilleur = $null; $dMin = 99
             foreach ($connu in $Options.Keys) {
@@ -568,21 +695,58 @@ function Test-Marqueurs {
     }
 }
 
+function Get-ChampsLitteraux {
+    <#
+      Les champs « nom=valeur » d'une ligne émise, tels qu'écrits dans le source.
+      Une valeur calculée ($x, $($x.y)) est renvoyée vide : elle échappe au
+      contrôle statique, par construction — seule la forme écrite en toutes
+      lettres se vérifie sans exécuter.
+    #>
+    param([string] $Texte)
+    $champs = [ordered]@{}
+    foreach ($m in [regex]::Matches($Texte, '(?<![\w$.-])([A-Za-z]+)=("[^"]*"|[^\s"'']*)')) {
+        $v = $m.Groups[2].Value.Trim('"')
+        if ($v -match '[\$\{]') { $v = '' }
+        $champs[$m.Groups[1].Value] = $v
+    }
+    return $champs
+}
+
+function Test-ChampsLigne {
+    <# Champs inconnus, valeurs hors des jetons admis : commun à [FIND], [ITEM], [METRIC]. #>
+    param([string] $Fichier, [int] $Ligne, [string] $Marqueur, [string] $Cle, $Champs, [string[]] $Admis, [string] $Code)
+    foreach ($c in $Champs.Keys) {
+        if ($Admis -cnotcontains $c) {
+            Add-Constat $Fichier $Ligne 'erreur' $Code "[$Marqueur] '$Cle' : champ '$c' inconnu. Champs admis : $($Admis -join ', ')."
+            continue
+        }
+        $v = $Champs[$c]
+        if ($v -and $VALEURS_CHAMP.ContainsKey($c) -and $VALEURS_CHAMP[$c] -cnotcontains $v) {
+            Add-Constat $Fichier $Ligne 'erreur' $Code "[$Marqueur] '$Cle' : $c vaut '$v' ; valeurs admises : $($VALEURS_CHAMP[$c] -join ' | ')."
+        }
+        if ($v -and @('size', 'count', 'ms', 'max') -ccontains $c -and $v -notmatch '^\d+(\.\d+)?$') {
+            Add-Constat $Fichier $Ligne 'erreur' $Code "[$Marqueur] '$Cle' : $c vaut '$v', qui n'est pas un nombre."
+        }
+    }
+}
+
 function Test-Analyse {
     <#
-      Le mode analyse (FORMAT_SCRIPT.md, « Le mode analyse »). Quatre choses se
-      verifient sans executer quoi que ce soit :
-        - un script qui se declare analysable lit bien WINTOOL_MODE et emet bien
-          des [FIND] — sans quoi WinTool l'interrogerait pour rien ;
-        - chaque [FIND] vise une option qui existe, et du bon type : c'est la case
-          que l'utilisateur cochera, elle doit pouvoir porter la selection ;
-        - la mesure n'emploie que des champs connus ;
+      Le mode analyse (FORMAT_SCRIPT.md, « Le mode analyse »). Ce qui se verifie
+      sans executer quoi que ce soit :
+        - un script qui se declare analysable lit bien WINTOOL_MODE et rapporte
+          quelque chose ([FIND], [ITEM] ou [METRIC]) — sinon WinTool l'interrogerait
+          pour rien ;
+        - chaque ligne vise ce qui existe : [FIND] une option a cocher et l'un de
+          ses choix, [ITEM] une liste [items], [METRIC] et [NOTE] une cle du bloc
+          REPORT, label= un libelle de REPORT ;
+        - les champs sont connus et leurs jetons admis ;
         - a l'inverse, un script qui sait analyser sans le declarer ne sera jamais
           interroge : on le signale.
       Seules les cles ecrites en toutes lettres sont verifiees. Une cle calculee
       ("[FIND] $cle ...") echappe au controle statique, par construction.
     #>
-    param([string] $Fichier, [string[]] $Lignes, [hashtable] $Champs, $Options)
+    param([string] $Fichier, [string[]] $Lignes, [hashtable] $Champs, $Options, $Rapport)
 
     $declare = $Champs.ContainsKey('scan') -and $Champs['scan'].Valeur.ToLower() -eq 'true'
     $ligneScan = if ($Champs.ContainsKey('scan')) { $Champs['scan'].Ligne } else { 1 }
@@ -593,65 +757,164 @@ function Test-Analyse {
         $ligne = $Lignes[$i]
         if ($ligne -match '^\s*#') { continue }
         if ($ligne -match 'WINTOOL_MODE') { $litMode = $true }
-        foreach ($m in [regex]::Matches($ligne, '["'']\s*\[FIND\]\s+([^\s"'']+)([^"'']*)')) {
-            $emissions += @{ Cle = $m.Groups[1].Value; Mesure = $m.Groups[2].Value; Ligne = $i + 1 }
+        foreach ($m in [regex]::Matches($ligne, '["'']\s*\[(FIND|ITEM|METRIC|NOTE|LOG|PROGRESS)\]\s+([^\s"'']+)([^"'']*(?:""[^"'']*)*)')) {
+            $emissions += @{ Marqueur = $m.Groups[1].Value; Cle = $m.Groups[2].Value; Reste = $m.Groups[3].Value; Ligne = $i + 1 }
         }
     }
-
-    $cibles = @($Options.Keys | Where-Object { @('bool', 'multi') -contains $Options[$_].Type })
+    $constats = @($emissions | Where-Object { @('FIND', 'ITEM', 'METRIC') -contains $_.Marqueur })
 
     if ($declare) {
-        if ($cibles.Count -eq 0) {
-            Add-Constat $Fichier $ligneScan 'erreur' 'SCAN_SANS_CIBLE' "'scan : true' exige au moins une option [bool] ou [multi] : c'est elle que l'utilisateur coche après l'analyse."
-        }
         if (-not $litMode) {
             Add-Constat $Fichier $ligneScan 'erreur' 'SCAN_NON_GERE' "'scan : true' mais le script ne lit jamais `$env:WINTOOL_MODE : il agirait au lieu d'analyser."
         }
-        if ($emissions.Count -eq 0) {
-            Add-Constat $Fichier $ligneScan 'erreur' 'SCAN_SANS_FIND' "'scan : true' mais aucun [FIND] n'est émis : l'analyse ne rapporterait rien."
+        if ($constats.Count -eq 0) {
+            Add-Constat $Fichier $ligneScan 'erreur' 'SCAN_SANS_FIND' "'scan : true' mais aucun [FIND], [ITEM] ni [METRIC] n'est émis : l'analyse ne rapporterait rien."
         }
     }
-    elseif ($litMode -or $emissions.Count -gt 0) {
+    elseif ($litMode -or $constats.Count -gt 0) {
         Add-Constat $Fichier $ligneScan 'avertissement' 'FIND_SANS_SCAN' "Le script sait analyser mais ne le déclare pas : ajoutez '## scan : true' à l'entête, sinon WinTool ne l'interrogera jamais."
     }
 
     foreach ($e in $emissions) {
         $cle = $e.Cle
-        if ($cle.StartsWith('$')) { continue }
+        $champsLigne = Get-ChampsLitteraux $e.Reste
+        switch ($e.Marqueur) {
+            'FIND' {
+                if ($cle.StartsWith('$')) { break }
+                $nom, $choix = $cle -split '\.', 2
+                if (-not $Options.Contains($nom)) {
+                    Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] vise '$nom', qui n'est pas déclarée dans le bloc OPTIONS."
+                    break
+                }
+                $type = $Options[$nom].Type
+                if (@('bool', 'multi', 'select') -notcontains $type) {
+                    $conseil = if ($type -eq 'items') { " Une liste [items] se remplit par des lignes [ITEM]." } else { '' }
+                    Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] vise '$nom', de type [$type] : seule une option [bool], [multi] ou [select] peut porter une case.$conseil"
+                    break
+                }
+                if ($type -eq 'bool' -and $choix) {
+                    Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] '$cle' : '$nom' est un [bool], il n'a pas de choix. Écrivez '[FIND] $nom ...'."
+                }
+                if (@('multi', 'select') -contains $type) {
+                    if (-not $choix) {
+                        Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] '$nom' est un [$type] : visez l'un de ses choix, par exemple '[FIND] $nom.$(@($Options[$nom].Choix.Keys)[0]) ...'."
+                    }
+                    elseif (-not $choix.StartsWith('$') -and -not $Options[$nom].Choix.Contains($choix)) {
+                        Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] vise le choix '$choix', que '$nom' ne déclare pas."
+                    }
+                }
+                $mesures = @($champsLigne.Keys | Where-Object { @('size', 'count', 'state', 'ms') -contains $_ })
+                if ($mesures.Count -eq 0 -and $champsLigne.Count -eq 0) {
+                    Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_MESURE' "[FIND] '$cle' sans mesure : ajoutez size=<octets>, count=<nombre>, state=todo|ok ou ms=<millisecondes>."
+                }
+                Test-ChampsLigne $Fichier $e.Ligne 'FIND' $cle $champsLigne $CHAMPS_FIND 'FIND_MESURE'
+            }
+            'ITEM' {
+                if ($cle.StartsWith('$')) { break }
+                if (-not $Options.Contains($cle)) {
+                    Add-Constat $Fichier $e.Ligne 'erreur' 'ITEM_CLE_INCONNUE' "[ITEM] vise '$cle', qui n'est pas déclarée dans le bloc OPTIONS."
+                    break
+                }
+                if ($Options[$cle].Type -ne 'items') {
+                    Add-Constat $Fichier $e.Ligne 'erreur' 'ITEM_CLE_INCONNUE' "[ITEM] vise '$cle', de type [$($Options[$cle].Type)] : une ligne [ITEM] remplit une option [items]."
+                    break
+                }
+                if (-not $champsLigne.Contains('id')) {
+                    Add-Constat $Fichier $e.Ligne 'erreur' 'ITEM_SANS_ID' "[ITEM] '$cle' sans id= : c'est l'id que WinTool renverra au script si l'élément est coché."
+                }
+                Test-ChampsLigne $Fichier $e.Ligne 'ITEM' $cle $champsLigne $CHAMPS_ITEM 'ITEM_CHAMP'
+                if ($champsLigne.Contains('label') -and $champsLigne['label']) {
+                    $l = $champsLigne['label']
+                    if (-not $Rapport.Contains($l) -or $Rapport[$l].Genre -ne 'label') {
+                        Add-Constat $Fichier $e.Ligne 'erreur' 'LIBELLE_INCONNU' "[ITEM] '$cle' : label=$l n'est pas un libellé du bloc REPORT ; il s'afficherait tel quel, sans traduction."
+                    }
+                }
+            }
+            'METRIC' {
+                if ($cle.StartsWith('$')) { break }
+                if (-not $Rapport.Contains($cle) -or $Rapport[$cle].Genre -ne 'label') {
+                    Add-Constat $Fichier $e.Ligne 'erreur' 'METRIC_CLE_INCONNUE' "[METRIC] '$cle' n'est pas un libellé du bloc REPORT : la mesure n'aurait pas de nom à afficher."
+                }
+                if (-not $champsLigne.Contains('value')) {
+                    Add-Constat $Fichier $e.Ligne 'erreur' 'METRIC_CHAMP' "[METRIC] '$cle' sans value= : il n'y aurait rien à afficher."
+                }
+                Test-ChampsLigne $Fichier $e.Ligne 'METRIC' $cle $champsLigne $CHAMPS_METRIC 'METRIC_CHAMP'
+            }
+            'NOTE' {
+                if ($cle.StartsWith('$')) { break }
+                if (-not $Rapport.Contains($cle) -or $Rapport[$cle].Genre -ne 'note') {
+                    Add-Constat $Fichier $e.Ligne 'erreur' 'NOTE_INCONNUE' "[NOTE] '$cle' n'est pas une note du bloc REPORT ([note:info] ou [note:warn])."
+                }
+                $cible = ($e.Reste.Trim() -split '\s+')[0]
+                if ($cible -and $cible -notmatch '=' -and -not $cible.StartsWith('$')) {
+                    $nom, $choix = $cible -split '\.', 2
+                    if (-not $Options.Contains($nom) -or ($choix -and -not $Options[$nom].Choix.Contains($choix))) {
+                        Add-Constat $Fichier $e.Ligne 'erreur' 'NOTE_INCONNUE' "[NOTE] '$cle' vise '$cible', qui n'est ni une option ni un choix déclarés."
+                    }
+                }
+                Test-ChampsLigne $Fichier $e.Ligne 'NOTE' $cle $champsLigne @('show') 'NOTE_INCONNUE'
+            }
+            'LOG' {
+                if (-not $cle.StartsWith('$') -and $cle -notmatch '^[A-Za-z][A-Za-z0-9_-]{0,31}$') {
+                    Add-Constat $Fichier $e.Ligne 'erreur' 'LOG_CANAL' "[LOG] '$cle' : le canal est un mot (lettres, chiffres, - et _), suivi du texte."
+                }
+            }
+            'PROGRESS' {
+                if (-not $cle.StartsWith('$') -and ($cle -notmatch '^\d+$' -or [int]$cle -gt 100)) {
+                    Add-Constat $Fichier $e.Ligne 'erreur' 'PROGRESS_VALEUR' "[PROGRESS] '$cle' : un pourcentage entier, de 0 à 100."
+                }
+            }
+        }
+    }
+}
 
-        $nom, $choix = $cle -split '\.', 2
-        if (-not $Options.Contains($nom)) {
-            Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] vise '$nom', qui n'est pas déclarée dans le bloc OPTIONS."
-            continue
-        }
-        $type = $Options[$nom].Type
-        if (@('bool', 'multi') -notcontains $type) {
-            Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] vise '$nom', de type [$type] : seule une option [bool] ou [multi] peut porter une case à cocher."
-            continue
-        }
-        if ($type -eq 'bool' -and $choix) {
-            Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] '$cle' : '$nom' est un [bool], il n'a pas de choix. Écrivez '[FIND] $nom ...'."
-        }
-        if ($type -eq 'multi') {
-            if (-not $choix) {
-                Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] '$nom' est un [multi] : visez l'un de ses choix, par exemple '[FIND] $nom.$(@($Options[$nom].Choix.Keys)[0]) ...'."
-            }
-            elseif (-not $choix.StartsWith('$') -and -not $Options[$nom].Choix.Contains($choix)) {
-                Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_CLE_INCONNUE' "[FIND] vise le choix '$choix', que '$nom' ne déclare pas."
-            }
-        }
+function Test-Presentation {
+    <#
+      Ce que l'entête et OPTIONS disent de l'affichage : vues, panneaux, groupes.
+      Un nom inconnu ne casserait rien (WinTool retomberait sur la liste à cocher),
+      mais l'auteur ne verrait jamais ce qu'il croit avoir demandé.
+    #>
+    param([string] $Fichier, [hashtable] $Champs, $Options, $Rapport)
 
-        $champsMesure = @([regex]::Matches($e.Mesure, '(?<![\w$])([A-Za-z]+)=') | ForEach-Object { $_.Groups[1].Value })
-        if ($champsMesure.Count -eq 0) {
-            Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_MESURE' "[FIND] '$cle' sans mesure : ajoutez size=<octets>, count=<nombre> ou state=todo|ok."
-        }
-        foreach ($c in $champsMesure) {
-            if (@('size', 'count', 'state') -cnotcontains $c) {
-                Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_MESURE' "[FIND] '$cle' : champ '$c' inconnu. Champs admis : size, count, state."
+    if ($Champs.ContainsKey('view')) {
+        $v = $Champs['view']
+        foreach ($morceau in ($v.Valeur -split '\s+' | Where-Object { $_ })) {
+            $nom = ($morceau -split '=', 2)[-1]
+            if ($morceau -match '=' -and $morceau -notmatch '^(simple|expert)=') {
+                Add-Constat $Fichier $v.Ligne 'erreur' 'VUE_INCONNUE' "'view' : '$morceau' ; forme admise : '<vue>' ou '<vue> expert=<vue>'."
+                continue
+            }
+            if ($VUES -cnotcontains $nom) {
+                Add-Constat $Fichier $v.Ligne 'erreur' 'VUE_INCONNUE' "'view' : vue '$nom' inconnue ; vues admises : $($VUES -join ' ')."
             }
         }
-        if ($e.Mesure -match 'state=([A-Za-z]+)' -and @('todo', 'ok') -cnotcontains $Matches[1]) {
-            Add-Constat $Fichier $e.Ligne 'erreur' 'FIND_MESURE' "[FIND] '$cle' : state vaut '$($Matches[1])' ; valeurs admises : todo | ok."
+    }
+    if ($Champs.ContainsKey('panels')) {
+        foreach ($p in ($Champs['panels'].Valeur -split '[\s,]+' | Where-Object { $_ })) {
+            if ($PANNEAUX -cnotcontains $p) {
+                Add-Constat $Fichier $Champs['panels'].Ligne 'erreur' 'PANNEAU_INCONNU' "'panels' : panneau '$p' inconnu ; panneaux admis : $($PANNEAUX -join ' ')."
+            }
+        }
+    }
+
+    # Les groupes : chaque [group:X] doit avoir son libellé dans REPORT, et un
+    # groupe déclaré que rien n'utilise est sans doute un reste.
+    $utilises = @{}
+    foreach ($nom in $Options.Keys) {
+        $o = $Options[$nom]
+        $porteurs = @(@{ E = $o.Etiquettes; L = $o.Ligne }) + @($o.Choix.Values | ForEach-Object { @{ E = $_.Etiquettes; L = $_.Ligne } })
+        foreach ($p in $porteurs) {
+            if (-not $p.E -or -not $p.E.ContainsKey('group')) { continue }
+            $g = $p.E['group']
+            $utilises[$g] = $true
+            if (-not $Rapport.Contains($g) -or $Rapport[$g].Genre -ne 'group') {
+                Add-Constat $Fichier $p.L 'erreur' 'GROUPE_INCONNU' "[group:$g] : le groupe '$g' n'est pas déclaré dans REPORT ('## $g : [group] Libellé — sous-titre')."
+            }
+        }
+    }
+    foreach ($cle in $Rapport.Keys) {
+        if ($Rapport[$cle].Genre -eq 'group' -and -not $utilises.ContainsKey($cle)) {
+            Add-Constat $Fichier $Rapport[$cle].Ligne 'avertissement' 'GROUPE_ORPHELIN' "Le groupe '$cle' est déclaré dans REPORT mais aucune option ni aucun choix ne s'y range."
         }
     }
 }
@@ -696,15 +959,17 @@ foreach ($f in $fichiers) {
     Test-Encodage $relatif $f.FullName
     $champs  = Test-Entete  $relatif $lignes
     $options = Test-Options $relatif $lignes
+    $rapport = Test-Rapport $relatif $lignes
     $config  = Test-Config  $relatif $lignes
     Test-Coherence $relatif $options $config
 
     if ($champs.ContainsKey('lang')) { $langBase = $champs['lang'].Valeur } else { $langBase = 'fr' }
-    Test-Traduction     $relatif $lignes $options $langBase
+    Test-Traduction     $relatif $lignes $options $langBase $rapport
     Test-Override       $relatif $lignes
     Test-Marqueurs      $relatif $lignes
     Test-SortieAnglaise $relatif $lignes
-    Test-Analyse        $relatif $lignes $champs $options
+    Test-Analyse        $relatif $lignes $champs $options $rapport
+    Test-Presentation   $relatif $champs $options $rapport
 
     if ($champs.ContainsKey('id')) {
         $id = $champs['id'].Valeur.ToLower()

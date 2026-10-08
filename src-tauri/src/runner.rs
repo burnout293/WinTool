@@ -51,10 +51,12 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 #[cfg(windows)]
 const FILE_SHARE_READ: u32 = 0x0000_0001;
 
-/// Marqueurs de la specification 5.3. Toute autre balise en debut de ligne est
-/// laissee telle quelle : le moteur affiche, il ne censure pas.
-const MARQUEURS: [&str; 8] = [
-    "INFO", "OK", "WARN", "ERR", "STEP", "CKPT", "REBOOT", "DONE",
+/// Marqueurs de la specification 5.3, et ceux de l'analyse (§17). Toute autre
+/// balise en debut de ligne est laissee telle quelle : le moteur affiche, il ne
+/// censure pas.
+const MARQUEURS: [&str; 15] = [
+    "INFO", "OK", "WARN", "ERR", "STEP", "CKPT", "REBOOT", "DONE", "FREED", "FIND", "ITEM",
+    "METRIC", "NOTE", "LOG", "PROGRESS",
 ];
 
 /// Politiques d'execution admises (specification 6.7). Elles ne s'appliquent
@@ -169,6 +171,13 @@ pub struct RunEnd {
     pub checkpoint_reached: bool,
     /// Le script a emis `[REBOOT]` : un redemarrage est reellement necessaire.
     pub reboot_requested: bool,
+    /// Octets annonces par `[FREED]` (§17) : ce qui a reellement ete libere.
+    /// `None` si le script ne l'a pas dit — le bilan affiche alors l'estimation
+    /// de l'analyse, precedee de « environ ».
+    pub freed: Option<u64>,
+    /// Vrai pour une analyse (`WINTOOL_MODE=scan`) : rien n'a ete modifie, et
+    /// l'evenement `script:analysis` a precede celui-ci.
+    pub analysis: bool,
     pub counts_ok: u32,
     pub counts_warn: u32,
     pub counts_err: u32,
@@ -367,6 +376,8 @@ pub struct Cible {
     /// `auto` | `winps` | `pwsh`, tel que declare dans l'entete.
     pub engine: String,
     pub interruptible: bool,
+    /// Lancer l'analyse (`WINTOOL_MODE=scan`) et non l'action (§17).
+    pub analyse: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -668,9 +679,10 @@ pub fn lancer(
     let dossier_logs = base.join("logs");
     std::fs::create_dir_all(&dossier_logs).map_err(|e| e.to_string())?;
     let fichier_log = dossier_logs.join(format!(
-        "{}-{}.log",
+        "{}-{}{}.log",
         horodatage_fichier(),
-        assainir(&cible.id)
+        assainir(&cible.id),
+        if cible.analyse { "-analyse" } else { "" }
     ));
 
     let mut journal =
@@ -684,6 +696,7 @@ pub fn lancer(
          empreinte  : {}\n\
          moteur     : {nom_moteur} — {exe}\n\
          politique  : {politique}\n\
+         mode       : {}\n\
          debut      : {}\n\
          config     : {}\n\
          {}",
@@ -692,6 +705,11 @@ pub fn lancer(
         cible.id,
         cible.chemin.display(),
         empreinte,
+        if cible.analyse {
+            "analyse (WINTOOL_MODE=scan)"
+        } else {
+            "action"
+        },
         chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
         config_pour_journal(&config),
         "-".repeat(72)
@@ -734,6 +752,14 @@ pub fn lancer(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    // Le seul signe qui distingue une analyse d'une action : le script mesure et
+    // decrit, sans rien modifier (§17). Toujours pose ou toujours retire, pour
+    // qu'une variable heritee de l'environnement ne decide pas a notre place.
+    if cible.analyse {
+        commande.env("WINTOOL_MODE", "scan");
+    } else {
+        commande.env_remove("WINTOOL_MODE");
+    }
 
     #[cfg(windows)]
     commande.creation_flags(CREATE_NO_WINDOW);
@@ -749,6 +775,8 @@ pub fn lancer(
     let checkpoint = Arc::new(AtomicBool::new(false));
     let tue = Arc::new(AtomicBool::new(false));
     let reboot = Arc::new(AtomicBool::new(false));
+    // `u64::MAX` : aucun `[FREED]` lu.
+    let libere = Arc::new(AtomicU64::new(u64::MAX));
 
     {
         let mut garde = runner.actif.lock().map_err(|_| "etat interne corrompu")?;
@@ -775,6 +803,7 @@ pub fn lancer(
         let journal = journal.clone();
         let checkpoint = checkpoint.clone();
         let reboot = reboot.clone();
+        let libere = libere.clone();
         std::thread::spawn(move || {
             let mut lecteur = BufReader::new(flux);
             let mut tampon = Vec::new();
@@ -794,6 +823,18 @@ pub fn lancer(
                         "ERR" => compteurs.lock().unwrap().err += 1,
                         "CKPT" => checkpoint.store(true, Ordering::Relaxed),
                         "REBOOT" => reboot.store(true, Ordering::Relaxed),
+                        // Le dernier `[FREED]` lisible l'emporte ; un nombre
+                        // illisible n'est jamais compte comme zero.
+                        "FREED" => {
+                            if let Some(n) = texte
+                                .trim_start()
+                                .split_once(']')
+                                .and_then(|(_, r)| r.split_whitespace().next())
+                                .and_then(|n| n.parse::<u64>().ok())
+                            {
+                                libere.store(n.min(u64::MAX - 1), Ordering::Relaxed);
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -824,6 +865,7 @@ pub fn lancer(
         let run_id = run_id.clone();
         let script_id = cible.id.clone();
         let chemin_log = fichier_log.clone();
+        let analyse = cible.analyse;
         std::thread::spawn(move || {
             let statut = enfant.wait();
             // Le verrou est relache ici, et pas avant : il a protege le fichier
@@ -880,6 +922,11 @@ pub fn lancer(
                 duration_ms: duree,
                 checkpoint_reached: checkpoint.load(Ordering::Relaxed),
                 reboot_requested: reboot.load(Ordering::Relaxed),
+                freed: match libere.load(Ordering::Relaxed) {
+                    u64::MAX => None,
+                    n => Some(n),
+                },
+                analysis: analyse,
                 counts_ok: c.0,
                 counts_warn: c.1,
                 counts_err: c.2,
@@ -912,13 +959,59 @@ pub fn run_script<R: Runtime>(
     req: RunRequest,
     entree: discovery::ScriptEntry,
 ) -> Result<RunStarted, String> {
+    let cible = preparer(&req, entree, false)?;
+    lancer(
+        cible,
+        req.config,
+        req.policy,
+        &discovery::base_dir(app)?,
+        runner,
+        Arc::new(VersInterface { app: app.clone() }),
+    )
+}
+
+/// L'analyse d'un script (§17) : meme lanceur durci, meme verrou, meme
+/// approbation prealable que l'action — analyser, c'est executer. Seule
+/// difference : `WINTOOL_MODE=scan`, et la sortie est lue contre l'entete du
+/// script, puis publiee en `script:analysis` juste avant `script:end`.
+pub fn run_analysis<R: Runtime>(
+    app: &AppHandle<R>,
+    runner: Arc<Runner>,
+    req: RunRequest,
+    entree: discovery::ScriptEntry,
+    memoire: Arc<crate::analyse::Memoire>,
+) -> Result<RunStarted, String> {
+    let meta = entree.meta.clone();
+    let hash = entree.hash.clone();
+    let cible = preparer(&req, entree, true)?;
+    let sortie = Arc::new(VersAnalyse {
+        app: app.clone(),
+        meta,
+        hash,
+        lignes: Mutex::new(Vec::new()),
+        memoire,
+    });
+    lancer(
+        cible,
+        req.config,
+        req.policy,
+        &discovery::base_dir(app)?,
+        runner,
+        sortie,
+    )
+}
+
+fn preparer(
+    req: &RunRequest,
+    entree: discovery::ScriptEntry,
+    analyse: bool,
+) -> Result<Cible, String> {
     if !req.expected_hash.is_empty() && entree.hash != req.expected_hash {
         return Err(format!(
             "Le fichier « {} » a change depuis son analyse. Re-analysez-le avant de le lancer.",
             entree.path
         ));
     }
-
     let cible = Cible {
         // Le chemin vient de la decouverte, pas de l'interface : il n'y a pas
         // de nom de fichier a reconstruire, donc rien a detourner.
@@ -928,16 +1021,69 @@ pub fn run_script<R: Runtime>(
         hash: entree.hash,
         engine: entree.meta.engine,
         interruptible: entree.meta.interruptible,
+        analyse,
     };
+    Ok(cible)
+}
 
-    lancer(
-        cible,
-        req.config,
-        req.policy,
-        &discovery::base_dir(app)?,
-        runner,
-        Arc::new(VersInterface { app: app.clone() }),
-    )
+/// Ce que publie une analyse : chaque ligne, comme une execution ordinaire, et a
+/// la fin ce qu'elle a rapporte, lu contre l'entete du script.
+struct VersAnalyse<R: Runtime> {
+    app: AppHandle<R>,
+    meta: crate::contract::Script,
+    hash: String,
+    /// Les seules lignes qui comptent pour l'analyse, dans l'ordre.
+    lignes: Mutex<Vec<String>>,
+    memoire: Arc<crate::analyse::Memoire>,
+}
+
+/// Une analyse terminee, telle que l'interface la recoit.
+#[derive(Debug, Clone, Serialize)]
+pub struct AnalysisEnd {
+    pub run_id: String,
+    pub script_id: String,
+    /// Le code de sortie valait 0 : l'analyse a abouti. Sinon ce qui suit est
+    /// partiel, et l'interface le dit.
+    pub success: bool,
+    pub analysis: crate::analyse::Analyse,
+}
+
+impl<R: Runtime> Sortie for VersAnalyse<R> {
+    fn ligne(&self, ligne: Ligne) {
+        let compte = ligne.stream == "stdout"
+            && ligne
+                .marker
+                .as_deref()
+                .is_some_and(|m| crate::analyse::MARQUEURS_ANALYSE.contains(&m));
+        if compte {
+            if let Ok(mut l) = self.lignes.lock() {
+                // Au-dela, `analyse::lire` ne lirait de toute facon plus rien.
+                if l.len() <= crate::analyse::MAX_LIGNES {
+                    l.push(ligne.text.clone());
+                }
+            }
+        }
+        let _ = self.app.emit("script:line", ligne);
+    }
+
+    fn fin(&self, fin: RunEnd) {
+        let lignes = self.lignes.lock().map(|l| l.clone()).unwrap_or_default();
+        let analyse = crate::analyse::lire(&self.meta, &lignes);
+        // Une analyse interrompue ou en echec ne fonde aucune selection.
+        if fin.success {
+            self.memoire.retenir(&fin.script_id, &self.hash, &analyse);
+        }
+        let _ = self.app.emit(
+            "script:analysis",
+            AnalysisEnd {
+                run_id: fin.run_id.clone(),
+                script_id: fin.script_id.clone(),
+                success: fin.success,
+                analysis: analyse,
+            },
+        );
+        let _ = self.app.emit("script:end", fin);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1446,6 +1592,7 @@ exit 0
             chemin,
             engine: "auto".into(),
             interruptible,
+            analyse: false,
         }
     }
 
@@ -1602,6 +1749,72 @@ exit 0
             lignes.iter().any(|l| l.marker.as_deref() == Some("DONE")),
             "le [DONE] final n'a pas ete vu"
         );
+    }
+
+    /// Une analyse pose `WINTOOL_MODE=scan` ; une action ne le pose jamais, meme
+    /// si la variable traine dans l'environnement de WinTool.
+    #[test]
+    fn l_analyse_et_l_action_se_distinguent_par_wintool_mode() {
+        let bac = Bac::neuf("mode");
+        let sonde = bac.poser(
+            "mode.ps1",
+            "Write-Output \"[INFO] mode=[$env:WINTOOL_MODE]\"\nexit 0\n",
+        );
+        for (analyse, attendu) in [(true, "mode=[scan]"), (false, "mode=[]")] {
+            let (collecteur, rx) = attelage();
+            let mut c = cible(sonde.clone(), true);
+            c.analyse = analyse;
+            lancer(
+                c,
+                BTreeMap::new(),
+                None,
+                &bac.0,
+                Arc::new(Runner::default()),
+                collecteur.clone(),
+            )
+            .expect("lancement");
+            let fin = rx
+                .recv_timeout(Duration::from_secs(90))
+                .expect("pas de bilan");
+            assert_eq!(fin.analysis, analyse);
+            let lignes = collecteur.lignes.lock().unwrap();
+            assert!(
+                lignes.iter().any(|l| l.text.contains(attendu)),
+                "{attendu} attendu, vu : {:?}",
+                lignes.iter().map(|l| &l.text).collect::<Vec<_>>()
+            );
+        }
+    }
+
+    /// `[FREED]` : le dernier nombre lisible fait foi ; un texte n'est jamais
+    /// lu comme zero, et un script qui ne dit rien n'annonce rien.
+    #[test]
+    fn freed_rapporte_ce_qui_a_vraiment_ete_libere() {
+        let bac = Bac::neuf("freed");
+        for (source, attendu) in [
+            (
+                "Write-Output '[FREED] 1024'\nWrite-Output '[FREED] 4096'\nexit 0\n",
+                Some(4096),
+            ),
+            ("Write-Output '[FREED] beaucoup'\nexit 0\n", None),
+            ("Write-Output '[DONE] rien'\nexit 0\n", None),
+        ] {
+            let script = bac.poser("freed.ps1", source);
+            let (collecteur, rx) = attelage();
+            lancer(
+                cible(script, true),
+                BTreeMap::new(),
+                None,
+                &bac.0,
+                Arc::new(Runner::default()),
+                collecteur,
+            )
+            .expect("lancement");
+            let fin = rx
+                .recv_timeout(Duration::from_secs(90))
+                .expect("pas de bilan");
+            assert_eq!(fin.freed, attendu, "pour : {source}");
+        }
     }
 
     #[test]
