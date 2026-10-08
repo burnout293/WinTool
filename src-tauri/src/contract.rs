@@ -1042,6 +1042,31 @@ if ($env:WINTOOL_CONFIG) { }
         );
     }
 
+    /// Le guide reproduit l'exemple de la norme d'analyse : les deux ne doivent
+    /// jamais diverger. C'est le fichier que l'on donne a lire, et le guide que
+    /// l'agent catalogue recopie.
+    #[test]
+    fn le_guide_reproduit_l_exemple_d_analyse() {
+        let racine = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let lire = |p: std::path::PathBuf| {
+            std::fs::read_to_string(&p)
+                .unwrap_or_else(|e| panic!("{} illisible : {e}", p.display()))
+                .trim_start_matches('\u{feff}')
+                .replace("\r\n", "\n")
+        };
+        let exemple = lire(
+            racine
+                .join("docs")
+                .join("mockups")
+                .join("exemple-analyse.ps1"),
+        );
+        let guide = lire(racine.join("docs").join("FORMAT_SCRIPT.md"));
+        assert!(
+            guide.contains(exemple.trim_end()),
+            "docs/FORMAT_SCRIPT.md ne reproduit plus docs/mockups/exemple-analyse.ps1 à l'identique"
+        );
+    }
+
     #[test]
     fn signale_une_etiquette_ou_un_groupe_inconnu() {
         let src = EXEMPLE.replace(

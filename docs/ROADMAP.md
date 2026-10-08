@@ -11,11 +11,11 @@ d'un cran (1.1, 1.2…), une version de corrections seules prend un troisième c
 | **1.1** | Mise à jour automatique de WinTool | Publiée le 06/10/2026 |
 | **1.1.1** | Simulation réglable script par script, bouées posées sur la vague, rangées multiples — et premier test réel de la mise à jour automatique | Publiée le 06/10/2026 |
 | **1.2** | Les scripts quittent WinTool : catalogue officiel dans son propre dépôt (MIT), index signé, installation et mises à jour depuis l'application (§16) ; durcissement (§12.4) ; visite du premier démarrage (§13) ; désinstallation au choix | Publiée le 06/10/2026 |
-| **1.2.1** | Réglages en page entière, une section par page, recherche, Simple / Expert sans les quitter (§8) ; emplacements protégés : résumé et plan du disque ; écran « Choisir » : le champ de bouées défile au lieu de se défaire, « Continuer » collé en bas (§15.2) | Prête |
-| **1.4** | Publiée d'un seul tenant, avec ce que prévoyait la 1.3 : | |
+| **1.2.1** | Réglages en page entière, une section par page, recherche, Simple / Expert sans les quitter (§8) ; emplacements protégés : résumé et plan du disque ; écran « Choisir » : le champ de bouées défile au lieu de se défaire, « Continuer » collé en bas (§15.2) | Publiée le 07/10/2026 |
+| **1.4** | Publiée d'un seul tenant, avec ce que prévoyait la 1.3 : | Prête |
 | | — catalogues multiples : ajouter, modifier, retirer, activer ; consulter et choisir ses actions (§16) ; présentation modifiable sans code (`src/presentation.json`, §13) ; « action » au lieu d'« entretien » (§3) | Fait |
-| | — analyser → cocher → nettoyer (§17), avec une norme qui laisse les scripts composer l'écran : listes d'éléments, arborescences, confiance, mesures, notes (`docs/mockups/analyse.html`, script d'exemple `docs/mockups/exemple-analyse.ps1`) | Maquette faite et choisie : résumé à déplier en Simple (anneau par défaut), sommaire et panneaux en Expert, un seul affichage réglé par `show=` ; norme à écrire et validateur à étendre |
-| | — catégories distinctes des lots, onglets Scripts / Lots en Expert | À faire |
+| | — analyser → cocher → nettoyer (§17), avec une norme qui laisse les scripts composer l'écran : listes d'éléments, arborescences, confiance, mesures, notes ; résumé à déplier en Simple (anneau par défaut, graphique au choix), vues et panneaux en Expert, un seul affichage réglé par `show` (`docs/FORMAT_SCRIPT.md`, exemple `docs/mockups/exemple-analyse.ps1`) | Fait |
+| | — catégories distinctes des lots, onglets Scripts / Lots en Expert, réglages de la 1.2 migrés sans perte (§4.1) | Fait |
 | **1.5** | Témoin des changements sensibles (voir ci-dessous) | À faire |
 | en continu | Améliorations graphiques et d'organisation | Glissées dans chaque version |
 
@@ -53,10 +53,10 @@ lu), avec une décision en plus : qui les ajoute, et avec quelle clé (§16.2).
 
 ## Ce qui attend une décision
 
-- **1.4** — le passage des « catégories » actuelles aux « lots » renomme environ 310
-  occurrences dans le code et impose de migrer `settings.json` sans rien perdre.
-  `tools/categories.json`, qui sert aujourd'hui à la fois au validateur et à fabriquer les
-  lots d'usine, sera scindé en deux.
+- **Le catalogue officiel et la norme d'analyse.** WinTool 1.4 sait analyser ; les scripts
+  du catalogue, eux, doivent l'adopter un par un — c'est le travail de l'agent qui les
+  écrit, avec `docs/FORMAT_SCRIPT.md` pour modèle. Tant qu'un script ne déclare pas
+  `scan : true`, il s'applique tel quel, comme en 1.2.
 
 ## Idées pour plus tard
 

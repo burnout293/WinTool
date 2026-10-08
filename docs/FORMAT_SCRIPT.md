@@ -168,7 +168,7 @@ script, pas à l'application.
 
 ## L'entête
 
-Tous ces champs sont **obligatoires**, sauf `tags` et `scan`.
+Tous ces champs sont **obligatoires**, sauf `tags`, `scan`, `view`, `panels` et `show`.
 
 | Champ | Valeurs | Rôle |
 |---|---|---|
@@ -176,7 +176,7 @@ Tous ces champs sont **obligatoires**, sauf `tags` et `scan`.
 | `lang` | `en`, `fr`… | Langue dans laquelle cet entête est rédigé |
 | `title` | texte court | Nom affiché |
 | `desc` | une phrase | Description affichée |
-| `category` | voir ci-dessous | **Suggestion de rangement, pas un ordre** |
+| `category` | voir ci-dessous | Sa catégorie dans l'Expert, et une **suggestion** de lot |
 | `icon` | nom Lucide | Voir la section Icônes |
 | `tags` | liste, virgules | Facultatif, alimente la recherche |
 | `version` | `2.0` | Version du script lui-même |
@@ -188,29 +188,47 @@ Tous ces champs sont **obligatoires**, sauf `tags` et `scan`.
 | `reboot` | `true` / `false` | `true` **pré-coche** « nécessite un redémarrage » |
 | `engine` | `auto` / `winps` / `pwsh` | Interpréteur requis |
 | `scan` | `true` / `false` | Facultatif. `true` = le script sait analyser avant d'agir — voir « Le mode analyse » |
+| `view` | une vue | Facultatif. La présentation de l'analyse — voir « Choisir sa vue » |
+| `panels` | des panneaux | Facultatif. Les panneaux de l'Expert ouverts d'office — voir « Les panneaux de l'Expert » |
+| `show` | `expert` | Facultatif. L'action n'existe qu'en mode Expert : ni montrée ni lancée en Simple |
+
+### Catégories et lots : deux choses distinctes
+
+Depuis la 1.4, WinTool range les scripts de deux façons, qui ne se confondent plus :
+
+| | La **catégorie** | Le **lot** |
+|---|---|---|
+| Ce que c'est | Le domaine du script : nettoyage, vie privée… | Un groupe de scripts lancés ensemble |
+| Qui décide | **Le script**, par `category` | **L'utilisateur**, en mode Expert |
+| Où elle sert | L'onglet **Scripts** du mode Expert, pour trier | Les boutons du mode **Simple**, et l'onglet **Lots** de l'Expert |
+| Combien | Une par script | Autant que l'utilisateur veut : un script peut être dans plusieurs lots, ou dans aucun |
 
 ### Les tokens acceptés par `category`
 
-Chaque catégorie d'usine a **un id anglais et un id français**, tous deux acceptés — écrivez
-celui qui correspond à la langue de votre `lang`, sans avoir à traduire. La liste vit dans
+Chaque catégorie a **un id anglais et un id français**, tous deux acceptés — écrivez celui
+qui correspond à la langue de votre `lang`, sans avoir à traduire. La liste vit dans
 **`tools/categories.json`** (`id` = token anglais, `id_fr` = token français) — c'est la seule
 source, lue à la fois par `tools/lint-scripts.ps1` (`CATEGORIE_INCONNUE` si vous en sortez) et
 par l'application (`src-tauri/src/settings.rs`) pour éviter que la liste ne diverge d'un côté
-comme c'est arrivé avec `CREER_UN_SCRIPT.txt`. Au 23/09/2026 : `cleaning`/`nettoyage`,
+comme c'est arrivé avec `CREER_UN_SCRIPT.txt`. Au 8/10/2026 : `cleaning`/`nettoyage`,
 `performance`/`performance`, `privacy`/`vieprivee`, `apps`/`applications`, `health`/`sante`,
-`tools`/`outillage`.
+`tools`/`outillage`, `customize`/`personnalisation`.
 
-Une catégorie **créée par l'utilisateur** en mode Expert n'a ni id anglais ni traduction :
-un seul id, dans la langue tapée à la création (SPECIFICATION.md §10). Un script ne peut
-donc viser par `category` qu'une catégorie d'usine, jamais une catégorie personnelle d'une
-installation particulière.
+Une catégorie inconnue ne bloque rien : le script est rangé dans **« Autres »**, en fin de
+liste.
 
-### Ce que « suggestion » veut dire pour `category`
+### Ce que « suggestion » veut dire pour les lots
 
-À la découverte du fichier, si la catégorie existe, le script y est rangé ; sinon il part
-en **« Non classé »**. Tant que personne ne l'a déplacé à la main, une ré-analyse le
-replacera en suivant `category`. **Dès que l'utilisateur le range lui-même, c'est terminé** :
-son classement devient figé. Le script propose, l'humain dispose.
+Les lots d'usine vivent dans **`tools/lots.json`**, et chacun dit quelles catégories il
+accueille : « Faire le ménage » accueille `cleaning`, « Vie privée » accueille `privacy`…
+À la découverte d'un script, WinTool le place dans le lot qui accueille sa catégorie ; s'il
+n'y en a aucun, le script part en **« Non classé »**. Tant que personne ne l'a déplacé à la
+main, une ré-analyse le replacera en suivant `category`. **Dès que l'utilisateur le range
+lui-même, c'est terminé** : son rangement devient figé. Le script propose, l'humain dispose.
+
+Un lot **créé par l'utilisateur** n'accueille aucune catégorie : seul un rangement manuel y
+place un script. Un script ne peut donc viser par `category` qu'un lot d'usine, jamais un
+lot personnel d'une installation particulière.
 
 La même règle vaut pour `reversible` et `reboot` : ils **pré-cochent** une case que
 l'utilisateur peut décocher, et son choix l'emporte ensuite définitivement.
@@ -402,16 +420,21 @@ La sortie est **en anglais** (§10). En mode Simple elle est masquée derrière 
 détail technique » ; c'est l'interface qui traduit la progression à partir des marqueurs.
 
 ```
-[INFO]   message           ligne neutre
-[OK]     message           succès d'une étape
-[WARN]   message           avertissement, n'échoue pas
-[ERR]    message erreur affichée et comptée — **ne suffit PAS à faire échouer le script**
-[STEP]   3/7 message       alimente la barre de progression
-[CKPT]   message           « interruption sans risque à partir d'ici »
-[REBOOT] message           un redémarrage est réellement nécessaire
-[DONE]   message           fin nominale
-[FIND]   Option mesure     mode analyse seulement : un constat — voir « Le mode analyse »
-[FREED]  octets            espace réellement libéré, repris dans le bilan
+[INFO]     message          ligne neutre
+[OK]       message          succès d'une étape
+[WARN]     message          avertissement, n'échoue pas
+[ERR]      message          erreur affichée et comptée — ne suffit PAS à faire échouer le script
+[STEP]     3/7 message      alimente la barre de progression
+[PROGRESS] 0-100            la progression en pourcentage, quand [STEP] ne convient pas
+[CKPT]     message          « interruption sans risque à partir d'ici »
+[REBOOT]   message          un redémarrage est réellement nécessaire
+[DONE]     message          fin nominale
+[FREED]    octets           espace réellement libéré, repris dans le bilan
+[LOG]      Canal texte      une ligne de journal rangée dans un canal (mode Expert)
+[FIND]     Option champs    mode analyse : un constat sur une case — voir « Le mode analyse »
+[ITEM]     Option id=…      mode analyse : un élément trouvé
+[METRIC]   Libellé value=…  mode analyse : une mesure
+[NOTE]     Note [cible]     mode analyse : une phrase du bloc REPORT
 ```
 
 > ### Le seul verdict est `exit`
@@ -444,29 +467,38 @@ Write-Host "[CKPT] Backup complete - safe to interrupt from here"
 
 ## Le mode analyse
 
-> **Accepté par le validateur depuis la 1.1, exploité par WinTool à partir de la 1.2.**
-> Vous pouvez écrire et valider des scripts analysables dès maintenant ; l'interface qui
-> les interroge arrive avec la 1.2. D'ici là, un script analysable se comporte exactement
-> comme un autre.
+> **Exploité par WinTool depuis la 1.4.** Un script qui ne déclare rien de ce qui suit
+> fonctionne exactement comme avant : le mode analyse est une capacité en plus, jamais
+> une obligation.
 
 C'est le fonctionnement de CCleaner ou de Malwarebytes, en trois temps :
 
 1. **Analyser** — WinTool demande au script ce qu'il ferait, sans rien modifier.
-2. **Cocher** — l'utilisateur voit les constats (« 795 Mo de fichiers temporaires »,
-   « Télémétrie : activée ») et choisit ce qu'il veut traiter.
-3. **Nettoyer** — WinTool relance le script en ne lui transmettant que les cases cochées.
+2. **Cocher** — l'utilisateur voit ce que le script a trouvé et choisit ce qu'il veut traiter.
+3. **Agir** — WinTool relance le script en ne lui transmettant que les cases cochées.
 
-Un script qui ne déclare rien de tout cela fonctionne comme avant. Le mode analyse est une
-capacité en plus, jamais une obligation.
+En mode Simple, c'est l'étape 2 de l'assistant, « Voici ce que j'ai trouvé ». En mode
+Expert, c'est le bouton **Analyser** de la fiche d'un script (§17 de la spécification).
 
-### Déclarer : une ligne dans l'entête
+**Le script ne compose pas l'écran : il le décrit.** Il n'écrit que des nombres, des noms
+et des jetons. Les mots viennent de son entête, déjà traduite, et WinTool les met en page
+dans la vue que le script a choisie. C'est ce qui permet au même script de s'afficher en
+résumé pour un débutant et en détail pour l'Expert, en français comme en anglais.
 
-```powershell
-## scan          : true
+### Déclarer : l'entête
+
+| Champ | Valeurs | Rôle |
+|---|---|---|
+| `scan` | `true` / `false` | `true` = le script sait analyser. Sans lui, rien de ce qui suit n'est lu. |
+| `view` | une vue, puis `expert=<vue>` si l'Expert doit en voir une autre | La présentation de l'analyse — voir « Choisir sa vue ». Absente : la liste à cocher. |
+| `panels` | des panneaux, séparés par des espaces | Les panneaux de l'Expert ouverts d'office — voir « Les panneaux de l'Expert » |
+| `show` | `expert` | L'action n'existe qu'en Expert — voir « Ce qui ne s'affiche que dans un mode » |
+
 ```
-
-Facultatif, `false` s'il est absent. Il annonce que le script sait répondre à la question
-« que ferais-tu ? ».
+## scan          : true
+## view          : gauge expert=table
+## panels        : plan progress
+```
 
 ### Le contrat, en quatre règles
 
@@ -475,48 +507,266 @@ Facultatif, `false` s'il est absent. Il annonce que le script sait répondre à 
 agit comme d'habitude.
 
 **2. En mode analyse, le script ne modifie RIEN.** Ni fichier, ni registre, ni service, ni
-tâche planifiée, ni réglage réseau. Il mesure, rapporte, et se termine par `exit 0`.
-Un code de sortie non nul signifie « l'analyse a échoué ».
+tâche planifiée, ni réglage réseau. Il mesure, décrit, et se termine par `exit 0`. Un code
+de sortie non nul signifie « l'analyse a échoué » : ce qu'elle a écrit reste visible en
+Expert, mais rien n'en est retenu, et en mode Simple l'action n'est pas lancée.
 
-**3. Chaque constat s'écrit sur une ligne `[FIND]`**, qui vise une option du bloc
-`OPTIONS` — c'est elle qui deviendra la case à cocher :
+**3. Chaque constat s'écrit sur une ligne**, qui vise une case que le script déclare — une
+option, un choix — ou un mot de son bloc `REPORT`. Une ligne qui vise autre chose est
+ignorée, et relevée en mode Expert : un script ne parle que de ses propres cases.
 
-```
-[FIND] <Option> <mesure>              une option [bool]
-[FIND] <Option>.<choix> <mesure>      un choix d'une option [multi]
-```
+**4. La sélection revient par `$CONFIG`, comme n'importe quel réglage.** C'est le point qui
+rend le mode analyse presque gratuit à écrire : il n'y a **pas de mode « action » à
+implémenter**. Après l'analyse, WinTool lance le script normalement, avec dans `$CONFIG`
+ce qui a été coché — voir « Ce qui revient au script ». Votre code d'action existe déjà :
+il lit `$CONFIG`, et fait ce qu'on lui dit.
 
-La mesure se compose d'un ou plusieurs de ces champs, séparés par des espaces :
+### Les lignes de l'analyse
+
+| Marqueur | Forme | Ce que c'est |
+|---|---|---|
+| `[FIND]` | `[FIND] Option champs…` ou `[FIND] Option.choix champs…` | Un constat sur une case déclarée : une option `[bool]`, un choix d'un `[multi]` ou d'un `[select]` |
+| `[ITEM]` | `[ITEM] Option id=… champs…` | Un élément trouvé, rangé dans une liste `[items]` |
+| `[METRIC]` | `[METRIC] Libellé value=… champs…` | Une mesure sans case : espace libre, température, durée de démarrage |
+| `[NOTE]` | `[NOTE] Note [Option ou Option.choix] [show=…]` | Une phrase du bloc `REPORT`, sous une case ou, sans cible, en tête |
+| `[LOG]` | `[LOG] Canal texte` | Une ligne de journal, rangée dans un canal que l'Expert peut filtrer. Jamais traduite. |
+| `[PROGRESS]` | `[PROGRESS] 0-100` | Un pourcentage, quand `[STEP] n/m` ne convient pas |
+| `[STEP]` | `[STEP] n/m texte` | Comme pendant l'action : la progression |
+
+Les champs s'écrivent `nom=valeur`, séparés par des espaces. Une valeur qui contient des
+espaces se met entre guillemets : `name="Google Chrome"`. Une valeur illisible — du texte
+là où il faut un nombre, un jeton hors liste — est **ignorée et relevée, jamais
+interprétée au mieux**.
+
+#### Les champs de `[FIND]`
 
 | Champ | Valeur | Sens |
 |---|---|---|
 | `size=` | entier, en **octets** | Espace récupérable. WinTool l'affiche dans l'unité et la langue de l'utilisateur. |
 | `count=` | entier | Nombre d'éléments trouvés : fichiers, entrées de démarrage… |
-| `state=` | `todo` ou `ok` | Pour un réglage : `todo` = pas encore en place, `ok` = déjà fait. |
+| `state=` | `todo` / `ok` | Un réglage : `todo` = pas encore en place, `ok` = déjà fait — la case est alors grisée |
+| `checked=` | `true` / `false` | L'avis du script : cocher d'office ou non, quoi que disent les mesures |
+| `ms=` | entier | Une durée en millisecondes, pour comparer les choix d'un `[select]` (vue `chart`) |
+| `current=` | `true` / `false` | Sur un choix de `[select]` : le réglage en place aujourd'hui |
+| `recommended=` | `true` / `false` | Sur un choix de `[select]` : celui que le script conseille, présélectionné |
+| `show=` | `simple` / `expert` | Ne s'affiche que dans ce mode |
 
-**4. La sélection revient par `$CONFIG`, comme n'importe quel réglage.** C'est le point qui
-rend le mode analyse presque gratuit à écrire : il n'y a **pas de mode « action » à
-implémenter**. Après l'analyse, WinTool lance le script normalement, avec :
+#### Les champs de `[ITEM]`
 
-- une option `[bool]` à `$true` si sa case est cochée, `$false` sinon ;
-- une option `[multi]` réduite à la liste des choix cochés ;
-- toutes les autres options à leur valeur configurée, inchangée.
+| Champ | Valeur | Sens |
+|---|---|---|
+| `id=` | lettres, chiffres et `- _ . : @ +`, 128 au plus | **Obligatoire.** Ce que WinTool renverra au script si l'élément est coché |
+| `parent=` | l'`id` d'un autre élément de la même liste | Range l'élément sous ce parent : une arborescence |
+| `name=` | texte | Lequel : « Default », « Adobe Reader » |
+| `label=` | une clé du bloc `REPORT` | Ce que c'est, traduit : `label=Cache name=Default` s'affiche « Fichiers en cache — Default » |
+| `path=` | texte | Où il se trouve. Affiché, **jamais renvoyé**. |
+| `publisher=`, `version=`, `to=` | texte | Éditeur, version en place, version proposée |
+| `date=` | `AAAA-MM-JJ` | Une date : dernière utilisation, installation |
+| `kind=` | `folder` `file` `registry` `app` `startup` `service` `task` `driver` `browser` | L'icône de la ligne |
+| `confidence=` | `high` / `medium` / `low` | Sûr, Probable, À vérifier — **`low` n'est jamais coché d'office** |
+| `impact=` | `high` / `medium` / `low` | Impact élevé, moyen, faible |
+| `risk=` | `high` / `medium` / `low` | Suspect, Inhabituel — `low` n'affiche rien |
+| `locked=` | `open` `system` `protected` `inuse` | Visible mais **pas cochable**, avec la raison : programme ouvert, nécessaire à Windows… |
+| `group=`, `keep=` | identifiant ; `true` / `false` | Pour `[items:keep-one]` : les exemplaires d'un même fichier, et celui à garder |
+| `size=` `count=` `state=` `checked=` `show=` | comme pour `[FIND]` | |
 
-Votre code d'action existe déjà : il lit `$CONFIG`, et fait ce qu'on lui dit.
+#### Les champs de `[METRIC]`
 
-WinTool pré-coche un constat quand il rapporte `size` ou `count` supérieur à zéro, ou
-`state=todo`. Il le décoche quand il rapporte `state=ok` ou une taille nulle.
+| Champ | Valeur | Sens |
+|---|---|---|
+| `value=` | un nombre, ou un jeton court | **Obligatoire.** La mesure. |
+| `unit=` | `celsius` `pct` `hours` `days` `s` `count` `cycles` | Son unité, écrite dans la langue de l'utilisateur |
+| `health=` | `ok` / `warn` / `crit` | Bon, À surveiller, Critique |
+| `max=` | nombre | Le maximum possible : de quoi dessiner une jauge |
+| `group=` | une clé de groupe du bloc `REPORT` | Regroupe les mesures dans la vue `light` |
+| `show=` | `simple` / `expert` | Ne s'affiche que dans ce mode |
 
-### Pourquoi aucun texte libre dans `[FIND]`
+### Le bloc `REPORT` : les mots de l'analyse
 
-La sortie brute des scripts est en anglais, et l'interface est bilingue. Un `[FIND]` qui
-porterait sa propre phrase ne pourrait donc pas être affiché en français. Le libellé vient
-de l'option visée, qui est **déjà traduite** dans le bloc `LANG`. Le script ne fournit que
-des nombres et des jetons ; c'est l'interface qui compose la phrase.
+Le script n'écrit jamais de phrase dans sa sortie : elle est en anglais, et l'interface est
+bilingue. Tout ce que l'analyse affiche et qui n'est pas déjà le libellé d'une option se
+déclare dans un bloc `REPORT`, placé entre `OPTIONS` et `LANG` :
+
+```
+## WINTOOL:REPORT
+## Junk       : [group] Junk files — Temporary files and the recycle bin
+## Cache      : Cache
+## FreeSpace  : Free space on drive C:
+## UpdateNote : [note:warn] If an update is waiting to be installed, Windows will download it again.
+## WINTOOL:END
+```
+
+| Forme | Sert à | Visé par |
+|---|---|---|
+| `Clé : Libellé` | Nommer une mesure, ou la nature d'un élément | `[METRIC] Clé`, `[ITEM] … label=Clé` |
+| `Clé : [note:info] Phrase` ou `[note:warn]` | Une phrase neutre, ou un avertissement | `[NOTE] Clé` |
+| `Clé : [group] Libellé — sous-titre` | Un **poste** du résumé Simple | `[group:Clé]` sur une option ou un choix |
+
+Chaque clé se traduit dans le bloc `LANG`, comme une option, sans répéter son étiquette :
+`## Junk : Fichiers inutiles — Fichiers temporaires et corbeille`. Une clé sans traduction
+s'affiche dans la langue de base (`TRADUCTION_RAPPORT`, avertissement).
+
+### `[items]` : une liste que seule l'analyse connaît
+
+Un `[multi]` déclare ses choix dans l'entête. Mais les caches de navigateurs, les restes de
+programmes désinstallés, les doublons n'existent qu'une fois la machine examinée. `[items]`
+est une liste **vide dans l'entête**, que l'analyse remplit de lignes `[ITEM]` :
+
+```
+## Browsers   : [items] Browser caches
+```
+
+Sa valeur par défaut dans `$CONFIG` est toujours un tableau, en général `@()`. Sans
+WinTool, la liste reste vide et le script ne touche à rien : c'est le comportement sûr
+du double-clic.
+
+**L'`id` est une clé, pas un chemin.** Calculez-le à partir de ce qui ne bouge pas entre
+l'analyse et l'action — le navigateur et le profil, l'identifiant d'un programme. À
+l'action, **retrouvez les éléments en rappelant la même fonction** que pendant l'analyse,
+et ne vous servez de l'id reçu que pour choisir parmi ce que vous avez vous-même retrouvé.
+Un id ne sert jamais à fabriquer un chemin.
+
+WinTool y veille de son côté : il retient les ids de la dernière analyse de chaque script,
+avec l'empreinte du fichier analysé, et **refuse de lancer** l'action si `$CONFIG` contient
+un id que cette analyse n'a pas annoncé — voir « Ce qui empêche un script de se lancer ».
+
+**Une arborescence.** `parent=` range un élément sous un autre de la même liste. Seules les
+**feuilles** reviennent au script : cocher un navigateur coche ses profils, et ce sont les
+ids des profils qui reviennent. Un parent jamais annoncé n'efface pas l'élément : il
+s'affiche à la racine, et l'Expert voit l'anomalie.
+
+**`[items:keep-one]`, pour les doublons.** Les éléments qui partagent un `group=` sont des
+exemplaires d'un même fichier ; l'utilisateur choisit celui qu'il garde — `keep=true`
+désigne celui que conseille le script, sinon c'est le premier. **Ce qui revient au script,
+ce sont les ids à supprimer.**
+
+Limites : 5 000 éléments par liste, 20 000 lignes par analyse, 400 caractères par texte.
+Au-delà, la suite est ignorée, et l'Expert le voit.
+
+### Les étiquettes : `[group:]`, `[show:]`, `[view:]`, `[scan]`
+
+Elles se placent entre le type et le libellé d'une option ; `[group:]` et `[show:]` se
+posent aussi sur un choix, avant son libellé :
+
+```
+## Targets    : [multi] Temporary files
+##   user     : [group:Junk] Your temporary files
+##   windows  : [group:Junk] [show:expert] Windows temporary files
+## RecycleBin : [bool] [group:Junk] Empty the recycle bin
+## Browsers   : [items] [view:tree] Browser caches
+## MinAgeDays : [number] [scan] Only files older than — in days
+```
+
+| Étiquette | Sur | Effet |
+|---|---|---|
+| `[group:Clé]` | option, choix | Range la case dans un **poste** du résumé Simple : le groupe `Clé`, déclaré dans `REPORT`. Sans groupe, une option fait un poste à elle seule. |
+| `[show:simple]`, `[show:expert]` | option, choix | La case ne s'affiche que dans ce mode |
+| `[view:x]` | option | La présentation de cette seule option : `bars` ou `donut` pour un `[multi]`, `chart` pour un `[select]`, `tree` `table` `tiles` `treemap` pour un `[items]` |
+| `[scan]` | option | Un réglage **de l'analyse elle-même** — une ancienneté minimale, un dossier à examiner. Ce n'est pas une case : WinTool le transmet tel qu'il est configuré, à l'analyse comme à l'action. |
+
+Les étiquettes ne se traduisent pas : le bloc `LANG` ne reprend que le libellé.
+
+### Ce que WinTool coche d'office
+
+Dans cet ordre :
+
+1. **`checked=`** — l'avis du script l'emporte toujours.
+2. Sinon, **`state=todo`** coche, et **`state=ok`** décoche et grise la case (« Déjà en place »).
+3. Sinon, une **`size` ou un `count` supérieur à zéro** coche ; zéro décoche.
+4. Un élément **`locked=`** n'est jamais cochable, et un élément **`confidence=low`** jamais
+   coché d'office.
+5. Un `[select]` présélectionne le choix `recommended=true`, sinon `current=true`, sinon le
+   premier rapporté.
+
+Une nouvelle analyse remet toutes les cases à l'avis du script.
+
+**Montrer sans cocher.** `checked=false` sert ce qui est gros mais peut encore servir : les
+mises à jour de Windows téléchargées, par exemple. Accompagnez-le d'une `[NOTE]` qui dit
+pourquoi la case n'est pas cochée.
+
+### Ce qui ne s'affiche que dans un mode
+
+Un seul affichage, réglé par le script — pas deux rendus à écrire :
+
+| Où | Forme | Effet |
+|---|---|---|
+| Entête | `## show : expert` | L'action entière n'existe qu'en Expert. Dans un lot lancé en Simple, elle n'est **ni montrée ni lancée**, et l'écran d'analyse le dit. |
+| Option, choix | `[show:expert]`, `[show:simple]` | La case n'apparaît que dans ce mode |
+| Ligne | `show=expert`, `show=simple` | Ce constat, cet élément, cette mesure ou cette note n'apparaît que dans ce mode |
+
+**Un élément caché garde sa case, et suit celle qui le contient — en revenant à l'avis du
+script.** Le cache de 300 Ko d'un profil, marqué `show=expert`, n'encombre pas le résumé
+d'un débutant ; si celui-ci coche « Google Chrome », ce petit cache est traité avec les
+autres s'il était coché d'office, et laissé s'il ne l'était pas. Le résumé annonce ce qu'il
+cache (« Un élément de plus ne s'affiche qu'en mode Expert »), jamais en silence.
+
+### Choisir sa vue
+
+`## view : <vue>` choisit la présentation de l'analyse, pour les deux modes ; `expert=<vue>`
+en donne une autre à l'Expert : `## view : gauge expert=table`.
+
+| Vue | Ce qu'il lui faut | Pour |
+|---|---|---|
+| `checklist` | rien : c'est la vue par défaut | Tout : chaque option devient une liste à cocher |
+| `minimal` | une case | Une phrase et un interrupteur : « Libérer 1,2 Go — fichiers inutiles » |
+| `bars` | un `[multi]` dont les choix ont une `size` | Les choix en barres proportionnelles |
+| `donut` | un `[multi]` dont les choix ont une `size` | L'anneau, ses choix en légende |
+| `tiles` | un `[items]` | Une tuile par élément |
+| `table` | un `[items]` | Un tableau triable, avec recherche |
+| `treemap` | un `[items]` avec des `size` | Des rectangles proportionnels, à explorer |
+| `tree` | un `[items]` avec des `parent=` | L'arborescence |
+| `timeline` | un `[items]` avec `impact=`, et une `[METRIC]` en `unit=s` | Le démarrage : ce qui se lance, et le temps gagné |
+| `compare` | des `[bool]` avec `state=` | Aujourd'hui → après, réglage par réglage |
+| `chart` | un `[select]` dont les choix ont un `ms=` | Des colonnes à comparer : plus bas, plus rapide |
+| `light` | des `[METRIC]` avec `health=` | Un feu : tout va bien, un point à surveiller, un problème |
+| `gauge` | une `[METRIC]` avec `max=` | Une jauge seule |
+| `history` | rien : WinTool garde le `[FREED]` de chaque action | Ce que l'action a libéré, passage après passage |
+
+**Une vue ne fait jamais disparaître une case.** Ce qu'elle ne montre pas suit dessous, en
+liste. Et une vue qui ne trouve pas de quoi s'afficher — un `donut` sans aucune taille —
+retombe sur la liste à cocher : jamais un écran vide.
+
+En mode Simple, la vue du script ne s'applique que si le lot ne contient **qu'une** action
+analysable. Dès qu'il y en a plusieurs, WinTool les rassemble dans son propre résumé : un
+poste par groupe, le graphique choisi dans les réglages (l'anneau par défaut), et des
+chevrons pour déplier le détail.
+
+### Les panneaux de l'Expert
+
+`## panels : plan progress` ouvre d'office, à côté de l'analyse, des panneaux que
+l'utilisateur peut aussi ouvrir et fermer lui-même :
+
+| Panneau | Contenu |
+|---|---|
+| `config` | Les réglages appliqués |
+| `progress` | Le journal de l'analyse, filtrable par étapes, constats et canaux `[LOG]` |
+| `plan` | Ce qui sera fait, d'après les cases cochées |
+| `payload` | Ce que recevra le script : le JSON exact de `WINTOOL_CONFIG` |
+| `attention` | Les points d'attention que WinTool repère dans le texte du script |
+| `history` | Ce que l'action a libéré, passage après passage |
+| `origin` | La provenance : catalogue, fichier, empreinte, accord |
+| `disk` | L'espace disque, aujourd'hui et après l'action |
+
+### Ce qui revient au script
+
+Après l'analyse, WinTool lance le script **sans** `WINTOOL_MODE`, avec dans `$CONFIG` :
+
+| Option | Ce que reçoit le script |
+|---|---|
+| `[bool]` visée par un `[FIND]` | `$true` si sa case est cochée, `$false` sinon |
+| `[multi]` | La liste des choix cochés **parmi ceux que l'analyse a rapportés** : un choix qu'elle n'a pas montré n'est jamais traité |
+| `[select]` visée par des `[FIND]` | Le choix retenu |
+| `[items]` | La liste des ids cochés — les feuilles seulement |
+| `[items:keep-one]` | La liste des ids **à supprimer** |
+| `[scan]`, et toute option sans constat | Sa valeur configurée, inchangée |
+
+**Rien de coché, rien de lancé.** Une action dont aucune case n'est cochée n'est pas
+relancée. Une action qui n'a rapporté que des mesures non plus : elle a fait son travail en
+analysant. La lancer pour rien l'inscrirait « fait » dans l'historique.
 
 ### `[FREED]` : ce qui a réellement été libéré
 
-L'analyse et le nettoyage sont deux exécutions distinctes. Entre les deux, des fichiers
+L'analyse et l'action sont deux exécutions distinctes. Entre les deux, des fichiers
 temporaires apparaissent, d'autres sont verrouillés et ne pourront pas être supprimés. Le
 chiffre de l'analyse est donc une **estimation**.
 
@@ -526,24 +776,28 @@ Un script qui libère de l'espace peut le dire, en fin d'action :
 Write-Output "[FREED] $freed"      # en octets
 ```
 
-Le bilan affiche alors le chiffre réel. Sans `[FREED]`, il affiche l'estimation de
-l'analyse, précédée de « environ ».
+Le bilan affiche alors le chiffre réel, l'historique le garde, et la vue `history` le
+montre. Sans `[FREED]`, le bilan affiche l'estimation de l'analyse, précédée de
+« environ ».
 
-### Exemple complet — un nettoyage
+### Exemple complet — faire de la place
 
-Ce script est vérifié : il passe le validateur en `-Strict`, et sa branche d'analyse a été
-exécutée sur une vraie machine, où elle a rapporté 795 Mo de fichiers temporaires et 266 Mo
-de corbeille sans rien modifier.
+C'est l'exemple de référence de la norme. Il passe le validateur en `-Strict`, et il est
+identique au fichier `docs/mockups/exemple-analyse.ps1` — un test y veille. Il montre des
+choix mesurés, une case simple, un choix montré sans être coché avec sa note, une
+arborescence d'`[items]`, des éléments réservés à l'Expert, une note réservée au Simple,
+une mesure et des lignes de journal ; puis l'action, qui ne lit que ce que WinTool lui
+renvoie.
 
 ```powershell
 ## WINTOOL:START
-## id            : 8d4e2f1a-6b3c-4a9e-b7d5-2c1f0e9a8b76
+## id            : 6c08ece0-709a-4210-aacb-eda594e8deee
 ## lang          : en
-## title         : Clean temporary files
-## desc          : Frees the space taken by leftover temporary files
+## title         : Free up disk space
+## desc          : Removes temporary files, downloaded updates and browser caches
 ## category      : cleaning
 ## icon          : trash-2
-## tags          : temp, cleanup, disk space
+## tags          : temp, cache, disk space, browsers
 ## version       : 1.0
 ## admin         : true
 ## risk          : low
@@ -553,31 +807,69 @@ de corbeille sans rien modifier.
 ## reboot        : false
 ## engine        : auto
 ## scan          : true
+## view          : donut
+## panels        : plan progress
 ## WINTOOL:END
 
 ## WINTOOL:OPTIONS
-## Targets    : [multi] What to clean
-##   user     : Your temporary files
-##   windows  : Windows temporary files
-## RecycleBin : [bool]  Empty the recycle bin
-## SafeTest   : [bool]  Simulate — shows what would be done, changes nothing
+## Targets    : [multi] Temporary files
+##   user     : [group:Junk] Your temporary files
+##   windows  : [group:Junk] [show:expert] Windows temporary files
+##   update   : [group:OldUpdates] Downloaded Windows updates
+## RecycleBin : [bool] [group:Junk] Empty the recycle bin
+## Browsers   : [items] [view:tree] Browser caches
+## SafeTest   : [bool] Simulate — shows what would be done, changes nothing
+## WINTOOL:END
+
+## WINTOOL:REPORT
+## Junk       : [group] Junk files — Temporary files and the recycle bin
+## OldUpdates : [group] Old Windows updates — What Windows keeps after installing them
+## Cache      : Cache
+## FreeSpace  : Free space on drive C:
+## UpdateNote : [note:warn] If an update is waiting to be installed, Windows will download it again.
+## Untouched  : [note:info] Your passwords, bookmarks and history are not touched.
 ## WINTOOL:END
 
 ## WINTOOL:LANG fr
-## title      : Nettoyer les fichiers temporaires
-## desc       : Libère la place prise par les fichiers temporaires oubliés
-## Targets    : Ce qu'il faut nettoyer
+## title      : Faire de la place
+## desc       : Supprime les fichiers temporaires, les mises à jour téléchargées et le cache des navigateurs
+## Targets    : Fichiers temporaires
 ##   user     : Vos fichiers temporaires
-##   windows  : Les fichiers temporaires de Windows
+##   windows  : Fichiers temporaires de Windows
+##   update   : Mises à jour de Windows téléchargées
 ## RecycleBin : Vider la corbeille
+## Browsers   : Cache des navigateurs
 ## SafeTest   : Simuler — montre ce qui serait fait, sans rien modifier
+## Junk       : Fichiers inutiles — Fichiers temporaires et corbeille
+## OldUpdates : Anciennes mises à jour de Windows — Ce que Windows garde après les avoir installées
+## Cache      : Fichiers en cache
+## FreeSpace  : Espace libre sur le disque C:
+## UpdateNote : Si une mise à jour attend d'être installée, Windows la téléchargera de nouveau.
+## Untouched  : Vos mots de passe, vos favoris et votre historique ne sont pas touchés.
 ## WINTOOL:END
+
+# ==============================================================================
+# L'exemple de référence de la norme d'analyse : docs/FORMAT_SCRIPT.md,
+# « Le mode analyse », le reproduit à l'identique, et un test y veille.
+# Il passe le validateur en -Strict (tools/lint-scripts.ps1).
+#
+# Le script est lancé deux fois :
+#   1. ANALYSE  — WinTool pose WINTOOL_MODE=scan. Le script mesure, décrit ce
+#      qu'il a trouvé, et ne modifie RIEN.
+#   2. ACTION   — WinTool relance le script sans WINTOOL_MODE, avec dans
+#      WINTOOL_CONFIG ce que l'utilisateur a coché. Le script ne fait que ça.
+#
+# Seul, en double-clic, il agit avec ses valeurs par défaut ($CONFIG ci-dessous).
+# ==============================================================================
 
 $CONFIG = @{
     Targets    = @("user", "windows")
     RecycleBin = $false
+    Browsers   = @()
     SafeTest   = $false
 }
+# Browsers est une liste [items] : ses éléments n'existent qu'après l'analyse.
+# Sans WinTool, elle reste vide et le script ne touche à aucun navigateur.
 
 # --- WinTool override (ne pas supprimer) ---
 if ($env:WINTOOL_CONFIG) {
@@ -586,72 +878,193 @@ if ($env:WINTOOL_CONFIG) {
 }
 
 # ==============================================================================
+# Ce que le script sait faire — utilisé par les deux passages
+# ==============================================================================
 
 $Folders = @{
     user    = $env:TEMP
     windows = Join-Path $env:SystemRoot 'Temp'
+    update  = Join-Path $env:SystemRoot 'SoftwareDistribution\Download'
 }
 
-function Get-FolderFiles([string] $Path) {
-    Get-ChildItem -LiteralPath $Path -Recurse -File -Force -ErrorAction SilentlyContinue
+function Measure-Folder([string] $Path) {
+    $m = Get-ChildItem -LiteralPath $Path -Recurse -File -Force -ErrorAction SilentlyContinue |
+         Measure-Object -Property Length -Sum
+    [pscustomobject]@{ Size = [long]$m.Sum; Count = [int]$m.Count }
 }
 
 function Get-RecycleBinItems {
     @((New-Object -ComObject Shell.Application).NameSpace(10).Items())
 }
 
-# --- Analyse : on mesure, on ne modifie RIEN ------------------------------------
-# Tout ce bloc doit etre en lecture seule. WinTool ne peut pas le verifier :
-# c'est une promesse de l'auteur, et l'utilisateur coche sur la foi de ce
-# qu'elle rapporte.
-if ($env:WINTOOL_MODE -eq 'scan') {
-    foreach ($target in $Folders.Keys) {
-        $m = Get-FolderFiles $Folders[$target] | Measure-Object -Property Length -Sum
-        Write-Output "[FIND] Targets.$target size=$([long]$m.Sum) count=$($m.Count)"
-    }
-    $bin = Get-RecycleBinItems
-    $binSize = ($bin | Measure-Object -Property Size -Sum).Sum
-    Write-Output "[FIND] RecycleBin size=$([long]$binSize) count=$($bin.Count)"
-    exit 0
-}
+# Les caches de navigateurs. Chaque cache reçoit un Id STABLE, calculé à partir
+# de ce qui ne bouge pas entre l'analyse et l'action : le navigateur et le profil.
+# WinTool ne renverra que des Id ; c'est cette même fonction, rappelée à l'action,
+# qui retrouvera les chemins. Un Id reçu ne sert jamais à fabriquer un chemin.
+$Browsers = @(
+    @{ Id = 'chrome';  Name = 'Google Chrome';   Process = 'chrome';  Cache = 'Cache';  Root = Join-Path $env:LOCALAPPDATA 'Google\Chrome\User Data' }
+    @{ Id = 'edge';    Name = 'Microsoft Edge';  Process = 'msedge';  Cache = 'Cache';  Root = Join-Path $env:LOCALAPPDATA 'Microsoft\Edge\User Data' }
+    @{ Id = 'brave';   Name = 'Brave';           Process = 'brave';   Cache = 'Cache';  Root = Join-Path $env:LOCALAPPDATA 'BraveSoftware\Brave-Browser\User Data' }
+    @{ Id = 'firefox'; Name = 'Mozilla Firefox'; Process = 'firefox'; Cache = 'cache2'; Root = Join-Path $env:LOCALAPPDATA 'Mozilla\Firefox\Profiles' }
+)
 
-# --- Action : uniquement ce que l'utilisateur a coche ---------------------------
-$SafeTest = ("$($CONFIG.SafeTest)" -eq 'True')
-$targets  = @($CONFIG.Targets | Where-Object { $Folders.ContainsKey("$_") })
-$doBin    = ("$($CONFIG.RecycleBin)" -eq 'True')
-$total    = $targets.Count + [int]$doBin
-$step     = 0
-$freed    = [long]0
-
-foreach ($target in $targets) {
-    $step++
-    Write-Host "[STEP] $step/$total Cleaning $target temporary files"
-    foreach ($f in Get-FolderFiles $Folders[$target]) {
-        if ($SafeTest) { $freed += $f.Length; continue }
-        try {
-            Remove-Item -LiteralPath $f.FullName -Force -ErrorAction Stop
-            $freed += $f.Length
-        } catch {
-            # Fichier ouvert par un programme : on le laisse, c'est normal.
+function Get-BrowserCaches {
+    foreach ($b in $Browsers) {
+        if (-not (Test-Path -LiteralPath $b.Root)) { continue }
+        $open = [bool](Get-Process -Name $b.Process -ErrorAction SilentlyContinue)
+        foreach ($dir in Get-ChildItem -LiteralPath $b.Root -Directory -ErrorAction SilentlyContinue) {
+            $path = Join-Path $dir.FullName $b.Cache
+            if (-not (Test-Path -LiteralPath $path)) { continue }
+            # Firefox préfixe ses profils d'un code (« me5fmut4.default-release ») :
+            # on n'affiche que la fin. Un vrai script lirait le nom choisi par
+            # l'utilisateur (Local State pour Chrome et Edge, profiles.ini pour Firefox).
+            $shown = if ($b.Id -eq 'firefox') { ($dir.Name -split '\.', 2)[-1] } else { $dir.Name }
+            [pscustomobject]@{
+                Id      = "$($b.Id)-$($dir.Name -replace '[^\w.-]', '-')"
+                Browser = $b
+                Profile = $shown
+                Path    = $path
+                Open    = $open
+            }
         }
     }
 }
 
+# ==============================================================================
+# 1. ANALYSE — on mesure, on décrit, on ne modifie RIEN
+# ==============================================================================
+# Tout ce bloc est en lecture seule. WinTool ne peut pas le vérifier : c'est une
+# promesse de l'auteur, et l'utilisateur coche sur la foi de ce qu'elle rapporte.
+# Le script n'écrit jamais de phrase : des nombres, des noms, des jetons. Les
+# mots viennent de l'entête (REPORT, LANG), déjà traduite.
+
+if ($env:WINTOOL_MODE -eq 'scan') {
+
+    # --- Des choix mesurés : une ligne [FIND] par choix de Targets ---
+    Write-Output "[STEP] 1/3 Measuring temporary folders"
+    foreach ($t in 'user', 'windows') {
+        $m = Measure-Folder $Folders[$t]
+        Write-Output "[FIND] Targets.$t size=$($m.Size) count=$($m.Count)"
+    }
+
+    # --- Une case simple, mesurée ---
+    $bin = Get-RecycleBinItems
+    $binSize = [long]($bin | Measure-Object -Property Size -Sum).Sum
+    Write-Output "[FIND] RecycleBin size=$binSize count=$($bin.Count)"
+
+    # --- Gros, mais peut encore servir : montré, PAS coché, avec sa note ---
+    Write-Output "[STEP] 2/3 Measuring downloaded Windows updates"
+    $m = Measure-Folder $Folders.update
+    Write-Output "[FIND] Targets.update size=$($m.Size) count=$($m.Count) checked=false"
+    Write-Output "[NOTE] UpdateNote Targets.update"
+
+    # --- Une arborescence : un parent par navigateur, un enfant par profil ---
+    Write-Output "[STEP] 3/3 Looking for browser caches"
+    $seen = @{}
+    foreach ($c in Get-BrowserCaches) {
+        # Navigateur ouvert : visible, mais pas cochable, avec la raison.
+        $lock = if ($c.Open) { ' locked=open' } else { '' }
+        if (-not $seen[$c.Browser.Id]) {
+            $seen[$c.Browser.Id] = $true
+            Write-Output "[ITEM] Browsers id=$($c.Browser.Id) name=""$($c.Browser.Name)"" kind=browser$lock"
+        }
+        $m = Measure-Folder $c.Path
+        # Un cache minuscule encombre le résumé d'un débutant : Expert seulement.
+        # Il garde sa case, et suit celle de son navigateur.
+        $show = if ($m.Size -lt 1MB) { ' show=expert' } else { '' }
+        # label= dit ce que c'est (traduit), name= lequel : « Fichiers en cache — Default ».
+        Write-Output "[ITEM] Browsers id=$($c.Id) parent=$($c.Browser.Id) kind=folder label=Cache name=""$($c.Profile)"" path=""$($c.Path)"" size=$($m.Size)$lock$show"
+        # Une ligne de journal, rangée dans le canal « Browsers » (Expert seulement).
+        Write-Output "[LOG] Browsers $($c.Browser.Name) / $($c.Profile): $($m.Count) files"
+    }
+    # Une note pour le débutant, inutile à l'Expert qui voit la liste exacte.
+    Write-Output "[NOTE] Untouched Browsers show=simple"
+
+    # --- Une mesure sans case : l'espace libre, pour situer le reste ---
+    $drive = Get-PSDrive -Name C
+    $pct = [math]::Round(100 * $drive.Free / ($drive.Used + $drive.Free))
+    $health = if ($pct -lt 10) { 'crit' } elseif ($pct -lt 20) { 'warn' } else { 'ok' }
+    Write-Output "[METRIC] FreeSpace value=$pct unit=pct health=$health max=100"
+
+    exit 0
+}
+
+# ==============================================================================
+# 2. ACTION — uniquement ce que l'utilisateur a coché
+# ==============================================================================
+# WinTool a posé dans WINTOOL_CONFIG, et l'override a versé dans $CONFIG :
+#   Targets    = les choix cochés, par exemple @("user", "update")
+#   RecycleBin = $true ou $false
+#   Browsers   = les Id cochés, par exemple @("chrome-Default", "firefox-abcd.default")
+# Une valeur reçue ne sert que de CLÉ dans les tables du script, et seulement si
+# elle y figure : $Folders['inconnu'] vaut $null, et "$null\*" viserait la racine.
+
+$SafeTest = ("$($CONFIG.SafeTest)" -eq 'True')
+$targets  = @($CONFIG.Targets | Where-Object { $Folders.ContainsKey("$_") })
+$doBin    = ("$($CONFIG.RecycleBin)" -eq 'True')
+$wanted   = @($CONFIG.Browsers | ForEach-Object { "$_" })
+$caches   = @(Get-BrowserCaches | Where-Object { $wanted -contains $_.Id })
+$total    = $targets.Count + [int]$doBin + [int]($caches.Count -gt 0)
+$step     = 0
+$freed    = [long]0
+
+function Remove-FolderContent([string] $Path) {
+    $n = [long]0
+    foreach ($f in Get-ChildItem -LiteralPath $Path -Recurse -File -Force -ErrorAction SilentlyContinue) {
+        if ($SafeTest) { $n += $f.Length; continue }
+        try {
+            Remove-Item -LiteralPath $f.FullName -Force -ErrorAction Stop
+            $n += $f.Length
+        } catch {
+            # Fichier ouvert par un programme : on le laisse, c'est normal.
+        }
+    }
+    $n
+}
+
+foreach ($t in $targets) {
+    $step++
+    Write-Output "[STEP] $step/$total Cleaning $t"
+    $stopped = $false
+    if ($t -eq 'update' -and -not $SafeTest) {
+        # Windows Update garde ses fichiers ouverts : on l'arrête le temps du ménage.
+        Stop-Service -Name wuauserv -Force -ErrorAction SilentlyContinue
+        $stopped = $true
+    }
+    $freed += Remove-FolderContent $Folders[$t]
+    if ($stopped) { Start-Service -Name wuauserv -ErrorAction SilentlyContinue }
+}
+
 if ($doBin) {
     $step++
-    Write-Host "[STEP] $step/$total Emptying the recycle bin"
+    Write-Output "[STEP] $step/$total Emptying the recycle bin"
     $freed += [long](Get-RecycleBinItems | Measure-Object -Property Size -Sum).Sum
     if (-not $SafeTest) { Clear-RecycleBin -Force -ErrorAction SilentlyContinue }
 }
 
+if ($caches.Count) {
+    $step++
+    Write-Output "[STEP] $step/$total Clearing browser caches"
+    foreach ($c in $caches) {
+        # Le navigateur a pu être ouvert depuis l'analyse : on revérifie.
+        if (Get-Process -Name $c.Browser.Process -ErrorAction SilentlyContinue) {
+            Write-Output "[WARN] $($c.Browser.Name) is open - cache left in place"
+            continue
+        }
+        $freed += Remove-FolderContent $c.Path
+        Write-Output "[LOG] Browsers Cleared $($c.Browser.Name) / $($c.Profile)"
+    }
+}
+
+# Ce qui a vraiment été libéré : le bilan l'affiche, l'historique le garde.
 Write-Output "[FREED] $freed"
-Write-Host "[DONE] Temporary files cleaned"
+Write-Output "[DONE] Disk space freed"
 exit 0
 ```
 
-Remarquez que la clé `Targets.$target` est calculée. Le validateur ne peut vérifier que
-les clés écrites en toutes lettres ; une clé calculée lui échappe, par construction. À
-vous de garantir qu'elle ne produit que des choix déclarés.
+Remarquez que les clés `Targets.$t` sont calculées. Le validateur ne peut vérifier que les
+clés écrites en toutes lettres ; une clé calculée lui échappe, par construction. À vous de
+garantir qu'elle ne produit que des choix déclarés — WinTool, lui, ignorera les autres.
 
 ### Exemple court — un réglage
 
@@ -668,7 +1081,8 @@ if ($env:WINTOOL_MODE -eq 'scan') {
 ```
 
 `DisableTelemetry` est ici une option `[bool]`. Si la télémétrie est déjà coupée, la case
-arrive décochée avec la mention « déjà fait » ; sinon elle arrive cochée.
+arrive grisée avec la mention « Déjà en place » ; sinon elle arrive cochée. Avec
+`## view : compare`, plusieurs réglages de ce genre s'affichent en « aujourd'hui → après ».
 
 ### Ce qu'il faut respecter
 
@@ -677,16 +1091,20 @@ arrive décochée avec la mention « déjà fait » ; sinon elle arrive cochée.
   rien », ne peut pas porter un constat : la case cochée dirait l'inverse de ce qu'elle
   montre. Nommez vos options par l'action.
 - **L'analyse se place après la ligne d'override et avant tout code qui modifie.** Après,
-  pour disposer de `$CONFIG` si l'analyse en a besoin. Avant, parce qu'une modification
-  qui s'exécuterait avant le test de `WINTOOL_MODE` aurait lieu pendant l'analyse.
+  pour disposer de `$CONFIG` — et de vos options `[scan]`. Avant, parce qu'une
+  modification qui s'exécuterait avant le test de `WINTOOL_MODE` aurait lieu pendant
+  l'analyse.
 - **L'analyse rapporte tout ce qu'elle pourrait faire**, pas seulement ce que la
   configuration actuelle sélectionne. C'est l'utilisateur qui choisit, après.
+- **À l'action, ne faites confiance qu'à ce que vous retrouvez.** Une valeur reçue ne sert
+  que de clé dans les tables du script, et seulement si elle y figure : `$Folders['x']`
+  vaut `$null` pour une clé inconnue, et `"$null\*"` viserait la racine du disque.
 - **Analyser, c'est exécuter.** WinTool lance le script en administrateur pour l'analyser,
   exactement comme pour agir. Un script non approuvé ne sera pas plus analysé qu'exécuté
-  (§12.1 de la spécification), et un `[FIND]` visant une option que le script ne déclare
-  pas est ignoré : un script ne parle que de ses propres cases.
-- **L'analyse doit être rapide.** Elle précède chaque nettoyage et l'utilisateur l'attend
-  devant l'écran. Mesurez des tailles, ne calculez pas d'empreintes.
+  (§12.1 de la spécification).
+- **L'analyse doit être rapide.** Elle précède chaque action et l'utilisateur l'attend
+  devant l'écran. Mesurez des tailles, ne calculez pas d'empreintes — sauf si c'est le
+  métier du script, comme pour les doublons.
 
 ---
 
@@ -734,17 +1152,17 @@ validateur sans l'ajouter ici est un défaut.**
 | `ENTETE_NON_FERME` | erreur | `WINTOOL:START` sans `WINTOOL:END` |
 | `CHAMP_MANQUANT` | erreur | Champ d'entête obligatoire absent |
 | `CHAMP_DOUBLON` | avertissement | Champ déclaré deux fois |
-| `VALEUR_INVALIDE` | erreur | `risk`, `duration`, `engine` ou un booléen hors valeurs admises |
+| `VALEUR_INVALIDE` | erreur | `risk`, `duration`, `engine`, `show` ou un booléen hors valeurs admises ; `[show:]` hors `simple`/`expert` |
 | `ID_INVALIDE` | erreur | `id` n'est pas un GUID |
 | `ID_COLLISION` | erreur | Deux scripts portent le même `id` |
-| `CATEGORIE_INCONNUE` | avertissement | Catégorie hors catégories d'usine → « Non classé » |
+| `CATEGORIE_INCONNUE` | avertissement | Catégorie hors `tools/categories.json` → « Autres », et aucun lot |
 | `ICONE_EMOJI` | erreur | `icon` contient un emoji |
 | `ICONE_INCONNUE` | erreur | Nom d'icône absent de Lucide — suggestion si proche |
 | `OPTIONS_ABSENT` | erreur | Pas de bloc `WINTOOL:OPTIONS` |
 | `OPTIONS_NON_FERME` | erreur | Bloc `OPTIONS` non refermé |
 | `TYPE_ABSENT` | erreur | Option déclarée sans `[type]` |
-| `TYPE_INVALIDE` | erreur | Type inconnu |
-| `LIBELLE_VIDE` | erreur | Option ou choix sans libellé |
+| `TYPE_INVALIDE` | erreur | Type inconnu, ou variante autre que `[items:keep-one]` |
+| `LIBELLE_VIDE` | erreur | Option, choix ou entrée de `REPORT` sans texte |
 | `CHOIX_MANQUANT` | erreur | `select` ou `multi` avec moins de deux choix |
 | `CHOIX_INATTENDU` | erreur | Choix déclarés sur un type qui n'en accepte pas |
 | `CONFIG_ABSENT` | erreur | Pas de bloc `$CONFIG = @{ }` |
@@ -753,13 +1171,14 @@ validateur sans l'ajouter ici est un défaut.**
 | `OPTION_NON_DECLAREE` | erreur | Clé dans `$CONFIG` absente du bloc `OPTIONS` |
 | `OPTION_ORPHELINE` | erreur | Option déclarée sans valeur par défaut dans `$CONFIG` |
 | `TYPE_INCOHERENT` | avertissement | `[bool]` sur une valeur non booléenne, `[number]` sur du texte |
-| `DEFAUT_INVALIDE` | erreur | Défaut hors des choix, `select` en tableau, `multi` qui n'en est pas un |
+| `DEFAUT_INVALIDE` | erreur | Défaut hors des choix, `select` en tableau, `multi` ou `items` qui n'en est pas un |
 | `TRADUCTION_ABSENTE` | erreur | Aucun bloc `WINTOOL:LANG` vers une langue autre que `lang` |
 | `TRADUCTION_NON_FERMEE` | erreur | Bloc de traduction non refermé |
 | `TRADUCTION_INCOMPLETE` | erreur | `title` ou `desc` non traduit |
 | `TRADUCTION_OPTION` | avertissement | Une option sans libellé traduit |
 | `TRADUCTION_CHOIX` | avertissement | Un choix sans libellé traduit |
-| `TRADUCTION_ORPHELINE` | erreur | Traduction d'une option ou d'un choix qui n'existe pas |
+| `TRADUCTION_ORPHELINE` | erreur | Traduction d'une option, d'un choix ou d'une entrée de `REPORT` qui n'existe pas |
+| `TRADUCTION_RAPPORT` | avertissement | Une entrée de `REPORT` sans texte traduit |
 | `OVERRIDE_ABSENT` | erreur | Ligne d'override manquante |
 | `OVERRIDE_OBSOLETE` | erreur | Ancienne ligne d'override lisant un fichier — `WINTOOL_CONFIG` contient le JSON |
 | `OVERRIDE_FICHIER` | erreur | Repli vers un fichier de configuration — **WinTool refuse de lancer le script** |
@@ -767,11 +1186,30 @@ validateur sans l'ajouter ici est un défaut.**
 | `MARQUEUR_CASSE` | avertissement | Marqueur pas en majuscules |
 | `SORTIE_NON_ANGLAISE` | avertissement | Message affiché contenant des accents |
 | `SCAN_NON_GERE` | erreur | `scan : true` mais `$env:WINTOOL_MODE` n'est jamais lu : le script agirait au lieu d'analyser |
-| `SCAN_SANS_FIND` | erreur | `scan : true` mais aucun `[FIND]` n'est émis |
-| `SCAN_SANS_CIBLE` | erreur | `scan : true` sans option `[bool]` ni `[multi]` à cocher |
+| `SCAN_SANS_FIND` | erreur | `scan : true` mais aucun `[FIND]`, `[ITEM]` ni `[METRIC]` n'est émis |
 | `FIND_SANS_SCAN` | avertissement | Le script sait analyser mais ne déclare pas `scan : true` : il ne sera jamais interrogé |
-| `FIND_CLE_INCONNUE` | erreur | `[FIND]` vise une option absente, d'un type autre que `[bool]`/`[multi]`, ou un choix non déclaré |
-| `FIND_MESURE` | erreur | `[FIND]` sans mesure, avec un champ autre que `size`/`count`/`state`, ou `state` hors `todo`/`ok` |
+| `FIND_CLE_INCONNUE` | erreur | `[FIND]` vise une option absente, d'un type autre que `[bool]`/`[multi]`/`[select]`, ou un choix non déclaré |
+| `FIND_MESURE` | erreur | `[FIND]` sans mesure (`size`, `count`, `state` ou `ms`), avec un champ inconnu ou une valeur hors liste |
+| `ITEM_CLE_INCONNUE` | erreur | `[ITEM]` vise une option absente, ou qui n'est pas un `[items]` |
+| `ITEM_SANS_ID` | erreur | `[ITEM]` sans `id=` |
+| `ITEM_CHAMP` | erreur | `[ITEM]` avec un champ inconnu, ou une valeur hors liste |
+| `LIBELLE_INCONNU` | erreur | `[ITEM] … label=` vise une clé absente du bloc `REPORT` |
+| `METRIC_CLE_INCONNUE` | erreur | `[METRIC]` vise une clé qui n'est pas un libellé du bloc `REPORT` |
+| `METRIC_CHAMP` | erreur | `[METRIC]` sans `value=`, avec un champ inconnu ou une valeur hors liste |
+| `NOTE_INCONNUE` | erreur | `[NOTE]` vise une note absente de `REPORT` ou une cible non déclarée, ou porte un champ autre que `show=` |
+| `LOG_CANAL` | erreur | `[LOG]` sans canal : un mot, puis le texte |
+| `PROGRESS_VALEUR` | erreur | `[PROGRESS]` hors d'un entier de 0 à 100 |
+| `RAPPORT_NON_FERME` | erreur | Bloc `WINTOOL:REPORT` non refermé |
+| `NOTE_NIVEAU` | erreur | `[note:…]` hors `info` / `warn` |
+| `ETIQUETTE_INCONNUE` | erreur | Étiquette inconnue sur une option, un choix ou une entrée de `REPORT` |
+| `GROUPE_INCONNU` | erreur | `[group:Clé]` vise un groupe que `REPORT` ne déclare pas |
+| `GROUPE_ORPHELIN` | avertissement | Groupe déclaré dans `REPORT` où aucune option ni aucun choix ne se range |
+| `VUE_INCONNUE` | erreur | `view` ou `[view:]` hors des vues admises, ou `view` d'une autre forme que `<vue> expert=<vue>` |
+| `PANNEAU_INCONNU` | erreur | `panels` cite un panneau inconnu |
+
+Les contrôles des lignes d'analyse ne voient que ce qui est écrit **en toutes lettres** :
+une clé ou une valeur calculée (`Targets.$t`, `size=$($m.Size)`) leur échappe, par
+construction. WinTool, lui, lit la vraie sortie, et ignore ce qui ne correspond pas.
 
 Le contrôle des marqueurs ne regarde que les balises **en tête de chaîne affichée**.
 Sans cette restriction, les transtypages PowerShell deviennent des faux positifs :
@@ -786,7 +1224,8 @@ validateur en `-Strict`. Ils sont de bons exemples de ce qu'on peut faire — ma
 évoluent, et aucun n'est garanti représentatif de toutes les règles.
 
 **Le squelette donné plus haut reste le modèle de référence**, et pour un script
-analysable, l'exemple complet de « Le mode analyse ». Il est vérifié : on l'extrait de
+analysable, l'exemple complet de « Le mode analyse » — aussi disponible tel quel dans
+`docs/mockups/exemple-analyse.ps1`. Il est vérifié : on l'extrait de
 ce fichier et on le passe au validateur en `-Strict` à chaque relecture de la documentation.
 
 ---
@@ -840,10 +1279,12 @@ exemple mis en commentaire dans un en-tête `<# … #>` ne compte pas, et vous r
 Et elle doit être **identique aux trois endroits** : `WINTOOL:OPTIONS`, `WINTOOL:LANG` et
 `$CONFIG`. Le validateur croise les trois dans les deux sens.
 
-### `category` ne peut pas viser « Entretien complet »
+### `category` ne peut pas viser un lot
 
-Cette catégorie est un agrégat : elle rassemble automatiquement ce qui est rangé ailleurs.
-Aucun script ne peut la désigner. Utilisez un des six jetons d'usine.
+`category` désigne une **catégorie** (`tools/categories.json`), jamais un lot. « Entretien
+complet », en particulier, est un lot agrégat : il rassemble automatiquement ce qui est
+rangé ailleurs, et aucun script ne peut le désigner. Écrire `category : maintenance` range
+le script dans « Autres ».
 
 ### Une valeur d'`engine` inconnue se comporte comme `auto`
 
@@ -917,8 +1358,9 @@ foreach ($dossier in ("$($CONFIG.CustomPaths)" -split ';' | ForEach-Object { $_.
 
 WinTool applique partout le principe « **constater, jamais bloquer** » : un script
 non conforme s'exécute quand même, ses anomalies sont simplement affichées. Il
-existe exactement **trois exceptions**, et toutes les trois portent sur
-l'exécution avec les droits administrateur — jamais sur la forme du fichier.
+existe exactement **cinq exceptions**, et aucune ne porte sur la forme du fichier :
+toutes protègent ce qui s'exécute avec les droits administrateur, ou ce que
+l'interface promet à l'utilisateur.
 
 Si vous écrivez des scripts pour WinTool, ce sont les seules choses qui peuvent
 faire refuser le lancement :
@@ -1024,3 +1466,16 @@ if ($SafeTest) {
 - **N'inventez jamais un résultat.** Écrire `[OK] simulated: no corruption found`
   sans avoir rien vérifié fait mentir le journal. Dites ce que vous *auriez* fait,
   jamais ce que vous *auriez trouvé*.
+
+### 5. Une sélection qui ne vient pas de la dernière analyse
+
+Pour un script analysable, ce qui revient dans une liste `[items]` est une liste d'ids
+(voir « Le mode analyse »). WinTool retient les ids que la **dernière analyse** de chaque
+script a annoncés, avec l'empreinte exacte du fichier analysé, et **refuse de lancer**
+l'action si `$CONFIG` contient un id que cette analyse n'a pas annoncé — ou si le fichier a
+changé depuis. L'utilisateur voit « Relancez l'analyse ».
+
+Ce souvenir ne vit qu'en mémoire : une analyse ne vaut que pour la session qui l'a vue.
+Conséquence pour vous : **un id doit être stable** entre l'analyse et l'action, et il ne doit
+désigner que ce que l'analyse a montré. C'est ce qui empêche une configuration modifiée à la
+main de faire traiter au script un élément que personne n'a vu.

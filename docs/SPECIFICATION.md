@@ -34,8 +34,8 @@ aucune recompilation, aucune liste à tenir à jour.
 
 > **Le mode Expert est le panneau de configuration du mode Simple.**
 
-Ce ne sont pas deux vues du même outil. Chaque bouton que voit le débutant est une
-catégorie dont l'utilisateur avancé a défini le contenu, l'ordre, la configuration et le
+Ce ne sont pas deux vues du même outil. Chaque bouton que voit le débutant est un
+**lot** dont l'utilisateur avancé a défini le contenu, l'ordre, la configuration et le
 comportement.
 
 ---
@@ -48,16 +48,23 @@ Destiné aux débutants et aux personnes âgées. Trois étapes :
 
 | Étape | Rôle | Ne fait jamais |
 |---|---|---|
-| **1 · Choisir** | La catégorie épinglée en grand, puis les autres catégories | — |
-| **2 · Vérifier** | Récapitulatif de ce qui va être fait, réglages repliés, annonce du point de restauration | **Ne modifie rien** |
+| **1 · Choisir** | Le lot épinglé en grand, puis les autres lots | — |
+| **2 · Vérifier** ou **Analyser** | Récapitulatif de ce qui va être fait, réglages repliés, annonce du point de restauration — ou, si le lot contient une action qui sait analyser, l'analyse elle-même (§17.2) | **Ne modifie rien** |
 | **3 · Entretien** | Progression, liste des tâches, puis bilan | — |
 
 Une seule décision par écran. Retour possible à tout moment avant l'étape 3.
 
 ### Mode Expert — master-détail
 
-Colonne gauche filtrable mêlant **Lots** (les catégories) et **Scripts**, détail à droite,
-journal ancré en bas.
+Colonne gauche filtrable à deux onglets, détail à droite, journal ancré en bas :
+
+- **Scripts** — toutes les actions, rangées par **catégorie** (§4.1) : c'est là qu'on trouve
+  une action, qu'on la règle, qu'on l'analyse (§17.3) ;
+- **Lots** — les groupes que lance le mode Simple : c'est là qu'on les compose, les
+  ordonne et les renomme.
+
+L'onglet choisi est retenu d'une session à l'autre. La fiche d'une action dit sa catégorie
+et les lots qui la contiennent.
 
 ---
 
@@ -93,36 +100,60 @@ Les cibles cliquables du mode Simple ne descendent **jamais sous 56 px**
 
 ## 4. Modèle de données
 
-### 4.1 Catégories — données **utilisateur**
+### 4.1 Lots et catégories
 
-C'est l'inversion majeure par rapport à la v0.3, où la catégorie était figée dans le script.
+Jusqu'à la 1.2, un seul mot désignait deux choses : le domaine d'un script et le groupe de
+scripts que lance un bouton du mode Simple. Depuis la 1.4, ce sont deux notions distinctes.
 
-Une catégorie porte :
+| | **Catégorie** | **Lot** |
+|---|---|---|
+| Ce que c'est | Le domaine d'une action : nettoyage, vie privée… | Un groupe d'actions lancées ensemble |
+| Qui la définit | **Le script**, par `category` (§5.1) | **L'utilisateur**, en mode Expert |
+| Où elle sert | Trier l'onglet **Scripts** de l'Expert | Les boutons du mode Simple ; l'onglet **Lots** de l'Expert |
+| Liste | `tools/categories.json`, figée — une catégorie inconnue range le script dans « Autres » | `tools/lots.json` pour les lots d'usine, puis données utilisateur |
+| Persistée | Jamais : relue à chaque découverte | Dans `settings.json` |
+
+#### Les lots — données **utilisateur**
+
+C'est l'inversion majeure par rapport à la v0.3, où le rangement était figé dans le script.
+
+Un lot porte :
 
 | Champ | Détail |
 |---|---|
 | `id` | interne, stable |
-| `name` | **un seul nom**, partagé par les deux modes → les catégories d'usine sont livrées avec des noms déjà grand public (« Faire le ménage », pas « Nettoyage ») |
+| `name` | **un seul nom**, partagé par les deux modes → les lots d'usine sont livrés avec des noms déjà grand public (« Faire le ménage », pas « Nettoyage ») |
 | `description` | une phrase, en langage courant |
 | `icon` | choisie parmi le jeu d'icônes de l'application |
-| `pinned` | épinglée en grand dans l'étape 1 du mode Simple |
+| `pinned` | épinglé en grand dans l'étape 1 du mode Simple |
 | `scripts[]` | **liste ordonnée** de références de scripts |
+| `factory_aliases` | les tokens de `category` qu'il accueille à la découverte — lots d'usine seulement |
 
-**Fr/en (§10) ne s'applique qu'aux catégories d'usine**, et seulement à elles : `id` y est
-doublé (`id_en` + `id_fr`, ex. `privacy` / `vieprivee`) — les deux sont acceptés par
-`category` dans l'entête d'un script (docs/FORMAT_SCRIPT.md) — et `name` y est traduit
-fr/en. Une catégorie **créée par l'utilisateur** n'a qu'un seul `id` et un seul `name`,
-dans la langue tapée à la création : aucun script ne peut la viser par `category`, elle ne
-se remplit qu'à la main.
+**Fr/en (§10) ne s'applique qu'aux lots d'usine**, et seulement à eux : leur `name` y est
+traduit fr/en, et chacun dit dans `tools/lots.json` quelles catégories il accueille — dont
+il reçoit les deux tokens, anglais et français (`privacy` / `vieprivee`). Un lot **créé par
+l'utilisateur** n'a qu'un seul `name`, dans la langue tapée à la création, et n'accueille
+aucune catégorie : il ne se remplit qu'à la main.
 
-Le mode Expert permet de **créer, renommer, réordonner et supprimer** des catégories.
+Le mode Expert permet de **créer, renommer, réordonner et supprimer** des lots.
 
-**Appartenance multiple** : un script peut figurer dans plusieurs catégories.
-→ **Garde-fou obligatoire** : si deux catégories enchaînées partagent un script, il ne
-s'exécute **qu'une fois**.
+**Appartenance multiple** : un script peut figurer dans plusieurs lots, ou dans aucun
+(« Non classé »).
+→ **Garde-fou obligatoire** : si deux lots enchaînés partagent un script, il ne s'exécute
+**qu'une fois**.
 
-**« Entretien complet »** n'est pas un cas particulier du code : c'est une catégorie
-ordinaire, simplement `pinned`. Elle est renommable et supprimable comme les autres.
+**« Entretien complet »** est un lot d'usine épinglé, renommable et supprimable comme les
+autres. Sa seule particularité est d'être un **agrégat** (`aggregate`) : son contenu n'est
+jamais enregistré, il est recalculé comme l'union de tout ce qui est rangé ailleurs. Aucun
+script ne peut le viser par `category`.
+
+#### Les catégories — données **du script**
+
+Une catégorie a un id anglais et un id français, un nom fr/en et une icône. Elle ne sert
+qu'à trier : l'onglet Scripts de l'Expert affiche une rubrique par catégorie, dans l'ordre
+de `tools/categories.json`, puis « Autres » ; une rubrique vide n'apparaît pas. Le script
+la déclare et elle le suit : l'utilisateur ne la change pas, il range le script dans des
+lots.
 
 ### 4.2 Réglages par script
 
@@ -136,7 +167,7 @@ Stockés dans la configuration, **jamais dans le fichier `.ps1`** :
 | Activé / désactivé | activé |
 
 **Principe général, valable pour tout réglage dérivé d'un script** (valeurs de `$CONFIG`,
-ces deux cases, et le classement en catégorie du script — §5.1) : la métadonnée du script
+ces deux cases, et le rangement du script dans les lots — §5.1) : la métadonnée du script
 **propose**, l'utilisateur **dispose**. Tant que l'utilisateur n'a rien changé, la valeur
 suit le script et se met à jour si le script change (à la Ré-analyse, §5.5) ; dès qu'il la
 modifie à la main, elle devient une **configuration figée** qu'aucun réglage venant du
@@ -183,7 +214,7 @@ avant remplacement (§16.5).
 
 **Identifiant d'un script — le champ `id` de l'entête (§5.1), pas le chemin.** Un chemin
 change au moindre renommage ou déplacement ; l'`id` survit, ce qui préserve la
-configuration, le classement dans les catégories et l'historique.
+configuration, le rangement dans les lots et l'historique.
 
 - **Scripts du catalogue officiel** : `id` obligatoire, vérifié par sa CI (§5.4) et par
   l'outil qui construit son index.
@@ -191,7 +222,7 @@ configuration, le classement dans les catégories et l'historique.
   retombe alors sur le **chemin relatif** à `scripts\` comme identifiant provisoire, et le
   lint signale l'anomalie « pas d'id déclaré : un renommage ou déplacement fera perdre la
   configuration de ce script ».
-- **Si l'`id` d'un fichier change** (ou disparaît), l'ancienne référence dans une catégorie
+- **Si l'`id` d'un fichier change** (ou disparaît), l'ancienne référence dans un lot
   devient une référence vers un script **manquant** (règle ci-dessous) : aucun mécanisme de
   migration automatique, c'est un nouveau script aux yeux de l'application.
 - **Collision d'`id`** (copier-coller d'un script sans relancer `New-Guid`) : le **premier
@@ -204,12 +235,12 @@ configuration, le classement dans les catégories et l'historique.
   d'un script officiel pour hériter de sa configuration et de sa place dans les lots. Un
   script sans `id`, identifié par son chemin, réserve ce chemin comme un `id` déclaré.
 
-Un script référencé par une catégorie mais introuvable (par `id` ou, à défaut, par chemin)
+Un script référencé par un lot mais introuvable (par `id` ou, à défaut, par chemin)
 est affiché comme **manquant** et ignoré à l'exécution — jamais une erreur bloquante.
 
 Un script dont le moteur requis (`engine`, §5.1) n'est pas installé est affiché avec un
 marqueur clair — « nécessite PowerShell 7 » — et ignoré à l'exécution, sans bloquer le
-reste de sa catégorie. Ce constat est fait à l'analyse (§5.5), pas à chaque lancement.
+reste de son lot. Ce constat est fait à la lecture du fichier (§5.5), pas à chaque lancement.
 Détail au §6.7.
 
 ---
@@ -253,9 +284,10 @@ Le bloc `WINTOOL:START` est rédigé dans la langue déclarée par `lang`. Chaqu
 `$CONFIG`. Une traduction absente retombe sur la langue de base. Ajouter une langue plus
 tard ne touche à rien d'autre.
 
-**`category` est une suggestion suivie tant que l'utilisateur n'a pas rangé le script
-lui-même.** À la découverte, si la catégorie existe, le script y est placé ; sinon il va
-dans « Non classé ». C'est une application du principe général du §4.2 : tant qu'aucun
+**`category` fait deux choses.** Elle désigne la **catégorie** du script (§4.1) — celle-là
+le suit toujours. Et elle **suggère un lot** : à la découverte, le script entre dans le lot
+d'usine qui accueille sa catégorie ; s'il n'y en a aucun, il va dans « Non classé ». Cette
+suggestion n'est suivie que tant que l'utilisateur n'a pas rangé le script lui-même. C'est une application du principe général du §4.2 : tant qu'aucun
 humain n'a déplacé ce script manuellement, une **Ré-analyse** (§5.5) le replace en suivant
 la valeur courante de `category` — utile si le script évolue. **Dès que l'utilisateur le
 range lui-même** (glisser-déposer, changement manuel en mode Expert), ce classement devient
@@ -334,14 +366,18 @@ configuration tronquée.
 **En anglais** (voir § 10). Le moteur colorise et interprète à partir de ces marqueurs :
 
 ```
-[INFO]  message          ligne neutre
-[OK]    message          succès d'une étape
-[WARN]  message          avertissement, n'échoue pas
-[ERR]   message          erreur, marque le script en échec
-[STEP]  3/7 message      alimente la barre de progression
-[CKPT]  message          « interruption sans risque à partir d'ici »
-[REBOOT] message         un redémarrage est réellement nécessaire
-[DONE]  message          fin nominale
+[INFO]     message          ligne neutre
+[OK]       message          succès d'une étape
+[WARN]     message          avertissement, n'échoue pas
+[ERR]      message          erreur affichée et comptée — le verdict reste le code de sortie
+[STEP]     3/7 message      alimente la barre de progression
+[PROGRESS] 0-100            la progression en pourcentage
+[CKPT]     message          « interruption sans risque à partir d'ici »
+[REBOOT]   message          un redémarrage est réellement nécessaire
+[DONE]     message          fin nominale
+[FREED]    octets           espace réellement libéré (§17.2)
+[LOG]      Canal texte      une ligne de journal rangée dans un canal (Expert)
+[FIND] [ITEM] [METRIC] [NOTE]   ce que rapporte une analyse (§17)
 ```
 
 **Le verdict de réussite vient du code de sortie du processus** (`0` = succès), jamais du
@@ -372,6 +408,9 @@ officiel**, dans son propre dépôt : ces scripts-là, qu'on maîtrise, doivent 
 
 ### 5.5 Analyse et ré-analyse
 
+> Il s'agit ici de la **lecture du fichier** par WinTool. À ne pas confondre avec
+> l'analyse du §17, où c'est le script qui examine le PC.
+
 **L'analyse** d'un script (parsing de l'entête, résolution de l'`id` et de ses collisions
 §4.3, vérification de conformité §5.4, vérification que le moteur requis par `engine` est
 disponible §6.7) a lieu **une seule fois, à la découverte du fichier**. Elle n'est pas
@@ -386,8 +425,8 @@ Deux déclenchements manuels, aucun automatique :
 
 Une ré-analyse rafraîchit tout ce qui n'a pas été figé par une configuration utilisateur
 explicite (titre, description, tags, risque, réversibilité, redémarrage, moteur requis,
-anomalies de lint, et le classement en catégorie **si** l'utilisateur ne l'a jamais changé
-à la main — §4.2, §5.1). Elle n'écrase jamais une valeur que l'utilisateur a lui-même
+anomalies de lint, la catégorie, et le rangement en lot **si** l'utilisateur ne l'a jamais
+changé à la main — §4.2, §5.1). Elle n'écrase jamais une valeur que l'utilisateur a lui-même
 modifiée : « Ré-analyser » n'est pas « Réinitialiser ».
 
 ---
@@ -396,8 +435,8 @@ modifiée : « Ré-analyser » n'est pas « Réinitialiser ».
 
 ### 6.1 Ordre
 
-**Manuel, défini en mode Expert** par glisser-déposer, catégorie par catégorie.
-Nécessaire dès lors qu'un script peut appartenir à plusieurs catégories : sa position n'a
+**Manuel, défini en mode Expert** par glisser-déposer, lot par lot.
+Nécessaire dès lors qu'un script peut appartenir à plusieurs lots : sa position n'a
 plus de raison d'être la même partout.
 
 ### 6.2 Échecs
@@ -417,8 +456,9 @@ du mode Simple. Comportement modifiable en mode Expert.
 ### 6.4 Point de restauration
 
 - **Les scripts n'en créent jamais eux-mêmes.** C'est l'application.
-- Au lancement d'une catégorie, **si au moins un de ses scripts le réclame, un seul point
-  est créé** avant toute la série. Un point par catégorie, pas un par script.
+- Au lancement d'un lot, **si au moins un des scripts qui seront réellement lancés le
+  réclame, un seul point est créé** avant toute la série. Un point par lot, pas un par
+  script.
 - **À traiter explicitement, jamais en silence** : la protection système est désactivée par
   défaut sur beaucoup d'installations Windows 10/11, et Windows refuse plus d'un point par
   24 h. L'interface l'a promis à l'étape 2 — elle doit donc dire clairement ce qui s'est
@@ -547,7 +587,7 @@ l'honore complètement. Cette responsabilité est celle de l'auteur du script, e
 ## 7. État affiché — historique local uniquement
 
 « Fait le 18 septembre » signifie **« lancé le 18 septembre »**, pas « vérifié appliqué ».
-Jusqu'à la 1.1, aucun script n'a de mode « vérifier ». À partir de la 1.2, un script peut
+Jusqu'à la 1.2, aucun script n'a de mode « vérifier ». À partir de la 1.4, un script peut
 savoir analyser (§17) — mais une analyse est un instantané montré avant d'agir, pas un
 suivi : elle n'écrit rien dans l'historique et ne change pas ce qu'affiche « Fait le … ».
 
@@ -565,6 +605,7 @@ réellement.
 | Thème (clair / sombre / Windows) | **partout**, icône engrenage |
 | Langue | **partout** |
 | Comportement des mises à jour | **partout** |
+| Graphique de l'analyse (1.7) : l'anneau, la barre d'espace, le fond des lignes, les rectangles, la gaufre ou la jauge seule (§17.2) | **partout** |
 | Catalogues : consulter et choisir les actions, installer, vérifier, activer, moment de la vérification (§16) | **partout** |
 | Catalogues : en ajouter, en modifier, en retirer — en administrateur (§16.2) | Expert |
 | Comportement en cas d'échec | Expert |
@@ -607,8 +648,8 @@ sans l'être pour soi. Chaque geste s'enregistre aussitôt ; un chemin incomplet
 sous le champ, au moment de la saisie ; retirer un emplacement très sensible se confirme.
 Sans droits administrateur, un bandeau unique remplace les commandes.
 
-**Configuration d'usine** : l'application est livrée avec des catégories prêtes à l'emploi,
-« Entretien complet » épinglée incluse, aux noms déjà grand public.
+**Configuration d'usine** : l'application est livrée avec des lots prêts à l'emploi
+(`tools/lots.json`), « Entretien complet » épinglé inclus, aux noms déjà grand public.
 **Export / import** : toute la configuration tient dans un fichier, réimportable — on
 configure une fois, on déploie chez un proche en quelques secondes. L'import **valide** le
 fichier et refuse proprement un fichier corrompu ou issu d'une version incompatible.
@@ -619,7 +660,7 @@ fichier et refuse proprement un fichier corrompu ou issu d'une version incompati
 
 | | Rétention |
 |---|---|
-| **Historique** (quoi, quand, réussi ou non, durée) | **maximale** — c'est lui qui alimente les « Fait le 18 septembre » |
+| **Historique** (quoi, quand, réussi ou non, durée, et ce que l'action a libéré quand elle l'a dit par `[FREED]`) | **maximale** — c'est lui qui alimente les « Fait le 18 septembre » |
 | **Journaux techniques complets** | plafonnés par **taille**, pas par ancienneté ; limite réglable jusqu'à « Pas de limite » |
 
 Le plafond porte sur la taille parce que c'est elle qui gêne réellement l'utilisateur —
@@ -633,7 +674,8 @@ laisse ses propres journaux s'accumuler sans limite.
 | Niveau | Langue |
 |---|---|
 | Interface de l'application | **fr + en** |
-| Catégories d'usine | **fr + en** (celles créées par l'utilisateur sont dans la langue qu'il tape) |
+| Lots d'usine et catégories | **fr + en** (les lots créés par l'utilisateur sont dans la langue qu'il tape) |
+| Mots de l'analyse (bloc `WINTOOL:REPORT`) | **fr + en** via les blocs `WINTOOL:LANG` |
 | Titres, descriptions et libellés d'options des scripts | **fr + en** via les blocs `WINTOOL:LANG` |
 | **Sortie d'exécution brute des scripts** | **anglais seul** |
 
@@ -957,11 +999,11 @@ contestés, pas dissimulés.
 
 | Sujet | Hypothèse |
 |---|---|
-| Script manquant | affiché comme « manquant » dans sa catégorie, ignoré à l'exécution |
+| Script manquant | affiché comme « manquant » dans son lot, ignoré à l'exécution |
 | Exécutions simultanées | interdites, une seule à la fois |
-| Granularité de l'historique | une entrée par catégorie lancée **et** une par script exécuté |
-| Catégorie vide | affichée en Expert, masquée en mode Simple |
-| Suppression d'une catégorie | ne supprime aucun fichier de script |
+| Granularité de l'historique | une entrée par lot lancé **et** une par script exécuté |
+| Lot vide | affiché en Expert, masqué en mode Simple |
+| Suppression d'un lot | ne supprime aucun fichier de script |
 
 ---
 
@@ -977,7 +1019,7 @@ Maquette de référence : `docs/mockups/` et le canevas *WinTool — Marée cont
 
 | Écran | Rôle de l'eau |
 |---|---|
-| Simple · étape 1 | Les catégories sont des **bouées posées sur la ligne d'eau**, chacune à la hauteur que lui donne la courbe |
+| Simple · étape 1 | Les lots sont des **bouées posées sur la ligne d'eau**, chacune à la hauteur que lui donne la courbe |
 | Simple · étape 3 | Le niveau **monte de 0 à 100 %** ; la liste des tâches vit dans une **carte blanche flottant par-dessus** |
 | Expert | Le **journal est l'eau profonde** : panneau sombre pleine largeur en bas d'écran, à crête ondulée |
 
@@ -1057,7 +1099,7 @@ Deux obligations :
 
 Un **accent unique** — dégradé `#22D39A` → `#35C8E8` — pour tout ce qui est interactif,
 actif ou sélectionné. Trois couleurs sémantiques qui ne disent **qu'un état** : réussi,
-attention, échec. Rien d'autre n'est coloré : une icône de catégorie reste neutre tant
+attention, échec. Rien d'autre n'est coloré : une icône de lot reste neutre tant
 qu'elle n'est pas choisie.
 
 Le code couleur par domaine (une teinte par catégorie) a été **essayé puis rejeté** :
@@ -1359,11 +1401,11 @@ un fichier de script (§14) — mais ils repassent par l'écran d'approbation.
 
 ## 17. Analyser avant d'agir
 
-> **État : spécifié au 30/09/2026, prévu pour la 1.2.** Le contrat côté script — `scan`,
-> `WINTOOL_MODE`, `[FIND]`, `[FREED]` — est décrit dans `docs/FORMAT_SCRIPT.md`, section
-> « Le mode analyse ». Le validateur l'accepte dès la 1.1, pour que le catalogue puisse
-> être adapté avant que l'interface n'existe. Cette section décrit ce que fait
-> l'application.
+> **État : livré dans la 1.4.** Le contrat côté script — `scan`, `WINTOOL_MODE`, les lignes
+> `[FIND]` `[ITEM]` `[METRIC]` `[NOTE]`, le bloc `WINTOOL:REPORT`, les vues et les
+> panneaux — est décrit dans `docs/FORMAT_SCRIPT.md`, section « Le mode analyse », avec un
+> exemple complet (`docs/mockups/exemple-analyse.ps1`). Maquette de référence :
+> `docs/mockups/analyse.html`. Cette section décrit ce que fait l'application.
 
 ### 17.1 Le principe
 
@@ -1372,22 +1414,50 @@ puis agir**. L'utilisateur ne lance plus un nettoyage à l'aveugle ; il voit ce 
 fait et en combien, et décoche ce qu'il veut garder.
 
 Ce n'est pas une nouvelle mécanique d'exécution. Un script analysable est lancé deux fois :
-une fois avec `WINTOOL_MODE=scan`, puis normalement, avec ses options `[bool]` et `[multi]`
-fixées d'après les cases cochées. La sélection voyage par `WINTOOL_CONFIG`, comme n'importe
-quel réglage (§5.2).
+une fois avec `WINTOOL_MODE=scan`, puis normalement, avec ses cases — `[bool]`, `[multi]`,
+`[select]`, `[items]` — fixées d'après ce qui a été coché. La sélection voyage par
+`WINTOOL_CONFIG`, comme n'importe quel réglage (§5.2).
+
+**Un seul affichage, réglé par le script.** Il n'y a pas un rendu Simple et un rendu Expert
+à écrire. Le script choisit sa vue (`view`, avec `expert=` si l'Expert doit en voir une
+autre), range ses cases en postes (`[group:]`), et marque par `show` ce qui ne s'adresse
+qu'à un mode. Il ne livre que des nombres, des noms et des jetons ; les mots viennent de
+son entête traduite, et c'est WinTool qui compose. Une vue ne fait jamais disparaître une
+case, et une vue qui ne trouve pas de quoi s'afficher retombe sur la liste à cocher.
 
 ### 17.2 Dans le mode Simple
 
-L'étape 2 de l'assistant cesse d'être un récapitulatif et devient l'analyse elle-même.
+L'étape 2 de l'assistant devient l'analyse elle-même dès que le lot contient au moins une
+action qui sait analyser ; sinon elle reste le récapitulatif. Le fil d'Ariane le dit :
+« Analyser » ou « Vérifier ».
 
 1. **Choisir** — inchangé : un lot.
-2. **Analyser** — WinTool interroge chaque script analysable du lot et affiche ses constats,
-   regroupés par script, chacun avec sa case. Un total résume ce qui est en jeu
-   (« 1,1 Go à libérer, 3 réglages à appliquer »). Les scripts du lot qui ne savent pas
-   analyser apparaissent aussi, cochés, avec la mention qu'ils s'appliqueront tels quels.
-3. **Entretien** — seuls les éléments cochés sont traités.
+2. **Analyser** — WinTool interroge une à une les actions analysables du lot (« J'examine
+   votre PC… », une barre, « Action 2 sur 3 »), puis affiche **« Voici ce que j'ai
+   trouvé »** :
+   - un lot d'**une seule** action analysable qui déclare une vue s'affiche dans cette vue ;
+   - sinon, **le résumé** : un poste par groupe, chacun avec sa case et sa taille, et un
+     chevron qui déplie son détail en arborescence ; le graphique choisi dans les réglages
+     (1.7 : l'anneau par défaut, la barre d'espace, le fond des lignes, les rectangles, la
+     gaufre, ou la jauge seule avec « Voir le détail ») ; un total (« À libérer : 1,1 Go »).
+   - Les actions du lot qui ne savent pas analyser sont listées à part : elles
+     « s'appliqueront telles quelles ».
+   - Une action dont l'analyse a échoué est signalée, et ne sera pas lancée.
+   - Une action `show : expert` n'est ni montrée ni lancée, et l'écran le dit.
+   - Le point de restauration et le redémarrage sont annoncés d'après les actions qui
+     seront réellement lancées.
+3. **Entretien** — seules les actions qui ont quelque chose de coché sont lancées, et
+   seulement avec ce qui est coché. Une action dont rien n'est coché n'est pas lancée : elle
+   serait inscrite « faite » sans avoir rien fait. Une action qui n'a rapporté que des
+   mesures non plus : elle a fait son travail en analysant. Quand il ne reste rien à lancer,
+   le bouton le dit.
 4. **Bilan** — reprend `[FREED]` quand le script l'a émis, sinon l'estimation de l'analyse
    précédée de « environ ». Un chiffre n'est jamais présenté comme mesuré s'il est estimé.
+
+**Ce qui est caché suit sa case.** Cocher un poste ne coche que ce que le script
+recommandait ; le décocher décoche tout. Un élément réservé à l'Expert (`show=expert`)
+garde sa case et suit celle qui le contient, en revenant à l'avis du script — et le résumé
+dit combien d'éléments il ne montre pas, jamais en silence.
 
 Les règles de langage du §3 s'appliquent : « 795 Mo de fichiers temporaires », jamais
 `size=795278422`.
@@ -1397,9 +1467,20 @@ Une analyse n'écrit **rien** dans l'historique. Seule l'action compte pour « F
 
 ### 17.3 Dans le mode Expert
 
-Chaque script analysable propose « Analyser » dans son détail, qui affiche ses constats
-sans rien lancer d'autre. C'est l'outil de l'utilisateur avancé qui veut comprendre avant de
-composer un lot, et celui de l'auteur de script qui vérifie ce que son analyse rapporte.
+La fiche de chaque script analysable propose **« Analyser »**. L'analyse s'affiche dans la
+fiche, dans la vue que le script a choisie, avec son heure, « Relancer l'analyse », et ce
+qui a été ignoré — ligne par ligne, avec la raison. À côté, des **panneaux** : réglages
+appliqués, journal de l'analyse filtrable par étapes, constats et canaux `[LOG]`, ce qui
+sera fait, ce que recevra le script (le JSON exact de `WINTOOL_CONFIG`), points
+d'attention, historique de ce que l'action a libéré, provenance, espace disque. Le script
+en ouvre certains d'office (`panels`) ; l'utilisateur ouvre et ferme les autres.
+
+**« Lancer » reprend la sélection.** Après une analyse, l'action reçoit ce qui est coché,
+comme en Simple. Sans analyse — ou si le fichier a changé depuis — elle reçoit sa
+configuration, comme n'importe quel script.
+
+C'est l'outil de l'utilisateur avancé qui veut comprendre avant de composer un lot, et
+celui de l'auteur de script qui vérifie ce que son analyse rapporte.
 
 ### 17.4 Sécurité : analyser, c'est exécuter
 
@@ -1412,12 +1493,22 @@ En conséquence :
 - **L'approbation du §12.1 s'applique à l'analyse** exactement comme à l'action. Un script
   non approuvé n'est pas plus analysé qu'exécuté.
 - L'analyse passe par le **même lanceur durci** que l'action (§12.4) : verrou en écriture
-  sur le fichier, `-NoProfile`, `PSModulePath` réduit, interpréteur par chemin absolu.
-- Un `[FIND]` qui vise une option que le script ne déclare pas est **ignoré** et relevé
-  comme anomalie : un script ne peut parler que de ses propres cases, jamais faire
-  apparaître une case au nom d'un autre.
-- Une mesure illisible — taille négative, texte à la place d'un nombre, `state` inconnu —
+  sur le fichier, `-NoProfile`, `PSModulePath` réduit, interpréteur par chemin absolu, garde
+  des réglages. `WINTOOL_MODE` est posé pour l'analyse et **retiré** de l'environnement de
+  l'action : une variable héritée ne peut faire ni analyser au lieu d'agir, ni l'inverse.
+- Une ligne qui vise une option, un choix, une note ou un libellé que le script ne déclare
+  pas est **ignorée** et relevée comme anomalie : un script ne peut parler que de ses
+  propres cases, jamais faire apparaître une case au nom d'un autre.
+- Une mesure illisible — taille négative, texte à la place d'un nombre, jeton inconnu —
   est ignorée et relevée, jamais interprétée au mieux.
+- **Les éléments trouvés reviennent par leur id, jamais par leur chemin.** WinTool retient
+  en mémoire les ids que la dernière analyse de chaque script a annoncés, avec l'empreinte
+  du fichier analysé, et **refuse de lancer** une action dont la configuration contient un
+  id que cette analyse n'a pas annoncé, ou dont le fichier a changé depuis
+  (`ANALYSE_PERIMEE`) : une configuration modifiée à la main ne peut pas faire traiter un
+  élément que personne n'a vu. Ce souvenir ne survit pas à la session.
+- **Bornes** : 20 000 lignes lues par analyse, 5 000 éléments par liste, 400 caractères par
+  texte. Au-delà, la suite est ignorée, et l'Expert le voit.
 - L'interface ne présente jamais l'analyse comme « sans risque ». Elle dit ce qu'elle fait :
   WinTool examine le PC.
 

@@ -664,7 +664,7 @@ function vueFeu(m, mode) {
   const groupes = [...new Set(ms.map((x) => x.group).filter(Boolean))];
   const detail = groupes.map((g) => {
     const h = ms.filter((x) => x.group === g).reduce((a, x) => (ordre.indexOf(x.health) > ordre.indexOf(a) ? x.health : a), 'ok');
-    return `${esc(g)} : ${esc(t(JETONS.health[h][0]))}`;
+    return `${esc(rapport(m.entree, g)?.label || g)} : ${esc(t(JETONS.health[h][0]))}`;
   }).join(' · ');
   return `<div class="an-feu"><span class="an-lampe ${pire}">${ico(pire === 'ok' ? 'shield-check' : 'warn', 'i20')}</span>
     <span><b>${esc(t(`an.feu.${pire}`))}</b><span>${detail}</span></span></div>`;

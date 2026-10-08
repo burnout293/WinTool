@@ -49,7 +49,7 @@ jobs:
       - name: Verifier la syntaxe du frontend
         shell: bash
         run: |
-          for f in src/main.js src/i18n.js tools/bench/fixtures.js tools/sync-icons.mjs tools/verifier-presentation.mjs; do
+          for f in src/main.js src/analyse.js src/i18n.js tools/bench/fixtures.js tools/sync-icons.mjs tools/verifier-presentation.mjs; do
             node --check "$f"
           done
           node tools/verifier-traductions.mjs

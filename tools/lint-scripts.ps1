@@ -251,7 +251,7 @@ function Test-Entete {
     if ($champs.ContainsKey('category')) {
         $cat = $champs['category'].Valeur.ToLower()
         if ($CATEGORIES_USINE -notcontains $cat) {
-            Add-Constat $Fichier $champs['category'].Ligne 'avertissement' 'CATEGORIE_INCONNUE' "Catégorie '$cat' hors des catégories d'usine ; le script arrivera dans « Non classé »."
+            Add-Constat $Fichier $champs['category'].Ligne 'avertissement' 'CATEGORIE_INCONNUE' "Catégorie '$cat' hors des catégories d'usine ; le script sera rangé dans « Autres », et dans aucun lot (« Non classé »)."
         }
     }
 

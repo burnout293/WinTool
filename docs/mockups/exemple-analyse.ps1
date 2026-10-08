@@ -57,10 +57,9 @@
 ## WINTOOL:END
 
 # ==============================================================================
-# Exemple de la norme d'analyse — PROPOSITION, pas encore la norme.
-# Maquette : docs/mockups/analyse.html. Le validateur (tools/lint-scripts.ps1)
-# ne connaît pas encore [items], [group:], [show:], [ITEM], [METRIC], [NOTE],
-# [LOG] : il les signalera tant que la norme n'est pas écrite.
+# L'exemple de référence de la norme d'analyse : docs/FORMAT_SCRIPT.md,
+# « Le mode analyse », le reproduit à l'identique, et un test y veille.
+# Il passe le validateur en -Strict (tools/lint-scripts.ps1).
 #
 # Le script est lancé deux fois :
 #   1. ANALYSE  — WinTool pose WINTOOL_MODE=scan. Le script mesure, décrit ce

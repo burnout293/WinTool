@@ -3,8 +3,9 @@
 Outil de maintenance Windows. Une interface, deux modes, et des scripts PowerShell que
 vous pouvez lire, modifier et ajouter vous-même.
 
-- **Mode Simple** — un assistant en trois étapes, sans un seul terme technique. Conçu pour
-  quelqu'un qui n'a jamais ouvert un terminal.
+- **Mode Simple** — un assistant en trois étapes, sans un seul terme technique : choisir,
+  voir ce que WinTool a trouvé et cocher ce qu'on veut traiter, puis le laisser faire.
+  Conçu pour quelqu'un qui n'a jamais ouvert un terminal.
 - **Mode Expert** — le panneau de configuration du mode Simple : vous composez les lots,
   réglez chaque script, et lisez la sortie réelle de PowerShell pendant qu'elle défile.
 
@@ -110,7 +111,8 @@ l'approuver nommément. L'approbation porte sur l'empreinte exacte du fichier : 
 modification ultérieure la révoque.
 
 Pour écrire un script conforme, tout est dans **[`docs/FORMAT_SCRIPT.md`](docs/FORMAT_SCRIPT.md)** :
-le squelette à copier, les règles, et les pièges silencieux.
+le squelette à copier, les règles, les pièges silencieux — et, pour qu'il sache analyser
+avant d'agir, la norme d'analyse avec un exemple complet.
 
 Vérifiez-le avant de le lancer :
 
