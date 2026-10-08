@@ -99,10 +99,7 @@ pub fn record_script_run<R: Runtime>(
     save(app, &h)
 }
 
-pub fn record_lot_run<R: Runtime>(
-    app: &AppHandle<R>,
-    record: LotRunRecord,
-) -> Result<(), String> {
+pub fn record_lot_run<R: Runtime>(app: &AppHandle<R>, record: LotRunRecord) -> Result<(), String> {
     let mut h = load(app)?;
     h.lots.push(record);
     save(app, &h)

@@ -226,7 +226,10 @@ pub fn categories_from_json(raw: &str) -> Result<Vec<ScriptCategory>, String> {
 /// Parse `tools/lots.json` en lots d'usine prêts à persister. Les catégories qu'un
 /// lot nomme deviennent ses `factory_aliases` (id anglais et id français) ; une
 /// catégorie inconnue est une erreur de construction, pas une donnée à ignorer.
-pub fn factory_lots_from_json(raw: &str, categories: &[ScriptCategory]) -> Result<Vec<Lot>, String> {
+pub fn factory_lots_from_json(
+    raw: &str,
+    categories: &[ScriptCategory],
+) -> Result<Vec<Lot>, String> {
     let usine: Vec<LotUsine> =
         serde_json::from_str(raw).map_err(|e| format!("lots.json invalide : {e}"))?;
     usine
@@ -234,15 +237,20 @@ pub fn factory_lots_from_json(raw: &str, categories: &[ScriptCategory]) -> Resul
         .map(|l| {
             let mut alias = Vec::new();
             for c in &l.categories {
-                let cat = categories
-                    .iter()
-                    .find(|x| &x.id == c)
-                    .ok_or_else(|| format!("lots.json : catégorie inconnue « {c} » dans le lot « {} »", l.id))?;
+                let cat = categories.iter().find(|x| &x.id == c).ok_or_else(|| {
+                    format!(
+                        "lots.json : catégorie inconnue « {c} » dans le lot « {} »",
+                        l.id
+                    )
+                })?;
                 alias.extend(cat.aliases.iter().cloned());
             }
             Ok(Lot {
                 factory_aliases: alias,
-                name: BTreeMap::from([("fr".to_string(), l.name_fr), ("en".to_string(), l.name_en)]),
+                name: BTreeMap::from([
+                    ("fr".to_string(), l.name_fr),
+                    ("en".to_string(), l.name_en),
+                ]),
                 id: l.id,
                 description: String::new(),
                 icon: l.icon,
@@ -322,12 +330,7 @@ pub fn save_to(path: &Path, settings: &Settings) -> Result<(), String> {
 /// plus aucun lot sont ecartes : supprimer un lot ne doit pas laisser des
 /// appartenances fantomes.
 pub fn resolve_lots(settings: &Settings, script_id: &str, declared: &str) -> Vec<String> {
-    let connue = |id: &String| {
-        settings
-            .lots
-            .iter()
-            .any(|c| &c.id == id && !c.aggregate)
-    };
+    let connue = |id: &String| settings.lots.iter().any(|c| &c.id == id && !c.aggregate);
 
     if let Some(over) = settings.overrides.get(script_id) {
         if let Some(liste) = &over.lots {
@@ -495,23 +498,37 @@ pub struct CategoryBucket {
 
 /// La catégorie d'un script : celle que `category:` désigne, par son id anglais ou
 /// français, sans égard à la casse — sinon [`AUTRES`].
-pub fn resolve_category<'a>(categories: &'a [ScriptCategory], declared: &str) -> Option<&'a ScriptCategory> {
-    categories
-        .iter()
-        .find(|c| c.aliases.iter().any(|a| a.eq_ignore_ascii_case(declared.trim())))
+pub fn resolve_category<'a>(
+    categories: &'a [ScriptCategory],
+    declared: &str,
+) -> Option<&'a ScriptCategory> {
+    categories.iter().find(|c| {
+        c.aliases
+            .iter()
+            .any(|a| a.eq_ignore_ascii_case(declared.trim()))
+    })
 }
 
 /// Range des scripts par catégorie, dans l'ordre de `tools/categories.json` ;
 /// « Autres » ferme la marche. Une catégorie sans script n'apparaît pas.
-pub fn group_by_category(categories: &[ScriptCategory], scripts: &[ScriptEntry]) -> Vec<CategoryBucket> {
+pub fn group_by_category(
+    categories: &[ScriptCategory],
+    scripts: &[ScriptEntry],
+) -> Vec<CategoryBucket> {
     let mut seaux: Vec<CategoryBucket> = categories
         .iter()
-        .map(|c| CategoryBucket { category: c.clone(), scripts: Vec::new() })
+        .map(|c| CategoryBucket {
+            category: c.clone(),
+            scripts: Vec::new(),
+        })
         .collect();
     let mut autres = CategoryBucket {
         category: ScriptCategory {
             id: AUTRES.to_string(),
-            name: BTreeMap::from([("fr".to_string(), "Autres".to_string()), ("en".to_string(), "Other".to_string())]),
+            name: BTreeMap::from([
+                ("fr".to_string(), "Autres".to_string()),
+                ("en".to_string(), "Other".to_string()),
+            ]),
             icon: "folder".to_string(),
             aliases: Vec::new(),
         },
@@ -774,11 +791,7 @@ mod tests {
         set_script_lot_membership(&mut r, "nettoie", "cleaning", "tools", true);
 
         let g = group_scripts(&r, vec![s]);
-        let agregat = g
-            .lots
-            .iter()
-            .find(|c| c.lot.aggregate)
-            .expect("agregat");
+        let agregat = g.lots.iter().find(|c| c.lot.aggregate).expect("agregat");
         // Sans deduplication, « Entretien complet » l'executerait deux fois.
         assert_eq!(
             agregat.scripts.iter().filter(|s| s.id == "nettoie").count(),
@@ -934,15 +947,23 @@ mod tests {
                 "b": { "category_locked": "mien", "config": { "Cle": 1 } }
             }
         }"#;
-        let s: Settings = serde_json::from_str(ancien).expect("un fichier de la 1.2 doit se relire");
+        let s: Settings =
+            serde_json::from_str(ancien).expect("un fichier de la 1.2 doit se relire");
         assert_eq!(s.lots.len(), 2);
         assert_eq!(s.lots[1].scripts, vec!["b", "a"]);
-        assert_eq!(s.overrides["a"].lots, Some(vec!["cleaning".to_string(), "mien".to_string()]));
+        assert_eq!(
+            s.overrides["a"].lots,
+            Some(vec!["cleaning".to_string(), "mien".to_string()])
+        );
         assert_eq!(s.overrides["b"].lot_locked.as_deref(), Some("mien"));
 
         // Reecrit sous les nouveaux noms : l'ancien ne reapparait jamais.
         let neuf = serde_json::to_string(&s).unwrap();
-        assert!(neuf.contains("\"lots\"") && !neuf.contains("\"categories\"") && !neuf.contains("category_locked"));
+        assert!(
+            neuf.contains("\"lots\"")
+                && !neuf.contains("\"categories\"")
+                && !neuf.contains("category_locked")
+        );
     }
 
     #[test]
@@ -952,7 +973,10 @@ mod tests {
         set_config_value(&mut r, "nettoie", "Cle", Some(json!(1)));
         set_config_value(&mut r, "nettoie", "Cle", None);
         let g = group_scripts(&r, vec![script_entry("nettoie", "cleaning")]);
-        assert!(rangement(&g, "nettoie").contains(&"tools".to_string()), "le rangement manuel a ete efface");
+        assert!(
+            rangement(&g, "nettoie").contains(&"tools".to_string()),
+            "le rangement manuel a ete efface"
+        );
     }
 
     #[test]
@@ -966,9 +990,21 @@ mod tests {
         let seaux = group_by_category(&categories(), &scripts);
         let vu: Vec<(&str, Vec<&str>)> = seaux
             .iter()
-            .map(|b| (b.category.id.as_str(), b.scripts.iter().map(String::as_str).collect()))
+            .map(|b| {
+                (
+                    b.category.id.as_str(),
+                    b.scripts.iter().map(String::as_str).collect(),
+                )
+            })
             .collect();
-        assert_eq!(vu, vec![("cleaning", vec!["s1", "s4"]), ("tools", vec!["s2"]), (AUTRES, vec!["s3"])]);
+        assert_eq!(
+            vu,
+            vec![
+                ("cleaning", vec!["s1", "s4"]),
+                ("tools", vec!["s2"]),
+                (AUTRES, vec!["s3"])
+            ]
+        );
     }
 
     #[test]
@@ -987,14 +1023,8 @@ mod tests {
     fn resout_un_alias_francais_ou_anglais() {
         let cats = lots_usine();
         let settings = default_settings(cats);
-        assert_eq!(
-            resolve_lots(&settings, "s1", "nettoyage"),
-            vec!["cleaning"]
-        );
-        assert_eq!(
-            resolve_lots(&settings, "s1", "CLEANING"),
-            vec!["cleaning"]
-        );
+        assert_eq!(resolve_lots(&settings, "s1", "nettoyage"), vec!["cleaning"]);
+        assert_eq!(resolve_lots(&settings, "s1", "CLEANING"), vec!["cleaning"]);
         // Une suggestion inconnue ne range nulle part : depuis l'appartenance
         // multiple, « Non classe » se lit a une liste VIDE, pas a un id special.
         assert!(resolve_lots(&settings, "s1", "bidon").is_empty());
@@ -1013,10 +1043,7 @@ mod tests {
         );
         // Le script suggere "cleaning" mais l'utilisateur l'a range dans "tools" :
         // ce rangement manuel l'emporte, quoi que dise `category:` par la suite.
-        assert_eq!(
-            resolve_lots(&settings, "s1", "cleaning"),
-            vec!["tools"]
-        );
+        assert_eq!(resolve_lots(&settings, "s1", "cleaning"), vec!["tools"]);
     }
 
     #[test]

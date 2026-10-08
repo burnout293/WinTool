@@ -75,7 +75,8 @@ fn list_scripts(app: tauri::AppHandle) -> Result<discovery::DiscoveryResult, Str
 fn list_scripts_grouped(app: tauri::AppHandle) -> Result<GroupedResult, String> {
     let decouverte = discovery::discover(&app)?;
     let reglages = settings::load(&app)?;
-    let categories = settings::group_by_category(&settings::read_categories(&app)?, &decouverte.scripts);
+    let categories =
+        settings::group_by_category(&settings::read_categories(&app)?, &decouverte.scripts);
     let groupes = settings::group_scripts(&reglages, decouverte.scripts);
     let mut problems = systeme::alertes();
     problems.extend(decouverte.problems);
@@ -547,6 +548,10 @@ fn check_script(app: tauri::AppHandle, script_id: String) -> Result<Verification
 /// Historique (specification §9/§14) : une entree par script execute et une
 /// par lot lance. L'horodatage vient du serveur, pas du client — le
 /// frontend fournit les faits constates, jamais l'heure.
+// Les arguments sont ceux que l'interface envoie, un par fait constate : les
+// regrouper dans une structure changerait la forme de l'appel IPC sans rien
+// rendre plus sur.
+#[allow(clippy::too_many_arguments)]
 #[tauri::command]
 fn record_script_run(
     app: tauri::AppHandle,
@@ -1262,11 +1267,7 @@ fn set_lot_icon(app: tauri::AppHandle, id: String, icon: String) -> Result<Setti
 /// Epingle ou detache un lot (« Entretien complet » n'est pas un cas special
 /// de code, §4.1 : n'importe quel lot peut l'etre).
 #[tauri::command]
-fn set_lot_pinned(
-    app: tauri::AppHandle,
-    id: String,
-    pinned: bool,
-) -> Result<Settings, String> {
+fn set_lot_pinned(app: tauri::AppHandle, id: String, pinned: bool) -> Result<Settings, String> {
     with_settings(&app, |s| {
         if !s.lots.iter().any(|c| c.id == id) {
             return Err(format!("lot introuvable : {id}"));
