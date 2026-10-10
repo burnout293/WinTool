@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sindry — étiquettes</title>
+<!--
+  Ébauches pour les « tags » d'une fiche (risque, durée, réversible, redémarrage,
+  droits, provenance, dernier passage). Retour utilisateur : c'est fouillis, il y
+  a des couleurs partout, et on dirait des boutons. Chaque proposition est posée
+  sur deux fiches : une action calme, une action qui mérite l'attention.
+  Thème Braise, variantes Ardente et Crépuscule.
+-->
+<style>
+@font-face { font-family: 'Inter'; font-weight: 100 900; font-display: swap;
+  src: url('../../src/fonts/inter-latin-wght-normal.woff2') format('woff2-variations'); }
+
+body {
+  --or: #FEC923; --ambre: #FD9E21; --orange: #FD7D26; --vermillon: #FD5632; --magenta: #DC1178;
+  --ciel: #4AB2E7; --violet: #775FD7; --orchidee: #CA28B1;
+}
+body[data-v="ardente"][data-mode="sombre"] {
+  --bg: #0F0A14; --surface: #18111F; --surface-2: #211829; --surface-3: #2B2034;
+  --border: #2C2236; --border-2: #3D3049; --text: #F7F1FA; --text-2: #B9A9C6; --text-3: #8E7E9C;
+  --acc-a: var(--or); --acc-b: var(--vermillon); --acc-on: #FFB35C; --on-acc: #1A0B12; --soft: #2A1A14;
+  --ok: #3FD69B; --warn: #FFB340; --err: #FF6B7A; --ok-s: #0F2A21; --warn-s: #2C2113; --err-s: #2E1720;
+}
+body[data-v="ardente"][data-mode="clair"] {
+  --bg: #FBF6F2; --surface: #FFFFFF; --surface-2: #F6EEE8; --surface-3: #EFE4DB;
+  --border: #EADFD6; --border-2: #DCCBBE; --text: #1F1426; --text-2: #6A5873; --text-3: #7D6B86;
+  --acc-a: var(--ambre); --acc-b: var(--vermillon); --acc-on: #B23A0C; --on-acc: #1A0B12; --soft: #FFF0E4;
+  --ok: #14915C; --warn: #9A650F; --err: #C0263F; --ok-s: #E6F5EC; --warn-s: #FBF3E2; --err-s: #FBEAEC;
+}
+body[data-v="crepuscule"][data-mode="sombre"] {
+  --bg: #110A1C; --surface: #1A1128; --surface-2: #231833; --surface-3: #2E2042;
+  --border: #2D2140; --border-2: #423058; --text: #F8F0FC; --text-2: #BCA9D0; --text-3: #9180A6;
+  --acc-a: var(--vermillon); --acc-b: var(--magenta); --acc-on: #FF86B0; --on-acc: #1C0614; --soft: #2C1229;
+  --ok: #45DCA3; --warn: #FFBF57; --err: #FF6B8F; --ok-s: #10291F; --warn-s: #2D2115; --err-s: #2F1424;
+}
+body[data-v="crepuscule"][data-mode="clair"] {
+  --bg: #FBF5FA; --surface: #FFFFFF; --surface-2: #F5ECF5; --surface-3: #EDE0EE;
+  --border: #EAD9EA; --border-2: #D9C2DB; --text: #22102C; --text-2: #6B5378; --text-3: #7E6589;
+  --acc-a: var(--vermillon); --acc-b: var(--magenta); --acc-on: #B0145F; --on-acc: #1C0614; --soft: #FCE8F1;
+  --ok: #138A58; --warn: #94600E; --err: #C0214A; --ok-s: #E6F5EC; --warn-s: #FBF3E2; --err-s: #FBEAEF;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #0A0A0F; }
+body { font-family: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; color: #EDEAF5;
+       padding: 24px 16px 60px; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; border: none; background: none; cursor: pointer; }
+svg.i { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+.page-h { max-width: 1180px; margin: 0 auto 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px 22px; }
+.page-h img { width: 56px; height: 56px; }
+.page-h h1 { font-size: 26px; letter-spacing: -.6px; font-weight: 800; }
+.page-h p { color: #A49DB6; font-size: 14px; margin-top: 2px; max-width: 560px; }
+.choix { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; }
+.pseg { display: inline-flex; padding: 4px; border-radius: 12px; background: #16141F; border: 1px solid #26232F; }
+.pseg button { padding: 8px 14px; border-radius: 9px; font-size: 13.5px; font-weight: 600; color: #A49DB6; }
+.pseg button[aria-pressed="true"] { color: #170A12; background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); }
+
+.principes { max-width: 1180px; margin: 0 auto 26px; background: #121019; border: 1px solid #221F2C; border-radius: 18px; padding: 18px 22px; }
+.principes h2 { font-size: 17px; }
+.principes ul { margin-top: 8px; padding-left: 18px; color: #C9C3D8; font-size: 13.5px; line-height: 1.65; columns: 2; column-gap: 32px; }
+@media (max-width: 760px) { .principes ul { columns: 1; } }
+
+.proposition { max-width: 1180px; margin: 0 auto 30px; }
+.proposition h2 { font-size: 20px; letter-spacing: -.3px; display: flex; align-items: baseline; gap: 10px; }
+.proposition h2 span { font-size: 13px; font-weight: 600; color: #A49DB6; }
+.proposition > p { color: #B4AECA; font-size: 13.5px; margin: 4px 0 12px; max-width: 900px; }
+.paire { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .paire { grid-template-columns: 1fr; } }
+
+/* --- La fiche : l'en-tête de la carte d'une action en mode Expert ---------- */
+.fiche { background: var(--bg); color: var(--text); border: 1px solid var(--border-2); border-radius: 18px; padding: 18px; }
+.fiche-in { background: var(--surface); border: 1px solid var(--border-2); border-radius: 16px; padding: 16px 18px; }
+.fh { display: flex; gap: 14px; align-items: flex-start; }
+.fi { width: 46px; height: 46px; border-radius: 14px; display: grid; place-items: center; color: var(--on-acc); background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); flex-shrink: 0; }
+.fi svg { width: 22px; height: 22px; }
+.ft { flex: 1; min-width: 0; }
+.ft h3 { font-size: 17.5px; letter-spacing: -.3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ft > p { color: var(--text-2); font-size: 13px; margin-top: 2px; }
+.fa { display: flex; gap: 8px; flex-shrink: 0; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 13px; border-radius: 10px; font-weight: 700; font-size: 12.5px;
+       border: 1px solid var(--border-2); background: var(--surface-2); color: var(--text); }
+.btn.prim { border: none; color: var(--on-acc); background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); }
+.zone { margin-top: 14px; }
+
+/* --- 0. Aujourd'hui : des pilules partout ------------------------------------ */
+.auj { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.auj + .auj { margin-top: 6px; }
+.pil { font-size: 11px; font-weight: 700; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-2); background: var(--surface-2); }
+.pil.ok { color: var(--ok); background: var(--ok-s); border-color: color-mix(in srgb, var(--ok) 34%, transparent); }
+.pil.med { color: var(--warn); background: var(--warn-s); border-color: color-mix(in srgb, var(--warn) 34%, transparent); }
+.pil.high { color: var(--err); background: var(--err-s); border-color: color-mix(in srgb, var(--err) 34%, transparent); }
+.pil.acc { color: var(--acc-on); background: var(--soft); border-color: color-mix(in srgb, var(--acc-b) 34%, transparent); }
+.pil.off { color: var(--text-3); background: transparent; opacity: .6; }
+.sep { width: 1px; height: 15px; background: var(--border-2); margin: 0 4px; }
+
+/* --- 1. La ligne de faits ----------------------------------------------------- */
+.faits { display: flex; flex-wrap: wrap; align-items: center; font-size: 12.5px; color: var(--text-2); row-gap: 4px; }
+.faits > span { display: inline-flex; align-items: center; gap: 5px; }
+.faits > span + span::before { content: '·'; margin: 0 9px; color: var(--text-3); }
+.faits .att { color: var(--warn); font-weight: 600; }
+.faits .grave { color: var(--err); font-weight: 600; }
+.faits svg { width: 13px; height: 13px; }
+
+/* --- 2. La fiche technique ---------------------------------------------------- */
+.tech { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px 20px; padding-top: 12px; border-top: 1px solid var(--border); }
+.tech div { display: flex; flex-direction: column; gap: 2px; }
+.tech dt { font-size: 10.5px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--text-3); }
+.tech dd { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; }
+.tech dd i { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+/* --- 3. Icônes et valeurs ------------------------------------------------------ */
+.icv { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 12.5px; color: var(--text-2); }
+.icv span { display: inline-flex; align-items: center; gap: 6px; }
+.icv svg { color: var(--text-3); }
+.icv .att, .icv .att svg { color: var(--warn); }
+.metre { display: inline-flex; gap: 2px; align-items: flex-end; }
+.metre i { width: 4px; border-radius: 2px; background: var(--surface-3); }
+.metre i:nth-child(1) { height: 6px; } .metre i:nth-child(2) { height: 9px; } .metre i:nth-child(3) { height: 12px; }
+.metre.n1 i:nth-child(1) { background: var(--ok); }
+.metre.n2 i:nth-child(-n+2) { background: var(--warn); }
+.metre.n3 i { background: var(--err); }
+
+/* --- 4. L'essentiel, puis le détail ------------------------------------------- */
+.alerte { display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; border-radius: 11px; font-size: 12.5px; color: var(--text); background: var(--warn-s); }
+.alerte + .alerte { margin-top: 6px; }
+.alerte svg { color: var(--warn); margin-top: 1px; }
+.alerte b { font-weight: 700; } .alerte span { color: var(--text-2); }
+.calme { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+.calme svg { color: var(--ok); }
+.pied4 { margin-top: 10px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-3); }
+.pied4 a { color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+/* --- 5. Jauges compactes --------------------------------------------------------- */
+.jauges { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 26px; }
+.jg { display: flex; flex-direction: column; gap: 5px; min-width: 120px; }
+.jg small { font-size: 10.5px; font-weight: 700; letter-spacing: .7px; text-transform: uppercase; color: var(--text-3); }
+.jg .barres { display: flex; gap: 3px; }
+.jg .barres i { flex: 1; height: 5px; border-radius: 3px; background: var(--surface-3); min-width: 24px; }
+.jg b { font-size: 12.5px; }
+.phrase { font-size: 12.5px; color: var(--text-2); }
+.phrase .att { color: var(--warn); font-weight: 600; }
+
+/* --- Provenance, à côté du titre (propositions 3 et 5) ----------------------- */
+.prov { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; color: var(--text-3); }
+.prov svg { width: 14px; height: 14px; color: var(--ok); }
+.prov.att svg, .prov.att { color: var(--warn); }
+</style>
+</head>
+<body data-v="ardente" data-mode="sombre">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 2v10" /> <path d="M18.4 6.6a9 9 0 1 1-12.77.04" /></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /></symbol>
+  <symbol id="i-broom" viewBox="0 0 24 24"><path d="M13.5 10.5 22 2" /> <path d="M14.734 13.841a2 2 0 00-.314-2.42L12.58 9.58a2 2 0 00-2.421-.314l-7.657 4.461A1 1 0 002.3 15.3l6.403 6.403a1 1 0 001.571-.204z" /> <path d="m5 18 2-2" /> <path d="m7.699 10.7 5.602 5.601" /></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z" /></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></symbol>
+  <symbol id="i-app-window" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2" /> <path d="M10 4v4" /> <path d="M2 8h20" /> <path d="M6 4v4" /></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" /> <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /> <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /> <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /> <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /> <circle cx="12" cy="12" r="3" /></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /> <path d="M12 2v2" /> <path d="M12 20v2" /> <path d="m4.93 4.93 1.41 1.41" /> <path d="m17.66 17.66 1.41 1.41" /> <path d="M2 12h2" /> <path d="M20 12h2" /> <path d="m6.34 17.66-1.41 1.41" /> <path d="m19.07 4.93-1.41 1.41" /></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></symbol>
+  <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4" /> <path d="M3.34 19a10 10 0 1 1 17.32 0" /></symbol>
+  <symbol id="i-house" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" /></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M3 5h.01" /> <path d="M3 12h.01" /> <path d="M3 19h.01" /> <path d="M8 5h13" /> <path d="M8 12h13" /> <path d="M8 19h13" /></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /> <path d="M12 7v5l4 2" /></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><path d="M12 19h8" /> <path d="m4 17 6-6-6-6" /></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" /></symbol>
+  <symbol id="i-shield-check" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /> <path d="m9 12 2 2 4-4" /></symbol>
+  <symbol id="i-triangle-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></symbol>
+  <symbol id="i-hard-drive" viewBox="0 0 24 24"><path d="M10 16h.01" /> <path d="M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /> <path d="M21.946 12.013H2.054" /> <path d="M6 16h.01" /></symbol>
+  <symbol id="i-trash-2" viewBox="0 0 24 24"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /> <path d="M2 12h20" /></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><path d="M12 20v2" /> <path d="M12 2v2" /> <path d="M17 20v2" /> <path d="M17 2v2" /> <path d="M2 12h2" /> <path d="M2 17h2" /> <path d="M2 7h2" /> <path d="M20 12h2" /> <path d="M20 17h2" /> <path d="M20 7h2" /> <path d="M7 20v2" /> <path d="M7 2v2" /> <rect x="4" y="4" width="16" height="16" rx="2" /> <rect x="8" y="8" width="8" height="8" rx="1" /></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <path d="M12 16v-4" /> <path d="M12 8h.01" /></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" /></symbol>
+  <symbol id="i-cog" viewBox="0 0 24 24"><path d="M11 10.27 7 3.34" /> <path d="m11 13.73-4 6.93" /> <path d="M12 22v-2" /> <path d="M12 2v2" /> <path d="M14 12h8" /> <path d="m17 20.66-1-1.73" /> <path d="m17 3.34-1 1.73" /> <path d="M2 12h2" /> <path d="m20.66 17-1.73-1" /> <path d="m20.66 7-1.73 1" /> <path d="m3.34 17 1.73-1" /> <path d="m3.34 7 1.73 1" /> <circle cx="12" cy="12" r="2" /> <circle cx="12" cy="12" r="8" /></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5" /> <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" /></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0" /> <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14" /> <path d="M12 5v14" /></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14" /></symbol>
+  <symbol id="i-square" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /></symbol>
+</svg>
+
+<header class="page-h">
+  <img src="sindry-256.png" alt="">
+  <div>
+    <h1>Les étiquettes d'une fiche</h1>
+    <p>Cinq ébauches pour remplacer les pilules colorées : risque, durée, réversible, redémarrage, droits, provenance, dernier passage.</p>
+  </div>
+  <nav class="choix">
+    <div class="pseg"><button type="button" data-v="ardente" aria-pressed="true">Ardente</button><button type="button" data-v="crepuscule" aria-pressed="false">Crépuscule</button></div>
+    <div class="pseg"><button type="button" data-m="sombre" aria-pressed="true">Sombre</button><button type="button" data-m="clair" aria-pressed="false">Clair</button></div>
+  </nav>
+</header>
+
+<section class="principes">
+  <h2>Ce qui rend les pilules d'aujourd'hui pénibles</h2>
+  <ul>
+    <li><b>Elles ressemblent à des boutons</b> : bordure, fond, coins ronds — la forme exacte des puces cliquables des réglages.</li>
+    <li><b>Toutes les valeurs possibles sont affichées</b> : « Faible, Moyen, Élevé » pour dire « Faible ». Neuf pilules pour quatre informations.</li>
+    <li><b>La couleur est partout</b>, donc elle ne signale plus rien : le vert d'un risque faible pèse autant que l'orange d'un redémarrage.</li>
+    <li><b>Règle des ébauches</b> : du texte, pas de cadre ; une seule valeur par information ; la couleur réservée à ce qui demande l'attention.</li>
+  </ul>
+</section>
+
+<main id="propositions"></main>
+
+<script>
+const ico = (n) => `<svg class="i"><use href="#i-${n}"/></svg>`;
+
+/** Deux actions : l'une calme, l'autre qui mérite l'attention. */
+const ACTIONS = [
+  { titre: 'Vider la corbeille', desc: 'Libère la place prise par les fichiers supprimés', icone: 'trash-2',
+    risque: 1, duree: 'Rapide', dureeN: 1, reversible: false, interruptible: true, reboot: false, admin: false,
+    prov: 'officiel', fait: 'Fait le 9 octobre' },
+  { titre: 'Réduire la télémétrie', desc: 'Limite ce que Windows envoie à Microsoft', icone: 'shield',
+    risque: 2, duree: 'Moyen', dureeN: 2, reversible: true, interruptible: false, reboot: true, admin: true,
+    prov: 'modifie', fait: 'Jamais fait' },
+];
+const RISQUE = ['', 'Faible', 'Moyen', 'Élevé'];
+const PROV = { officiel: 'Officiel', modifie: 'Officiel, modifié sur ce PC' };
+
+function fiche(a, zone, avecProv = false) {
+  const prov = avecProv
+    ? ` <span class="prov${a.prov === 'modifie' ? ' att' : ''}">${ico(a.prov === 'modifie' ? 'triangle-alert' : 'shield-check')}${PROV[a.prov]}</span>`
+    : '';
+  return `<div class="fiche"><div class="fiche-in">
+    <div class="fh"><span class="fi">${ico(a.icone)}</span>
+      <div class="ft"><h3>${a.titre}${prov}</h3><p>${a.desc}</p></div>
+      <div class="fa"><button class="btn" type="button">Analyser</button><button class="btn prim" type="button">Exécuter</button></div></div>
+    <div class="zone">${zone}</div></div></div>`;
+}
+
+/* 0. Aujourd'hui */
+function aujourdhui(a) {
+  const echelle = (vals, actif, ton) => vals.map((v, i) => `<span class="pil ${i + 1 === actif ? ton(i + 1) : 'off'}">${v}</span>`).join('');
+  const tonRisque = (n) => ['', 'ok', 'off', 'high'][n] || 'off';
+  return `<div class="auj">${echelle(['Risque faible', 'Risque moyen', 'Risque élevé'], a.risque, tonRisque)}<i class="sep"></i>${echelle(['Rapide', 'Moyen', 'Lent'], a.dureeN, () => '')}</div>
+    <div class="auj"><span class="pil ${a.reversible ? 'acc' : 'med'}">${a.reversible ? 'Réversible' : 'Non réversible'}</span>
+      <span class="pil ${a.interruptible ? '' : 'med'}">${a.interruptible ? 'Interruptible' : 'Non interruptible'}</span>
+      <span class="pil ${a.reboot ? 'med' : 'off'}">Redémarrage</span><span class="pil ${a.admin ? '' : 'off'}">Admin requis</span>
+      <span class="pil ${a.prov === 'officiel' ? 'acc' : 'med'}">${a.prov === 'officiel' ? 'Officiel' : 'Modifié'}</span><span class="pil ${a.fait.startsWith('Jamais') ? 'off' : ''}">${a.fait}</span></div>`;
+}
+
+/* 1. La ligne de faits */
+function ligneDeFaits(a) {
+  const f = [
+    `<span class="${a.risque > 1 ? 'att' : ''}">Risque ${RISQUE[a.risque].toLowerCase()}</span>`,
+    `<span>${a.duree === 'Rapide' ? 'Quelques secondes' : 'Quelques minutes'}</span>`,
+    a.reversible ? '<span>Réversible</span>' : `<span class="att">${ico('triangle-alert')}Irréversible</span>`,
+    a.interruptible ? '' : `<span class="att">Ne s'interrompt pas</span>`,
+    a.reboot ? `<span class="att">${ico('power')}Redémarrage</span>` : '',
+    a.admin ? '<span>Administrateur</span>' : '',
+    `<span class="${a.prov === 'modifie' ? 'att' : ''}">${PROV[a.prov]}</span>`,
+    `<span>${a.fait}</span>`,
+  ];
+  return `<div class="faits">${f.filter(Boolean).join('')}</div>`;
+}
+
+/* 2. La fiche technique */
+function ficheTechnique(a) {
+  const point = (c) => (c ? `<i style="background:var(--${c})"></i>` : '');
+  const L = [
+    ['Risque', RISQUE[a.risque], a.risque > 1 ? 'warn' : ''],
+    ['Durée', a.duree === 'Rapide' ? 'Quelques secondes' : 'Quelques minutes', ''],
+    ['Retour arrière', a.reversible ? 'Possible' : 'Impossible', a.reversible ? '' : 'warn'],
+    ['Interruption', a.interruptible ? 'Possible' : 'Déconseillée', a.interruptible ? '' : 'warn'],
+    ['Redémarrage', a.reboot ? 'Nécessaire' : 'Non', a.reboot ? 'warn' : ''],
+    ['Droits', a.admin ? 'Administrateur' : 'Utilisateur', ''],
+    ['Provenance', PROV[a.prov], a.prov === 'modifie' ? 'warn' : ''],
+    ['Dernier passage', a.fait.replace('Fait le ', ''), ''],
+  ];
+  return `<dl class="tech">${L.map(([k, v, c]) => `<div><dt>${k}</dt><dd>${point(c)}${v}</dd></div>`).join('')}</dl>`;
+}
+
+/* 3. Icônes et valeurs */
+function iconesValeurs(a) {
+  const L = [
+    `<span><span class="metre n${a.risque}"><i></i><i></i><i></i></span>Risque ${RISQUE[a.risque].toLowerCase()}</span>`,
+    `<span>${ico('clock')}${a.duree === 'Rapide' ? 'Secondes' : 'Minutes'}</span>`,
+    a.reversible ? `<span>${ico('history')}Réversible</span>` : `<span class="att">${ico('history')}Irréversible</span>`,
+    a.reboot ? `<span class="att">${ico('power')}Redémarrage</span>` : '',
+    a.interruptible ? '' : `<span class="att">${ico('x')}Ne pas interrompre</span>`,
+    a.admin ? `<span>${ico('shield')}Administrateur</span>` : '',
+    `<span>${ico('check')}${a.fait}</span>`,
+  ];
+  return `<div class="icv">${L.filter(Boolean).join('')}</div>`;
+}
+
+/* 4. L'essentiel, puis le détail */
+function essentiel(a) {
+  const al = [];
+  if (!a.reversible) al.push(['triangle-alert', 'Irréversible', 'ce qui est supprimé ne revient pas — un point de restauration sera proposé.']);
+  if (a.reboot) al.push(['power', 'Redémarrage nécessaire', 'à la fin de l\'entretien, il vous sera proposé.']);
+  if (!a.interruptible) al.push(['x', 'À ne pas interrompre', 'l\'arrêter en cours peut laisser Windows à moitié réglé.']);
+  if (a.prov === 'modifie') al.push(['triangle-alert', 'Modifié sur ce PC', 'il ne correspond plus à la version publiée et signée.']);
+  const corps = al.length
+    ? al.map(([i, b, s]) => `<div class="alerte">${ico(i)}<div><b>${b}</b> — <span>${s}</span></div></div>`).join('')
+    : `<div class="calme">${ico('shield-check')}Rien de particulier à savoir avant de la lancer.</div>`;
+  return `${corps}<div class="pied4">Risque ${RISQUE[a.risque].toLowerCase()} · ${a.duree.toLowerCase()} · ${a.fait} · <a>Tout voir</a></div>`;
+}
+
+/* 5. Jauges compactes */
+function jauges(a) {
+  const jg = (titre, n, mots, couleurs) => `<div class="jg"><small>${titre}</small>
+    <div class="barres">${[1, 2, 3].map((i) => `<i style="${i <= n ? `background:var(--${couleurs[n - 1]})` : ''}"></i>`).join('')}</div><b>${mots[n - 1]}</b></div>`;
+  const phrase = [
+    a.reversible ? 'Réversible' : '<span class="att">Irréversible</span>',
+    a.interruptible ? 'peut s\'arrêter à tout moment' : '<span class="att">ne doit pas être interrompue</span>',
+    a.reboot ? '<span class="att">redémarrage nécessaire</span>' : 'sans redémarrage',
+    a.admin ? 'droits administrateur' : 'droits ordinaires',
+  ].join(', ');
+  return `<div class="jauges">${jg('Risque', a.risque, ['Faible', 'Moyen', 'Élevé'], ['ok', 'warn', 'err'])}
+    ${jg('Durée', a.dureeN, ['Secondes', 'Minutes', 'Longue'], ['text-3', 'text-3', 'text-3'])}
+    <p class="phrase">${phrase}. ${a.fait}.</p></div>`;
+}
+
+const PROPOSITIONS = [
+  ['Aujourd\'hui', 'pour comparer', 'Les pilules actuelles : toutes les valeurs, encadrées et colorées.', aujourdhui, false],
+  ['1 · La ligne de faits', 'du texte, une ligne', 'Une phrase de faits séparés par des points, comme sous un titre d\'article. Rien n\'a de cadre ; seul ce qui demande l\'attention change de couleur.', ligneDeFaits, false],
+  ['2 · La fiche technique', 'libellé et valeur', 'Une petite grille, comme les caractéristiques d\'un produit. Chaque information a sa place fixe : on la retrouve d\'une fiche à l\'autre. Un point coloré marque l\'inhabituel.', ficheTechnique, false],
+  ['3 · Icônes et valeurs', 'compact', 'Une icône neutre devant chaque valeur, un petit indicateur à trois barres pour le risque. La provenance passe à côté du titre, où elle sert de signature.', iconesValeurs, true],
+  ['4 · L\'essentiel, puis le détail', 'pour le débutant', 'Seul ce qu\'il faut savoir avant de lancer est dit, en phrases ; tout le reste tient sur une ligne discrète, avec « Tout voir » pour la fiche complète.', essentiel, false],
+  ['5 · Jauges compactes', 'visuel', 'Le risque et la durée en jauges à trois segments, le reste en une phrase. Provenance à côté du titre.', jauges, true],
+];
+
+document.getElementById('propositions').innerHTML = PROPOSITIONS.map(([t, s, p, f, prov]) => `
+  <section class="proposition"><h2>${t} <span>${s}</span></h2><p>${p}</p>
+    <div class="paire">${ACTIONS.map((a) => fiche(a, f(a), prov)).join('')}</div></section>`).join('');
+
+function choisir(attr, valeur) {
+  document.body.dataset[attr === 'v' ? 'v' : 'mode'] = valeur;
+  document.querySelectorAll(`.choix [data-${attr}]`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset[attr] === valeur)));
+}
+document.querySelectorAll('.choix [data-v]').forEach((b) => (b.onclick = () => choisir('v', b.dataset.v)));
+document.querySelectorAll('.choix [data-m]').forEach((b) => (b.onclick = () => choisir('m', b.dataset.m)));
+</script>
+</body>
+</html>
