@@ -279,6 +279,9 @@
           </div>
         </div>
         <div class="term-prog"><i id="termProg"></i></div>
+        <!-- Familles de lignes a montrer ou masquer : on masque, on ne supprime
+             rien. Le choix vaut aussi pour l'apercu de la colonne Expert. -->
+        <div class="term-filtres" id="termFiltres" role="group"></div>
         <div class="term-body" id="termBody"></div>
       </section>
 
@@ -341,6 +344,16 @@
                     <button type="button" data-set-theme="light"></button>
                     <button type="button" data-set-theme="dark"></button>
                     <button type="button" data-set-theme="system"></button>
+                  </div>
+                </div>
+                <div class="setrow" data-num="1.8">
+                  <span class="setrow-txt"><span class="num">1.8</span><span class="rg-libelle"><b id="setAccentLabel"></b><span class="desc" data-i18n="reglages.d_accent"></span></span></span>
+                  <div class="accents" id="setAccentChoix" role="radiogroup">
+                    <button type="button" role="radio" class="accent-pastille" data-set-accent="orange"></button>
+                    <button type="button" role="radio" class="accent-pastille" data-set-accent="tide"></button>
+                    <button type="button" role="radio" class="accent-pastille" data-set-accent="blue"></button>
+                    <button type="button" role="radio" class="accent-pastille" data-set-accent="violet"></button>
+                    <button type="button" role="radio" class="accent-pastille" data-set-accent="pink"></button>
                   </div>
                 </div>
                 <div class="setrow" data-num="1.2">

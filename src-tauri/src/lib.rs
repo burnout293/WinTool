@@ -1262,6 +1262,18 @@ fn set_analysis_chart(app: tauri::AppHandle, chart: String) -> Result<Settings, 
     })
 }
 
+/// Couleur d'accent de l'interface (§15.4, reglage 1.8).
+#[tauri::command]
+fn set_accent(app: tauri::AppHandle, accent: String) -> Result<Settings, String> {
+    if !settings::ACCENTS.contains(&accent.as_str()) {
+        return Err(format!("couleur inconnue : {accent}"));
+    }
+    with_settings(&app, |s| {
+        s.accent = accent;
+        Ok(())
+    })
+}
+
 /// Place libre sur le disque du systeme, pour le panneau « Espace disque » de
 /// l'Expert (§17). Une lecture, rien de plus.
 #[tauri::command]
@@ -1455,6 +1467,7 @@ pub fn run() {
             run_script,
             scan_script,
             set_analysis_chart,
+            set_accent,
             disk_space,
             simulation_state,
             set_simulation_all,

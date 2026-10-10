@@ -25,6 +25,8 @@ pub enum RestoreOutcome {
     /// La protection systeme est desactivee sur ce volume : rien a creer tant
     /// qu'elle ne l'est pas.
     ProtectionDisabled,
+    /// Le service dont depend la restauration du systeme est desactive.
+    ServiceDisabled,
     /// Refus pour une autre raison ; le message brut est conserve pour le
     /// diagnostic, jamais pour accuser un succes qui n'a pas eu lieu.
     Failed(String),
@@ -33,12 +35,30 @@ pub enum RestoreOutcome {
 /// Cree un point de restauration. Bloquant : `Checkpoint-Computer` prend
 /// quelques secondes, ce qui correspond a l'attente deja annoncee a
 /// l'utilisateur avant le lancement d'une categorie (specification §2, étape 2).
+///
+/// Le verdict ne repose pas sur le texte de Windows, qui change avec sa langue :
+/// on compare le dernier point avant et apres, et on lit l'identifiant stable de
+/// l'erreur (`FullyQualifiedErrorId`). Deux cas que le code de sortie seul ne
+/// distinguait pas : Windows **n'echoue pas** quand un point existe deja depuis
+/// moins de 24 h — il avertit et ne cree rien —, et la sortie arrivait dans la
+/// page de code de la console, d'ou des accents illisibles.
 pub fn creer_point_de_restauration(description: &str) -> Result<RestoreOutcome, String> {
     // Guillemets simples doubles : la seule sequence d'echappement dont
     // PowerShell a besoin a l'interieur d'une chaine deja entre guillemets simples.
     let description_echappee = description.replace('\'', "''");
     let commande = format!(
-        "Checkpoint-Computer -Description '{description_echappee}' -RestorePointType MODIFY_SETTINGS"
+        "$ErrorActionPreference = 'Stop'; \
+         [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); \
+         function Dernier {{ try {{ (@(Get-ComputerRestorePoint -ErrorAction SilentlyContinue) | Select-Object -Last 1).SequenceNumber }} catch {{ $null }} }}; \
+         try {{ \
+           $avant = Dernier; \
+           Checkpoint-Computer -Description '{description_echappee}' -RestorePointType MODIFY_SETTINGS -WarningAction SilentlyContinue; \
+           $apres = Dernier; \
+           if ($null -eq $apres) {{ 'WINTOOL:AUCUN' }} elseif ($apres -eq $avant) {{ 'WINTOOL:RECENT' }} else {{ 'WINTOOL:CREE' }} \
+         }} catch {{ \
+           'WINTOOL:ERREUR ' + $_.FullyQualifiedErrorId; \
+           $_.Exception.Message \
+         }}"
     );
 
     // Chemin absolu, lu dans HKLM : ce processus est eleve (specification 12.4).
@@ -47,11 +67,42 @@ pub fn creer_point_de_restauration(description: &str) -> Result<RestoreOutcome, 
         .output()
         .map_err(|e| format!("lancement de Checkpoint-Computer impossible : {e}"))?;
 
-    if sortie.status.success() {
-        return Ok(RestoreOutcome::Created);
+    let texte = String::from_utf8_lossy(&sortie.stdout);
+    if texte.contains("WINTOOL:") {
+        return Ok(interpreter(&texte));
     }
-
+    // Le script n'a meme pas pu s'executer : on garde ce que PowerShell a dit.
     Ok(classer_echec(&String::from_utf8_lossy(&sortie.stderr)))
+}
+
+/// Lit le verdict ecrit par le script de [`creer_point_de_restauration`].
+fn interpreter(sortie: &str) -> RestoreOutcome {
+    let mut lignes = sortie
+        .lines()
+        .map(str::trim)
+        .skip_while(|l| !l.starts_with("WINTOOL:"));
+    let verdict = lignes.next().unwrap_or_default();
+    match verdict {
+        "WINTOOL:CREE" => RestoreOutcome::Created,
+        "WINTOOL:RECENT" => RestoreOutcome::ThrottledRecent,
+        // Aucun point, meme apres une creation sans erreur : la protection du
+        // disque systeme est coupee.
+        "WINTOOL:AUCUN" => RestoreOutcome::ProtectionDisabled,
+        _ => {
+            let id = verdict.strip_prefix("WINTOOL:ERREUR").unwrap_or("").trim();
+            let message = lignes.collect::<Vec<_>>().join(" ").trim().to_string();
+            if id.starts_with("ServiceDisabled") {
+                RestoreOutcome::ServiceDisabled
+            } else {
+                match classer_echec(&message) {
+                    RestoreOutcome::Failed(_) if !id.is_empty() => {
+                        RestoreOutcome::Failed(format!("{message} ({id})"))
+                    }
+                    autre => autre,
+                }
+            }
+        }
+    }
 }
 
 /// Classement du message d'erreur de `Checkpoint-Computer` en l'un des refus
@@ -66,7 +117,8 @@ fn classer_echec(stderr: &str) -> RestoreOutcome {
     if minuscule.contains("24 hours") || minuscule.contains("24 heures") {
         RestoreOutcome::ThrottledRecent
     } else if minuscule.contains("system restore") && minuscule.contains("disabled")
-        || minuscule.contains("protection") && minuscule.contains("desactiv")
+        || minuscule.contains("protection")
+            && (minuscule.contains("desactiv") || minuscule.contains("désactiv"))
     {
         RestoreOutcome::ProtectionDisabled
     } else {
@@ -90,6 +142,41 @@ mod tests {
     fn classe_la_protection_desactivee() {
         let msg = "Checkpoint-Computer : System Restore is disabled on this computer.";
         assert_eq!(classer_echec(msg), RestoreOutcome::ProtectionDisabled);
+    }
+
+    #[test]
+    fn lit_le_verdict_sans_dependre_de_la_langue() {
+        assert_eq!(
+            interpreter(
+                "WINTOOL:CREE
+"
+            ),
+            RestoreOutcome::Created
+        );
+        assert_eq!(
+            interpreter("WINTOOL:RECENT"),
+            RestoreOutcome::ThrottledRecent
+        );
+        assert_eq!(
+            interpreter("WINTOOL:AUCUN"),
+            RestoreOutcome::ProtectionDisabled
+        );
+        // La capture de l'utilisateur, 1.4.0 : service desactive, message en
+        // francais. C'est l'identifiant qui tranche, pas la phrase.
+        let sortie =
+            "WINTOOL:ERREUR ServiceDisabled,Microsoft.PowerShell.Commands.CheckpointComputerCommand
+                      Impossible d'exécuter cette commande : le service ne peut pas démarrer.";
+        assert_eq!(interpreter(sortie), RestoreOutcome::ServiceDisabled);
+    }
+
+    #[test]
+    fn une_erreur_inconnue_garde_son_message_et_son_identifiant() {
+        let sortie = "WINTOOL:ERREUR Autre,Commande
+Quelque chose d'imprévu.";
+        assert_eq!(
+            interpreter(sortie),
+            RestoreOutcome::Failed("Quelque chose d'imprévu. (Autre,Commande)".to_string())
+        );
     }
 
     #[test]

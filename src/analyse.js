@@ -27,7 +27,29 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ECHAPPE[c]);
 const ico = (nom, classe = '') => `<svg class="ico ${classe}" aria-hidden="true"><use href="#${nom}" /></svg>`;
 
 /** Couleurs des postes, dans l'ordre : assez distinctes entre voisines. */
-const PALETTE = ['#22D39A', '#35C8E8', '#8B7CF6', '#F5A524', '#F472B6', '#60A5FA', '#A3E635', '#FB7185', '#2DD4BF', '#C084FC', '#FBBF24', '#94A3B8'];
+/** Couleurs des series. La premiere est l'accent choisi (reglage 1.8) ; on
+ *  ecarte des autres celles qui lui ressemblent trop, pour que deux postes
+ *  voisins ne se confondent pas. */
+const SERIES = ['#35C8E8', '#8B7CF6', '#22D39A', '#F472B6', '#60A5FA', '#A3E635', '#FB7185', '#F5A524', '#2DD4BF', '#C084FC', '#FBBF24', '#94A3B8'];
+function teinte(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  if (!d) return -1;
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return (h * 60 + 360) % 360;
+}
+let paletteMemo = { cle: null, couleurs: [] };
+function palette() {
+  const cle = document.documentElement.dataset.accent || 'orange';
+  if (paletteMemo.cle !== cle) {
+    const acc = getComputedStyle(document.documentElement).getPropertyValue('--acc').trim() || '#FF8A1F';
+    const h = teinte(acc);
+    const loin = (c) => { const d = Math.abs(teinte(c) - h); return teinte(c) < 0 || Math.min(d, 360 - d) > 24; };
+    paletteMemo = { cle, couleurs: [acc, ...SERIES.filter(loin)] };
+  }
+  return paletteMemo.couleurs;
+}
+const serie = (i) => { const p = palette(); return p[i % p.length]; };
 
 /** Graphiques du resume Simple : la cle du reglage, l'ordre de la liste. */
 export const GRAPHIQUES = ['donut', 'bar', 'rows', 'treemap', 'waffle', 'gauge'];
@@ -523,7 +545,7 @@ function vueAnneau(m, k, mode) {
   const e = Object.entries(o.finds).filter(([c, f]) => Number(f.size) > 0 && montre(f, mode) && visibleDecl(o, c, mode)).sort((a, b) => b[1].size - a[1].size)
     .map(([c, f]) => ({ attr: attrs(m, k, `data-a-k="choix" data-a-choix="${esc(c)}"`), label: libChoix(m.entree, o.def, c), taille: Number(f.size), choisi: s.choix[k][c] ? Number(f.size) : 0, coche: !!s.choix[k][c] }));
   if (!e.length) return '';
-  const c = e.map((_, i) => PALETTE[i % PALETTE.length]);
+  const c = e.map((_, i) => serie(i));
   const choisi = e.reduce((a, x) => a + x.choisi, 0);
   return `<div class="an-anneau-zone compacte">${anneau(e, c, `<b>${taille(choisi)}</b><span>${esc(t('an.coches_court'))}</span>`, 180)}<div class="an-postes">${e.map((x, i) => lignePosteSimple(x, c[i])).join('')}</div></div>`;
 }
@@ -543,7 +565,7 @@ function vueTuiles(m, k, mode) {
     const nom = nomElement(m, it);
     return `<label class="an-tuile${c ? ' coche' : ''}${it.locked ? ' verrou' : ''}">
       <input type="checkbox" hidden ${attrs(m, k, `data-a-k="item" data-a-item="${esc(it.id)}" data-a-mode="${mode}"`)}${c ? ' checked' : ''}${it.locked ? ' disabled' : ''}>
-      ${c ? `<span class="an-marque">${ico('check', 'i12')}</span>` : ''}<span class="an-av" style="background:${PALETTE[i % PALETTE.length]}">${esc(nom.slice(0, 1).toUpperCase())}</span>
+      ${c ? `<span class="an-marque">${ico('check', 'i12')}</span>` : ''}<span class="an-av" style="background:${serie(i)}">${esc(nom.slice(0, 1).toUpperCase())}</span>
       <b>${esc(nom)}</b><span class="muted">${it.locked ? esc(verrouTexte(it.locked)) : it.size ? taille(it.size) : ''}</span></label>`;
   }).join('')}</div>${notesPour(m, k, mode)}`;
 }
@@ -589,7 +611,7 @@ function vueTreemap(m, k) {
   const groupes = (plat ? feuilles(o).map((it) => ({ p: it, e: [it] })) : parents.map((p) => ({ p, e: enfantsDe(o, p.id) })))
     .map((x) => ({ ...x, taille: x.e.reduce((a, y) => a + (Number(y.size) || 0), 0), n: x.e.filter((y) => s.items[k][y.id]).length }))
     .sort((a, b) => b.taille - a.taille);
-  const couleur = Object.fromEntries(groupes.map((x, i) => [x.p.id, PALETTE[i % PALETTE.length]]));
+  const couleur = Object.fromEntries(groupes.map((x, i) => [x.p.id, serie(i)]));
   const cases = (tuiles, hauteur) => {
     const total = tuiles.reduce((a, x) => a + x.taille, 0) || 1;
     return `<div class="an-treemap" style="height:${hauteur}px"><div class="an-tm-rang">${tuiles.map((x) => `
@@ -894,7 +916,7 @@ export function resume(modeles, { graphe = 'donut', ouverts = new Set(), detailJ
   const tous = postesResume(modeles);
   const pesants = tous.filter((p) => p.taille > 0);
   const legers = tous.filter((p) => !(p.taille > 0));
-  const couleurs = new Map(tous.map((p, i) => [p.cle, PALETTE[i % PALETTE.length]]));
+  const couleurs = new Map(tous.map((p, i) => [p.cle, serie(i)]));
   const total = pesants.reduce((a, p) => a + p.taille, 0) || 1;
   const choisi = pesants.reduce((a, p) => a + p.choisi, 0);
   const liste = (postes, opts = {}) => (postes.length

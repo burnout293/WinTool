@@ -86,6 +86,15 @@ function appliquerTheme(valeur, persister = true) {
   if (persister) invoke('set_theme', { theme: valeur }).catch((e) => console.error('set_theme a echoue :', e));
 }
 
+/** Couleur d'accent (reglage 1.8). L'orange est celle des tokens : aucun
+ *  attribut. Les autres posent `data-accent`, que la feuille surcharge. */
+const ACCENTS = ['orange', 'tide', 'blue', 'violet', 'pink'];
+function appliquerAccent(valeur) {
+  const v = ACCENTS.includes(valeur) ? valeur : 'orange';
+  if (v === 'orange') delete document.documentElement.dataset.accent;
+  else document.documentElement.dataset.accent = v;
+}
+
 /* -------------------------------------------------------------------------
    Etat
    ------------------------------------------------------------------------- */
@@ -182,6 +191,13 @@ function estSimule(entree) {
  *  declare non reversible (4.2), mais l'utilisateur a le dernier mot. */
 function besoinPointRestauration(entree) {
   return reglagesScript(entree.id).reversible_ack ?? !entree.meta.reversible;
+}
+
+/** Un point de restauration avant ce script, a ce lancement : pas s'il est
+ *  simule — il ne modifiera rien, et la simulation promet de ne rien modifier
+ *  non plus, point de restauration compris. */
+function pointAvant(entree) {
+  return besoinPointRestauration(entree) && !estSimule(entree);
 }
 
 /** Idem pour le redemarrage, pre-coche si le script declare `reboot : true`. */
@@ -1112,6 +1128,58 @@ function initTerminal() {
   term.stop = document.getElementById('btnStop');
   term.log = document.getElementById('btnLog');
   term.fermer = document.getElementById('btnCloseTerm');
+}
+
+/** Les familles de lignes du journal, chacune filtrable. Masquer ne supprime
+ *  rien : recocher rend les lignes, et le fichier de log reste complet. */
+const FAMILLES_JOURNAL = [
+  ['info', ['INFO']],
+  ['etapes', ['STEP', 'CKPT', 'PROGRESS']],
+  ['succes', ['OK', 'DONE', 'FREED']],
+  ['avert', ['WARN', 'REBOOT']],
+  ['erreurs', ['ERR']],
+  ['analyse', ['FIND', 'ITEM', 'METRIC', 'NOTE']],
+  ['canaux', ['LOG']],
+  ['texte', []],
+];
+function familleLigne(marker, stream) {
+  if (stream === 'stderr' || marker === 'ERR') return 'erreurs';
+  return FAMILLES_JOURNAL.find(([, m]) => m.includes(marker))?.[0] || 'texte';
+}
+
+/** Les familles masquees : une commodite d'affichage, gardee dans ce
+ *  navigateur seulement (rien a voir avec les reglages de WinTool). */
+const CLE_MASQUES = 'wintool.journalMasques';
+let masquesJournal = new Set();
+try { masquesJournal = new Set(JSON.parse(localStorage.getItem(CLE_MASQUES) || '[]')); } catch { /* stockage indisponible : tout est montre */ }
+
+function appliquerMasquesJournal() {
+  const valeur = [...masquesJournal].join(' ');
+  for (const id of ['termBody', 'ljBody']) {
+    const e = document.getElementById(id);
+    if (e) e.dataset.masques = valeur;
+  }
+  document.querySelectorAll('#termFiltres [data-famille]').forEach((b) => {
+    b.setAttribute('aria-pressed', String(!masquesJournal.has(b.dataset.famille)));
+  });
+}
+
+function rendreFiltresJournal() {
+  const zone = document.getElementById('termFiltres');
+  if (!zone) return;
+  zone.setAttribute('aria-label', t('console.filtrer'));
+  zone.innerHTML = `<span class="term-filtres-t">${esc(t('console.afficher'))}</span>${FAMILLES_JOURNAL.map(([id]) =>
+    `<button type="button" class="term-filtre f-${id}" data-famille="${id}">${esc(t(`console.f_${id}`))}</button>`).join('')}`;
+  zone.querySelectorAll('[data-famille]').forEach((b) => {
+    b.onclick = () => {
+      const f = b.dataset.famille;
+      if (masquesJournal.has(f)) masquesJournal.delete(f);
+      else masquesJournal.add(f);
+      try { localStorage.setItem(CLE_MASQUES, JSON.stringify([...masquesJournal])); } catch { /* sans memoire, le filtre vaut pour la session */ }
+      appliquerMasquesJournal();
+    };
+  });
+  appliquerMasquesJournal();
 }
 
 /** Densite de la console : Compact (aperçu tronque, docke), Etendu (pleine
@@ -2156,6 +2224,7 @@ function cablerConsole() {
     b.textContent = t(`console.${b.dataset.consoleMode}`);
     b.onclick = () => basculerConsole(b.dataset.consoleMode);
   });
+  rendreFiltresJournal();
   // Le journal compact de la colonne est lui-meme le raccourci vers le detail :
   // cliquer sur l'apercu ouvre le panneau complet, ce qu'on attend d'un apercu.
   const compact = document.getElementById('lotsJournal');
@@ -2222,7 +2291,7 @@ function ajouterLigneCompacte({ stream, marker, text }) {
     corps.classList.remove('vide');
   }
 
-  const classes = ['ljl', `s-${stream}`];
+  const classes = ['ljl', `s-${stream}`, `f-${familleLigne(marker, stream)}`];
   if (marker) classes.push(`m-${marker.toLowerCase()}`);
   const ligne = document.createElement('span');
   ligne.className = classes.join(' ');
@@ -2245,7 +2314,7 @@ function ajouterLigne({ at_ms, stream, marker, text }) {
   ajouterLigneCompacte({ stream, marker, text });
 
   const suivre = colleEnBas();
-  const classes = ['tl', `s-${stream}`];
+  const classes = ['tl', `s-${stream}`, `f-${familleLigne(marker, stream)}`];
   if (marker) classes.push(`m-${marker.toLowerCase()}`);
 
   const ligne = document.createElement('div');
@@ -3557,7 +3626,7 @@ async function rendreEtapeVerifier(groupe) {
   document.getElementById('recapZone').innerHTML = lignes.join('');
 
   const note = document.getElementById('restoreNote');
-  const besoinRestauration = scriptsSimples(groupe).some(besoinPointRestauration);
+  const besoinRestauration = scriptsSimples(groupe).some(pointAvant);
   note.hidden = !besoinRestauration;
   if (besoinRestauration) note.textContent = t('simple.point_restauration_annonce');
 
@@ -3806,7 +3875,7 @@ function rendreResumeAnalyse(groupe) {
 
   const aLancer = scriptsALancer(g);
   const note = document.getElementById('restoreNote');
-  note.hidden = !aLancer.some(besoinPointRestauration);
+  note.hidden = !aLancer.some(pointAvant);
   if (!note.hidden) note.textContent = t('simple.point_restauration_annonce');
   const noteRedemarrage = document.getElementById('rebootNote');
   noteRedemarrage.hidden = !aLancer.some(besoinRedemarrage);
@@ -3993,16 +4062,18 @@ function messageRestauration(resultat) {
   if (resultat === 'created') return t('simple.point_restauration_cree');
   if (resultat === 'throttled_recent') return t('simple.point_restauration_frequence');
   if (resultat === 'protection_disabled') return t('simple.point_restauration_protection');
-  // `String(objet)` donne « [object Object] » — a montrer a un debutant, c'est
-  // pire que pas de message du tout. Toute forme inattendue retombe donc sur
-  // un texte lisible plutot que sur le nom d'un type JavaScript.
-  let erreur;
-  if (resultat && typeof resultat === 'object') {
-    erreur = 'failed' in resultat ? String(resultat.failed) : t('simple.point_restauration_inconnu');
-  } else {
-    erreur = String(resultat ?? t('simple.point_restauration_inconnu'));
-  }
-  return t('simple.point_restauration_echec', { erreur });
+  if (resultat === 'service_disabled') return t('simple.point_restauration_service');
+  // Le message brut de Windows n'a rien a faire sous les yeux d'un debutant :
+  // il part au journal (detail technique, mode Expert), et l'ecran dit
+  // seulement qu'aucun point n'a ete cree.
+  return t('simple.point_restauration_echec');
+}
+
+/** Le detail technique d'un echec, pour le journal : jamais « [object Object] ». */
+function detailRestauration(resultat) {
+  if (resultat && typeof resultat === 'object' && 'failed' in resultat) return String(resultat.failed);
+  if (typeof resultat === 'string' && !['created', 'throttled_recent', 'protection_disabled', 'service_disabled'].includes(resultat)) return resultat;
+  return null;
 }
 
 /** Estimation grossiere, jamais precise (specification §7 : ne pretend pas
@@ -4015,11 +4086,25 @@ function estimerMinutesRestantes(groupe) {
   return Math.max(1, restants.reduce((total, s) => total + (MINUTES_PAR_DUREE[s.meta.duration] || 2), 0));
 }
 
+/** Le resultat du point de restauration : une phrase a l'ecran, le detail
+ *  brut au journal. */
+function noterRestauration(resultat) {
+  document.getElementById('tasksBilanDetail').textContent = messageRestauration(resultat);
+  const detail = detailRestauration(resultat);
+  const ligne = (marker, texte) => ajouterLigne({ at_ms: 0, stream: 'stdout', marker, text: `[${marker}] ${texte}` });
+  if (resultat === 'created') ligne('OK', t('simple.point_restauration_cree'));
+  else ligne('WARN', detail ? `${t('simple.point_restauration_echec')} ${detail}` : messageRestauration(resultat));
+}
+
 async function lancerEntretien() {
   document.getElementById('riseFill')?.classList.remove('termine');
   const groupe = etatGroupes?.lots.find((g) => g.lot.id === entretienEnCours?.lotId);
   if (!groupe) return;
   entretienActif = true;
+  // Le journal de l'entretien part de zero : il gardait sinon les lignes de la
+  // derniere analyse, qui n'ont rien a voir avec ce qui va tourner.
+  term.corps.innerHTML = '';
+  viderJournalCompact();
   rendreBandeauMaj();
   rendreBandeauCatalogue();
 
@@ -4045,15 +4130,15 @@ async function lancerEntretien() {
     scriptIds: aLancer.map((s) => s.id),
   }).catch((e) => console.error("Enregistrement de l'historique impossible :", e));
 
-  const besoinRestauration = aLancer.some(besoinPointRestauration);
+  const besoinRestauration = aLancer.some(pointAvant);
   if (besoinRestauration) {
     try {
       const resultat = await invoke('create_restore_point', {
         description: `WinTool - ${nomLot(groupe.lot)}`,
       });
-      document.getElementById('tasksBilanDetail').textContent = messageRestauration(resultat);
+      noterRestauration(resultat);
     } catch (e) {
-      document.getElementById('tasksBilanDetail').textContent = messageRestauration({ failed: String(e) });
+      noterRestauration({ failed: String(e) });
     }
   }
 
@@ -4381,6 +4466,11 @@ function appliquerTraductionsReglages() {
   document.getElementById('setLangueLabel').textContent = t('reglages.langue');
   document.getElementById('setMajLabel').textContent = t('reglages.maj_comportement');
   document.getElementById('setGrapheLabel').textContent = t('reglages.graphique');
+  document.getElementById('setAccentLabel').textContent = t('reglages.accent');
+  document.querySelectorAll('#setAccentChoix [data-set-accent]').forEach((b) => {
+    b.setAttribute('aria-label', t(`accent.${b.dataset.setAccent}`));
+    b.title = t(`accent.${b.dataset.setAccent}`);
+  });
   document.querySelectorAll('#setGrapheSelect option').forEach((o) => { o.textContent = t(`graphe.${o.value}`); });
   document.querySelector('#setMajSelect [value="propose"]').textContent = t('reglages.maj_proposer');
   document.querySelector('#setMajSelect [value="never"]').textContent = t('reglages.maj_jamais');
@@ -4455,6 +4545,9 @@ function remplirFormulaireReglages(reglages) {
   });
   document.getElementById('setMajSelect').value = reglages.update_policy;
   document.getElementById('setGrapheSelect').value = reglages.analysis_chart || 'donut';
+  document.querySelectorAll('#setAccentChoix [data-set-accent]').forEach((b) => {
+    b.setAttribute('aria-checked', String(b.dataset.setAccent === (reglages.accent || 'orange')));
+  });
   document.getElementById('setCatalogueSelect').value = reglages.catalogue_check || 'startup';
   rendreReglagesCatalogue();
   document.getElementById('setEchecSelect').value = reglages.failure_policy;
@@ -4750,6 +4843,7 @@ async function appliquerLangue(lang) {
   document.querySelectorAll('#consoleSeg [data-console-mode]').forEach((b) => {
     b.textContent = t(`console.${b.dataset.consoleMode}`);
   });
+  rendreFiltresJournal();
   await rendreLots();
   await rendreDetail();
   if (modeCourant === 'simple') {
@@ -5045,6 +5139,15 @@ function cablerReglages() {
     };
   });
 
+  document.querySelectorAll('#setAccentChoix [data-set-accent]').forEach((b) => {
+    b.onclick = async () => {
+      appliquerAccent(b.dataset.setAccent);
+      reglagesActuels = await invoke('set_accent', { accent: b.dataset.setAccent });
+      remplirFormulaireReglages(reglagesActuels);
+      // Les graphiques de l'analyse prennent la couleur d'accent : on les redessine.
+      rafraichirZonesAnalyse();
+    };
+  });
   document.getElementById('setGrapheSelect').onchange = async (ev) => {
     reglagesActuels = await invoke('set_analysis_chart', { chart: ev.target.value });
   };
@@ -5174,6 +5277,7 @@ function cablerReglages() {
       remplirFormulaireReglages(reglagesActuels);
       await appliquerLangue(reglagesActuels.lang);
       appliquerTheme(reglagesActuels.theme, false);
+      appliquerAccent(reglagesActuels.accent);
       await chargerLots();
     } catch (e) {
       p.textContent = t('reglages.import_echec', { erreur: String(e) });
@@ -5187,6 +5291,7 @@ function cablerReglages() {
     remplirFormulaireReglages(reglagesActuels);
     await appliquerLangue(reglagesActuels.lang);
     appliquerTheme(reglagesActuels.theme, false);
+    appliquerAccent(reglagesActuels.accent);
     await chargerLots();
   };
 }
@@ -5300,6 +5405,7 @@ async function demarrer() {
   setLang(reglages.lang);
   document.documentElement.lang = currentLang();
   appliquerTheme(reglages.theme, false);
+  appliquerAccent(reglages.accent);
   appliquerTraductionsStatiques();
   appliquerTraductionsReglages();
 

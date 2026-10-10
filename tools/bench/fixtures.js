@@ -766,6 +766,7 @@
     scan_script: (a) => analyserBanc(a?.req),
     disk_space: () => ({ lecteur: 'C:', total: 511_101_108_224, libre: 46_170_898_432 }),
     set_analysis_chart: (a) => { reglages.analysis_chart = a.chart; return JSON.parse(JSON.stringify(reglages)); },
+    set_accent: (a) => { reglages.accent = a.accent; return JSON.parse(JSON.stringify(reglages)); },
     cancel_script: () => {
       if (enCours) enCours.arrete = true;
       return { killed: true, needs_confirmation: false, message: 'Exécution interrompue.' };
@@ -849,7 +850,14 @@
       });
       return JSON.parse(JSON.stringify(reglages));
     },
-    create_restore_point: () => 'created',
+    // ?restauration=service|echec : les refus de Windows (1.4.0 : le message brut
+    // s'affichait, accents casses, sous les yeux du debutant).
+    create_restore_point: () => {
+      const r = new URLSearchParams(location.search).get('restauration');
+      if (r === 'service') return 'service_disabled';
+      if (r === 'echec') return { failed: 'Impossible d’exécuter cette commande. (Autre,Microsoft.PowerShell.Commands.CheckpointComputerCommand)' };
+      return 'created';
+    },
     set_show_setting_numbers: (a) => { reglages.show_setting_numbers = !!a.value; return JSON.parse(JSON.stringify(reglages)); },
     export_settings: () => 'C:\\Users\\Buly\\Documents\\wintool-config.json',
     import_settings: () => ({ ok: true, message: 'Configuration importée.' }),

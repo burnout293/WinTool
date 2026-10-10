@@ -605,6 +605,7 @@ réellement.
 | Thème (clair / sombre / Windows) | **partout**, icône engrenage |
 | Langue | **partout** |
 | Comportement des mises à jour | **partout** |
+| Couleur d'accent (1.8) : orange par défaut, Marée, bleu, violet, framboise (§15.4) | **partout** |
 | Graphique de l'analyse (1.7) : l'anneau, la barre d'espace, le fond des lignes, les rectangles, la gaufre ou la jauge seule (§17.2) | **partout** |
 | Catalogues : consulter et choisir les actions, installer, vérifier, activer, moment de la vérification (§16) | **partout** |
 | Catalogues : en ajouter, en modifier, en retirer — en administrateur (§16.2) | Expert |
@@ -1097,8 +1098,13 @@ Deux obligations :
 
 ### 15.4 Couleur
 
-Un **accent unique** — dégradé `#22D39A` → `#35C8E8` — pour tout ce qui est interactif,
-actif ou sélectionné. Trois couleurs sémantiques qui ne disent **qu'un état** : réussi,
+Un **accent unique** pour tout ce qui est interactif, actif ou sélectionné — boutons,
+repères, marée. Depuis la 1.5, il se **choisit** (réglage 1.8) : orange par défaut
+(`#FF8A1F` → `#FFB547`), Marée (`#22D39A` → `#35C8E8`, l'accent d'origine), bleu, violet
+ou framboise. Un seul accent à la fois ; changer de couleur ne change rien d'autre.
+Chaque couleur proposée est un jeu complet — accent, texte d'accent pour le thème clair
+et le sombre, fond doux, fond du journal — mesuré au seuil ci-dessous, et la première
+couleur des graphiques de l'analyse suit l'accent. Trois couleurs sémantiques qui ne disent **qu'un état** : réussi,
 attention, échec. Rien d'autre n'est coloré : une icône de lot reste neutre tant
 qu'elle n'est pas choisie.
 
@@ -1106,7 +1112,8 @@ Le code couleur par domaine (une teinte par catégorie) a été **essayé puis r
 quand tout est coloré, plus rien ne ressort, et le vert « nettoyage » entrait en
 collision avec le vert « réussi ».
 
-**Seuil de contraste** : 4,5 pour tout texte. Vérifié par mesure, pas à l'œil. Deux
+**Seuil de contraste** : 4,5 pour tout texte, dans chaque couleur d'accent et chaque
+thème. Vérifié par mesure, pas à l'œil. Deux
 valeurs ont dû être corrigées à ce titre — `#7C8FA0` en sous-libellé (3,3 sur blanc)
 remplacé par `#54697A` (5,2).
 

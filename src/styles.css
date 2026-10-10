@@ -65,19 +65,30 @@
   --warn-s: #FBF3E2;
   --err-s: #FBEBEA;
 
-  /* Accent unique : la couleur ne decore pas, elle signale. */
-  --acc: #22D39A;
-  --acc-2: #35C8E8;
-  --acc-on: #0B7D59;
+  /* Accent unique : la couleur ne decore pas, elle signale. Orange par defaut
+     depuis la 1.5 ; les autres couleurs du reglage 1.8 surchargent ces cinq
+     valeurs plus bas (bloc « Couleurs d'accent »). Chaque jeu est mesure :
+     --ink sur --acc et --acc-2, --acc-on sur les fonds clairs et sombres, et
+     les marqueurs du journal sur --term-bg, tous au-dessus de 4,5:1. */
+  --acc: #FF8A1F;
+  --acc-2: #FFB547;
+  --acc-on: #A84800;
   /* Fond d'une ligne de reglage, et fond d'une ligne selectionnee dans la
      colonne des lots : deux aplats de la maquette, opaques et non translucides
      — une transparence par-dessus l'eau animee donnerait une teinte qui bouge. */
   --surface-soft: #F7FAFC;
-  --acc-soft: #EAFAF4;
+  --acc-soft: #FFF3E8;
   /* Pastille d'un interrupteur eteint : grise sur rail clair (maquette). */
   --knob-off: #7C8FA0;
 
-  --term-bg: #0A2A33;
+  --term-bg: #1F1610;
+
+  /* Pastilles du reglage 1.8 : chaque couleur proposee, telle qu'elle sera. */
+  --pal-orange: #FF8A1F;
+  --pal-tide: #22D39A;
+  --pal-blue: #3D9DF5;
+  --pal-violet: #9D85FF;
+  --pal-pink: #FF6B93;
   --term-text: #C7D9DE;
   --term-dim: #5B7C86;
 
@@ -126,9 +137,9 @@
     --ok-s: #0E2A22;
     --warn-s: #2C2113;
     --err-s: #2E1717;
-    --acc-on: #4BE8B8;
+    --acc-on: #FFA54F;
     --surface-soft: #171C24;
-    --acc-soft: #12241F;
+    --acc-soft: #2A1D12;
     --knob-off: #5B6C7C;
     --term-bg: #060A0F;
     --term-text: #C7D3DE;
@@ -154,9 +165,9 @@
   --ok-s: #0E2A22;
   --warn-s: #2C2113;
   --err-s: #2E1717;
-  --acc-on: #4BE8B8;
+  --acc-on: #FFA54F;
   --surface-soft: #171C24;
-  --acc-soft: #12241F;
+  --acc-soft: #2A1D12;
   --knob-off: #5B6C7C;
   --term-bg: #060A0F;
   --term-text: #C7D3DE;
@@ -164,6 +175,26 @@
   --sh: 0 2px 10px rgba(0, 0, 0, .35);
   --sh-2: 0 16px 46px rgba(0, 0, 0, .55);
 }
+
+/* --- Couleurs d'accent (reglage 1.8, §15.4) ------------------------------
+   L'orange est dans les tokens ci-dessus ; chaque autre couleur remplace les
+   memes valeurs. Les variantes sombres reposent --term-bg : sans cela, la
+   surcharge claire, declaree apres le theme sombre, l'emporterait sur lui.
+   ------------------------------------------------------------------------- */
+:root[data-accent="tide"] { --acc: #22D39A; --acc-2: #35C8E8; --acc-on: #0B7D59; --acc-soft: #EAFAF4; --term-bg: #0A2A33; }
+:root[data-accent="blue"] { --acc: #3D9DF5; --acc-2: #6FD0FF; --acc-on: #0B5FB0; --acc-soft: #EAF3FE; --term-bg: #0D1B2B; }
+:root[data-accent="violet"] { --acc: #9D85FF; --acc-2: #D29BFF; --acc-on: #5B3CC4; --acc-soft: #F2EFFF; --term-bg: #160F29; }
+:root[data-accent="pink"] { --acc: #FF6B93; --acc-2: #FFA07A; --acc-on: #B5174D; --acc-soft: #FFEEF3; --term-bg: #24101A; }
+@media (prefers-color-scheme: dark) {
+  :root[data-accent="tide"]:not([data-theme="light"]) { --acc-on: #4BE8B8; --acc-soft: #12241F; --term-bg: #060A0F; }
+  :root[data-accent="blue"]:not([data-theme="light"]) { --acc-on: #73B8FF; --acc-soft: #101E2E; --term-bg: #060A0F; }
+  :root[data-accent="violet"]:not([data-theme="light"]) { --acc-on: #B9A6FF; --acc-soft: #1C1830; --term-bg: #060A0F; }
+  :root[data-accent="pink"]:not([data-theme="light"]) { --acc-on: #FF8FB0; --acc-soft: #2B141C; --term-bg: #060A0F; }
+}
+:root[data-theme="dark"][data-accent="tide"] { --acc-on: #4BE8B8; --acc-soft: #12241F; --term-bg: #060A0F; }
+:root[data-theme="dark"][data-accent="blue"] { --acc-on: #73B8FF; --acc-soft: #101E2E; --term-bg: #060A0F; }
+:root[data-theme="dark"][data-accent="violet"] { --acc-on: #B9A6FF; --acc-soft: #1C1830; --term-bg: #060A0F; }
+:root[data-theme="dark"][data-accent="pink"] { --acc-on: #FF8FB0; --acc-soft: #2B141C; --term-bg: #060A0F; }
 
 /* ========================================================================== */
 
@@ -608,6 +639,33 @@ button.chip[aria-pressed="true"] {
 .term-body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .16); border-radius: 5px; }
 
 .tl { display: flex; gap: 10px; white-space: pre-wrap; word-break: break-word; }
+
+/* Filtre par famille de lignes : une puce par famille, sa pastille dans la
+   couleur des lignes qu'elle montre. Eteinte, la famille est masquee. */
+.term-filtres { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 18px 0; flex-shrink: 0; }
+.term-filtres-t { color: var(--term-dim); font-size: 11.5px; margin-right: 2px; }
+.term-filtre {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600;
+  padding: 3px 10px; border-radius: 999px; color: var(--term-dim);
+  border: 1px solid rgba(255, 255, 255, .14);
+}
+.term-filtre::before { content: ''; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; }
+.term-filtre:hover { border-color: rgba(255, 255, 255, .3); }
+.term-filtre[aria-pressed="true"] { color: var(--term-text); background: rgba(255, 255, 255, .08); }
+.term-filtre[aria-pressed="true"]::before { border: none; background: var(--term-text); }
+.term-filtre.f-info[aria-pressed="true"]::before    { background: var(--term-info); }
+.term-filtre.f-etapes[aria-pressed="true"]::before  { background: var(--term-step); }
+.term-filtre.f-succes[aria-pressed="true"]::before  { background: var(--term-ok); }
+.term-filtre.f-avert[aria-pressed="true"]::before   { background: var(--term-warn); }
+.term-filtre.f-erreurs[aria-pressed="true"]::before { background: var(--term-err); }
+[data-masques~="info"] > .f-info,
+[data-masques~="etapes"] > .f-etapes,
+[data-masques~="succes"] > .f-succes,
+[data-masques~="avert"] > .f-avert,
+[data-masques~="erreurs"] > .f-erreurs,
+[data-masques~="analyse"] > .f-analyse,
+[data-masques~="canaux"] > .f-canaux,
+[data-masques~="texte"] > .f-texte { display: none; }
 .tl .t { color: var(--term-dim); flex-shrink: 0; font-variant-numeric: tabular-nums; }
 
 /* --- Densite de la console : Compact / Etendu / Complet -------------------
@@ -2100,3 +2158,18 @@ body.inactive .onb-illu * { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   .an-prog-barre i, .an-pile i, .an-plier .ico, .an-plier-poste .ico, .an-anneau circle, .an-tm-case, .an-gaufre i { transition: none; }
 }
+
+/* --- Reglage 1.8 : la couleur d'accent ------------------------------------ */
+.accents { display: flex; gap: 10px; flex-wrap: wrap; }
+.accent-pastille {
+  width: 34px; height: 34px; border-radius: 50%; position: relative;
+  border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border-2);
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.accent-pastille:hover { transform: scale(1.08); }
+.accent-pastille[aria-checked="true"] { box-shadow: 0 0 0 2px var(--text); }
+.accent-pastille[data-set-accent="orange"] { background: var(--pal-orange); }
+.accent-pastille[data-set-accent="tide"]   { background: var(--pal-tide); }
+.accent-pastille[data-set-accent="blue"]   { background: var(--pal-blue); }
+.accent-pastille[data-set-accent="violet"] { background: var(--pal-violet); }
+.accent-pastille[data-set-accent="pink"]   { background: var(--pal-pink); }

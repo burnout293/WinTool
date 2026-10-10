@@ -165,7 +165,14 @@ pub struct Settings {
     /// `rows`, `treemap`, `waffle` ou `gauge`. Vide : l'anneau.
     #[serde(default)]
     pub analysis_chart: String,
+    /// Couleur d'accent de l'interface (§15.4) : une de [`ACCENTS`]. Vide :
+    /// l'orange, couleur par defaut depuis la 1.5.
+    #[serde(default)]
+    pub accent: String,
 }
+
+/// Couleurs d'accent proposees ; `tide` est la couleur d'origine (« Maree »).
+pub const ACCENTS: [&str; 5] = ["orange", "tide", "blue", "violet", "pink"];
 
 /// Graphiques proposes pour le resume de l'analyse.
 pub const GRAPHIQUES_ANALYSE: [&str; 6] = ["donut", "bar", "rows", "treemap", "waffle", "gauge"];
@@ -293,6 +300,7 @@ pub fn default_settings(factory: Vec<Lot>) -> Settings {
         sources_inactives: Vec::new(),
         sources_exclus: BTreeMap::new(),
         analysis_chart: String::new(),
+        accent: String::new(),
     }
 }
 

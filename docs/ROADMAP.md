@@ -17,6 +17,9 @@ d'un cran (1.1, 1.2…), une version de corrections seules prend un troisième c
 | | — analyser → cocher → nettoyer (§17), avec une norme qui laisse les scripts composer l'écran : listes d'éléments, arborescences, confiance, mesures, notes ; résumé à déplier en Simple (anneau par défaut, graphique au choix), vues et panneaux en Expert, un seul affichage réglé par `show` (`docs/FORMAT_SCRIPT.md`, exemple `docs/mockups/exemple-analyse.ps1`) | Fait |
 | | — catégories distinctes des lots, onglets Scripts / Lots en Expert, réglages de la 1.2 migrés sans perte (§4.1) | Fait |
 | **1.5** | Témoin des changements sensibles (voir ci-dessous) | À faire |
+| | — couleur d'accent au choix, orange par défaut (§15.4) | Fait |
+| | — journal : filtre par famille de lignes (infos, étapes, réussites, avertissements, erreurs, analyse, canaux, texte brut) | Fait |
+| | — point de restauration : verdict indépendant de la langue de Windows, accents lisibles, message simple en Simple et détail au journal, aucun point pendant une simulation | Fait |
 | en continu | Améliorations graphiques et d'organisation | Glissées dans chaque version |
 
 ## Pourquoi cet ordre
