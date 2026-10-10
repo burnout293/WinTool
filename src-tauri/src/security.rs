@@ -68,10 +68,77 @@ pub fn detecter(source: &str) -> Vec<PointAttention> {
                 extrait: extrait(),
             });
         }
+        for (code, variantes) in PERSISTANCE {
+            if variantes
+                .iter()
+                .any(|mots| ligne_contient_toutes(&minuscule, mots))
+            {
+                trouves.push(PointAttention {
+                    code: code.into(),
+                    ligne: numero,
+                    extrait: extrait(),
+                });
+            }
+        }
     }
 
     trouves
 }
+
+/// Les gestes qu'un logiciel malveillant fait pour s'installer durablement :
+/// ceux-la memes que le temoin (§12.5) releve apres coup, reperes ici avant.
+/// Chaque variante est une liste de mots qui doivent tous figurer sur la ligne.
+const PERSISTANCE: [(&str, &[&[&str]]); 7] = [
+    (
+        "TACHE_PLANIFIEE",
+        &[
+            &["register-scheduledtask"],
+            &["new-scheduledtask"],
+            &["schtasks", "/create"],
+        ],
+    ),
+    (
+        "SERVICE_CREE",
+        &[
+            &["new-service"],
+            &["sc.exe", "create"],
+            &["sc ", " create "],
+        ],
+    ),
+    (
+        "DEMARRAGE_AUTO",
+        &[
+            &["currentversion\\run"],
+            &["\\winlogon"],
+            &["start menu\\programs\\startup"],
+        ],
+    ),
+    (
+        "CERTIFICAT_RACINE",
+        &[
+            &["import-certificate", "root"],
+            &["cert:\\localmachine\\root"],
+            &["certutil", "-addstore"],
+        ],
+    ),
+    (
+        "PARE_FEU",
+        &[
+            &["new-netfirewallrule"],
+            &["set-netfirewallprofile"],
+            &["netsh", "advfirewall", "add"],
+        ],
+    ),
+    ("FICHIER_HOSTS", &[&["drivers\\etc\\hosts"]]),
+    (
+        "VARIABLE_SYSTEME",
+        &[
+            &["setenvironmentvariable", "machine"],
+            &["setx", "/m"],
+            &["session manager\\environment"],
+        ],
+    ),
+];
 
 #[cfg(test)]
 mod tests {
@@ -97,6 +164,32 @@ mod tests {
     fn un_script_ordinaire_ne_declenche_rien() {
         let source = "Write-Host 'Bonjour'\nStop-Service -Name Spooler -Force";
         assert!(detecter(source).is_empty());
+    }
+
+    #[test]
+    fn repere_les_gestes_de_persistance() {
+        let source = "Register-ScheduledTask -TaskName X -Action $a\n\
+                      Set-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run' -Name X -Value y\n\
+                      Import-Certificate -FilePath c.cer -CertStoreLocation Cert:\\LocalMachine\\Root\n\
+                      New-NetFirewallRule -DisplayName X\n\
+                      Add-Content \"$env:SystemRoot\\System32\\drivers\\etc\\hosts\" '0.0.0.0 x'\n\
+                      [Environment]::SetEnvironmentVariable('X', 'y', 'Machine')\n\
+                      New-Service -Name X -BinaryPathName c.exe";
+        let codes: Vec<String> = detecter(source).into_iter().map(|p| p.code).collect();
+        for attendu in [
+            "TACHE_PLANIFIEE",
+            "DEMARRAGE_AUTO",
+            "CERTIFICAT_RACINE",
+            "PARE_FEU",
+            "FICHIER_HOSTS",
+            "VARIABLE_SYSTEME",
+            "SERVICE_CREE",
+        ] {
+            assert!(
+                codes.iter().any(|c| c == attendu),
+                "{attendu} manque : {codes:?}"
+            );
+        }
     }
 
     #[test]

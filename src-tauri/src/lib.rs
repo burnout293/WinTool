@@ -12,6 +12,7 @@ mod settings;
 mod simulation;
 mod sources;
 mod systeme;
+mod temoin;
 mod update;
 
 use serde::Serialize;
@@ -636,6 +637,8 @@ fn record_script_run(
     simulated: Option<bool>,
     // Ce que le script a annonce par `[FREED]`, s'il l'a fait (§17).
     freed: Option<u64>,
+    // Ce que le temoin a vu changer (§12.5).
+    changes: Option<Vec<temoin::Changement>>,
 ) -> Result<(), String> {
     history::record_script_run(
         &app,
@@ -647,6 +650,7 @@ fn record_script_run(
             duration_ms,
             simulated: simulated.unwrap_or(false),
             freed,
+            changes: changes.unwrap_or_default(),
             at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
         },
     )

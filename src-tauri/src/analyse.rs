@@ -327,13 +327,20 @@ pub fn lire(meta: &Script, lignes: &[String]) -> Analyse {
                     ));
                     continue;
                 }
+                let fields = filtrer("FIND", &cle, champs, &CHAMPS_FIND, &mut a.anomalies);
+                // Une seconde ligne sur la meme case la complete : un script ne
+                // sait qu'a la fin lequel de ses choix recommander, une fois
+                // tous mesures. Sur un meme champ, la derniere valeur l'emporte.
                 if !cibles_vues.insert(cle.clone()) {
-                    a.anomalies.push(format!(
-                        "[FIND] {cle} rapporté deux fois — seul le premier compte"
-                    ));
+                    if let Some(c) = a
+                        .finds
+                        .iter_mut()
+                        .find(|c| c.option == nom && c.choice == choix)
+                    {
+                        c.fields.extend(fields);
+                    }
                     continue;
                 }
-                let fields = filtrer("FIND", &cle, champs, &CHAMPS_FIND, &mut a.anomalies);
                 a.finds.push(Constat {
                     option: nom.to_string(),
                     choice: choix.to_string(),
@@ -626,6 +633,56 @@ mod tests {
             .is_err());
         assert!(m.verifier("s1", "h2", "Browsers", &ok).is_err());
         assert!(m.verifier("s2", "h1", "Browsers", &ok).is_err());
+    }
+
+    /// Le DNS du catalogue mesure tous ses choix, puis dit lequel recommander :
+    /// la seconde ligne complete la premiere au lieu d'etre ignoree.
+    #[test]
+    fn une_seconde_ligne_complete_le_meme_constat() {
+        let meta = parse(
+            r#"## WINTOOL:START
+## id            : 00000000-0000-4000-8000-000000000001
+## lang          : en
+## title         : T
+## desc          : D
+## category      : tools
+## icon          : zap
+## version       : 1.0
+## admin         : false
+## risk          : low
+## duration      : fast
+## reversible    : true
+## interruptible : true
+## reboot        : false
+## engine        : auto
+## scan          : true
+## WINTOOL:END
+## WINTOOL:OPTIONS
+## Dns : [select] DNS
+##   a : A
+##   b : B
+## WINTOOL:END
+$CONFIG = @{
+    Dns = "a"
+}
+"#,
+        );
+        let a = lire(
+            &meta,
+            &lignes(
+                "[FIND] Dns.a ms=12 current=true
+[FIND] Dns.b ms=9 current=false
+[FIND] Dns.b recommended=true",
+            ),
+        );
+        assert!(a.anomalies.is_empty(), "{:?}", a.anomalies);
+        assert_eq!(a.finds.len(), 2);
+        let b = a.finds.iter().find(|c| c.choice == "b").unwrap();
+        assert_eq!(b.fields.get("ms").map(String::as_str), Some("9"));
+        assert_eq!(
+            b.fields.get("recommended").map(String::as_str),
+            Some("true")
+        );
     }
 
     #[test]

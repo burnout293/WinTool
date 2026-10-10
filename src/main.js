@@ -2373,6 +2373,62 @@ function etiqueterFermerJournal() {
 
 const PLURIEL = (cle, n) => t(cle, { n, s: n > 1 ? 's' : '' });
 
+/* --- Temoin des changements sensibles (§12.5) ----------------------------
+   Le moteur releve, avant et apres chaque script, ce qu'un logiciel
+   malveillant modifie pour s'installer ; `script:end` en porte la difference. */
+
+const FAMILLES_TEMOIN = ['tasks', 'services', 'autorun', 'environment', 'defender', 'hosts', 'certificates', 'firewall'];
+
+/** « Programmes de fond de Windows : 2 modifiés, 1 ajouté ». */
+function resumeTemoin(changes) {
+  return FAMILLES_TEMOIN.map((f) => {
+    const ici = changes.filter((c) => c.family === f);
+    if (!ici.length) return null;
+    const genre = t(`temoin.g.${f}`) === 'f' ? 'f' : 'm';
+    const parts = ['added', 'modified', 'removed']
+      .map((k) => [k, ici.filter((c) => c.kind === k).length])
+      .filter(([, n]) => n)
+      .map(([k, n]) => PLURIEL(`temoin.${k}_${genre}`, n));
+    return `${t(`temoin.f.${f}`)} : ${parts.join(', ')}`;
+  }).filter(Boolean);
+}
+
+/** Le detail exact, pour le journal (mode Expert, detail technique). */
+function journaliserTemoin(changes) {
+  for (const c of changes) {
+    ajouterLigne({ at_ms: 0, stream: 'stdout', marker: 'WARN', text: `[WARN] ${t('temoin.ligne', { famille: t(`temoin.f.${c.family}`), genre: t(`temoin.k.${c.kind}`), nom: c.name })}` });
+  }
+}
+
+/** Le bilan du temoin, sous la liste des taches de l'entretien. */
+function rendreTemoinBilan() {
+  const zone = document.getElementById('temoinBilan');
+  const res = entretienEnCours?.resultats || [];
+  const touches = res.filter((r) => r.changes?.length);
+  const regarde = res.length && res.every((r) => r.watched?.length);
+  if (!touches.length) {
+    zone.hidden = !regarde;
+    zone.className = 'temoin calme';
+    zone.innerHTML = regarde ? `${ico('shield-check', 'i16')}<span>${esc(t('temoin.rien'))}</span>` : '';
+    return;
+  }
+  zone.hidden = false;
+  zone.className = 'temoin';
+  const simules = touches.filter((r) => r.simule);
+  zone.innerHTML = `<div class="temoin-h">${ico('warn', 'i16')}<b>${esc(t('temoin.titre'))}</b></div>
+    ${simules.map((r) => `<p class="temoin-alerte">${esc(t('temoin.simulation', { titre: titreDe(r.id) }))}</p>`).join('')}
+    ${touches.map((r) => `<div class="temoin-action"><b>${esc(titreDe(r.id))}</b><ul>${resumeTemoin(r.changes).map((l) => `<li>${esc(l)}</li>`).join('')}</ul></div>`).join('')}
+    <p class="muted temoin-note">${esc(t('temoin.explication'))}</p>`;
+}
+
+function titreDe(id) {
+  const s = catalogue.get(id);
+  return s ? (s.meta.translations?.[currentLang()]?.title || s.meta.title || id) : id;
+}
+
+/** Les analyses qui ont modifie Windows, alors qu'elles ne le devaient pas. */
+const temoinAnalyses = new Map();
+
 function afficherVerdict(fin) {
   const secondes = (fin.duration_ms / 1000).toFixed(1);
   const bloc = document.createElement('div');
@@ -2651,9 +2707,13 @@ async function cablerMoteur() {
     // mode — ne bloque jamais la suite, ne fait que rafraichir "Fait le ...".
     enregistrerExecution(payload, titre, course.simule).then(() => rendreLots());
 
+    if (payload.changes?.length) journaliserTemoin(payload.changes);
     if (course.entretien) {
       const succes = payload.success && !payload.killed;
-      entretienEnCours.resultats.push({ id: payload.script_id, success: succes, simule: course.simule, freed: payload.freed ?? null });
+      entretienEnCours.resultats.push({
+        id: payload.script_id, success: succes, simule: course.simule, freed: payload.freed ?? null,
+        changes: payload.changes || [], watched: payload.watched || [],
+      });
       course = null;
       majEtatJournalCompact();
       // Comportement d'echec (specification §6.2, reglage Expert §8) : par
@@ -3777,6 +3837,14 @@ async function analyser(entree, { simple = false } = {}) {
 }
 
 function finirAnalyse(fin) {
+  // Une analyse promet de ne rien modifier : si le temoin voit le contraire,
+  // cela se dit — dans le journal, et la ou l'analyse s'affiche.
+  if (fin.changes?.length) {
+    temoinAnalyses.set(fin.script_id, fin.changes);
+    journaliserTemoin(fin.changes);
+  } else {
+    temoinAnalyses.delete(fin.script_id);
+  }
   const lignes = course?.lignes || [];
   course = null;
   journauxAnalyse.set(fin.script_id, lignes);
@@ -3911,6 +3979,9 @@ function rendreResumeAnalyse(groupe) {
     const s = catalogue.get(e.id);
     autres.push(`<p class="an-masques">${esc(t('simple.analyse_echec', { titre: s ? A.titreAction(s) : e.id }))}</p>`);
   }
+  for (const id of analyseSimple.ids.filter((x) => temoinAnalyses.has(x))) {
+    autres.push(`<p class="temoin-alerte">${esc(t('temoin.analyse', { titre: titreDe(id) }))} ${esc(resumeTemoin(temoinAnalyses.get(id)).join(' · '))}</p>`);
+  }
   if (reserves.length) {
     autres.push(`<p class="an-masques">${esc(t(reserves.length > 1 ? 'simple.reservees_expert' : 'simple.reservee_expert', {
       n: reserves.length, liste: reserves.map((s) => `« ${A.titreAction(s)} »`).join(', '),
@@ -3933,8 +4004,16 @@ function rendreResumeAnalyse(groupe) {
   document.getElementById('anTotal').textContent = morceaux.join(' · ');
   const bouton = document.getElementById('btnLancerEntretien');
   bouton.hidden = false;
-  bouton.disabled = aLancer.length === 0;
-  bouton.textContent = aLancer.length ? t('simple.lancer') : t('simple.rien_a_lancer');
+  // Un lot qui n'a fait que mesurer (un diagnostic) est termine : il n'y a
+  // rien a cocher, donc rien a lancer — le bouton y met fin au lieu de rester
+  // grise sur « Rien n'est coché ».
+  const rienACocher = !telsQuels.length && modeles.every((m) => !Object.values(m.options)
+    .some((o) => !o.def.scan && (o.find || Object.keys(o.finds).length || o.items.length)));
+  bouton.dataset.fin = !aLancer.length && rienACocher ? '1' : '';
+  bouton.disabled = aLancer.length === 0 && !bouton.dataset.fin;
+  bouton.textContent = aLancer.length ? t('simple.lancer')
+    : bouton.dataset.fin ? t(entretienEnCours?.depuisExpert ? 'simple.retour_expert' : 'simple.termine_retour')
+      : t('simple.rien_a_lancer');
 }
 
 /* --- Mode Expert : « Analyser » sur la fiche d'un script ---------------- */
@@ -3977,7 +4056,8 @@ function contenuAnalyseExpert(entree) {
       <button class="btn compact" type="button" data-relancer-an="${esc(entree.id)}">${esc(t('an.relancer'))}</button>
     </div>
     ${m.succes ? '' : `<p class="card-warn">${esc(t('an.analyse_echouee'))}</p>`}
-    ${m.tronque ? `<p class="card-warn">${esc(t('an.tronquee'))}</p>` : ''}`;
+    ${m.tronque ? `<p class="card-warn">${esc(t('an.tronquee'))}</p>` : ''}
+    ${alerteTemoinAnalyse(entree)}`;
   const puces = PANNEAUX_AN.map((k) => `<button type="button" class="chip${ouverts.has(k) ? ' on' : ''}" data-panneau-an="${esc(entree.id)}|${k}" aria-pressed="${ouverts.has(k)}">${esc(t(`an.p.${k}`))}</button>`).join('');
   const panneaux = PANNEAUX_AN.filter((k) => ouverts.has(k)).map((k) => panneauAnalyse(entree, m, k)).join('');
   return `${tete}<div class="an-grille">
@@ -3991,6 +4071,13 @@ function valeurAffichee(v) {
   if (v === true) return t('an.oui');
   if (v === false) return t('an.non');
   return v == null || v === '' ? '—' : String(v);
+}
+
+/** En tete de l'analyse d'une fiche : ce que l'analyse a modifie, s'il y a lieu. */
+function alerteTemoinAnalyse(entree) {
+  const c = temoinAnalyses.get(entree.id);
+  if (!c?.length) return '';
+  return `<p class="temoin-alerte">${esc(t('temoin.analyse', { titre: titreDe(entree.id) }))} ${esc(resumeTemoin(c).join(' · '))}</p>`;
 }
 
 function panneauAnalyse(entree, m, cle) {
@@ -4162,6 +4249,7 @@ async function lancerEntretien() {
   document.getElementById('tasksBilan').hidden = false;
   document.getElementById('tasksBilanDetail').textContent = nomLot(groupe.lot);
   document.getElementById('term').hidden = true;
+  document.getElementById('temoinBilan').hidden = true;
   const aLancer = scriptsALancer(groupe);
   entretienEnCours.lances = aLancer.map((s) => s.id);
   entretienEnCours.total = aLancer.length;
@@ -4262,6 +4350,7 @@ function terminerEntretien() {
   document.getElementById('tasksBilan').hidden = false;
   document.getElementById('tasksBilan').textContent = t('simple.bilan_titre');
   const simules = entretienEnCours.resultats.filter((r) => r.simule).length;
+  rendreTemoinBilan();
   document.getElementById('tasksBilanDetail').textContent = t(total === 1 ? 'simple.bilan_detail_un' : 'simple.bilan_detail', { ok, total })
     + (simules ? ` ${t('simulation.bilan', { n: simules })}` : '')
     + bilanLibere();
@@ -4375,7 +4464,12 @@ function cablerModeEtSimple() {
     if (ev.target.closest('#btnSuivantVerifier')) return void suivreVerifier();
     // Les gestes du resume de l'analyse (§17) : cases, chevrons, interrupteurs.
     if (ev.target.closest('#anResume') && A.agir(ev, analyses)) return void rendreResumeAnalyse();
-    if (ev.target.closest('#btnLancerEntretien')) return void lancerEntretien();
+    const lancerOuFinir = ev.target.closest('#btnLancerEntretien');
+    if (lancerOuFinir) {
+      if (!lancerOuFinir.dataset.fin) return void lancerEntretien();
+      if (entretienEnCours?.depuisExpert) return void retourExpert();
+      return void afficherEtapeSimple(1);
+    }
     if (ev.target.closest('#btnArreterEntretien')) return void arreterEntretien();
     if (ev.target.closest('#btnRetourAccueil')) {
       if (entretienEnCours?.depuisExpert) return void retourExpert();
@@ -4455,6 +4549,7 @@ async function enregistrerExecution(payload, titre, simule) {
       durationMs: payload.duration_ms,
       simulated: !!simule,
       freed: payload.freed ?? null,
+      changes: payload.changes || [],
     });
     await invoke('enforce_log_cap');
   } catch (e) {

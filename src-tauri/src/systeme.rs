@@ -345,6 +345,53 @@ extern "system" {
     ) -> i32;
 }
 
+#[cfg(windows)]
+#[link(name = "kernel32")]
+extern "system" {
+    fn MultiByteToWideChar(
+        page: u32,
+        drapeaux: u32,
+        source: *const u8,
+        longueur: i32,
+        cible: *mut u16,
+        place: i32,
+    ) -> i32;
+}
+
+/// Decode du texte ecrit dans la page de codes OEM de la console — celle de
+/// PowerShell 5.1 quand sa sortie est redirigee. Sur un Windows francais, les
+/// messages d'erreur de PowerShell lui-meme (« Acces refuse ») y arrivent ;
+/// lus octet par octet, leurs accents devenaient des caracteres de controle.
+#[cfg(windows)]
+pub fn depuis_oem(brut: &[u8]) -> Option<String> {
+    const CP_OEMCP: u32 = 1;
+    if brut.is_empty() {
+        return Some(String::new());
+    }
+    let n = i32::try_from(brut.len()).ok()?;
+    // SAFETY : `brut` vit pendant les deux appels et `n` est sa longueur ; le
+    // premier appel ne fait que mesurer, le second ecrit au plus `place`
+    // unites dans un tampon de cette taille.
+    unsafe {
+        let place = MultiByteToWideChar(CP_OEMCP, 0, brut.as_ptr(), n, std::ptr::null_mut(), 0);
+        if place <= 0 {
+            return None;
+        }
+        let mut tampon = vec![0u16; place as usize];
+        let ecrit = MultiByteToWideChar(CP_OEMCP, 0, brut.as_ptr(), n, tampon.as_mut_ptr(), place);
+        if ecrit <= 0 {
+            return None;
+        }
+        tampon.truncate(ecrit as usize);
+        Some(String::from_utf16_lossy(&tampon))
+    }
+}
+
+#[cfg(not(windows))]
+pub fn depuis_oem(_brut: &[u8]) -> Option<String> {
+    None
+}
+
 /// Lit la place du disque du systeme. Une lecture, rien de plus.
 pub fn espace_disque() -> Result<EspaceDisque, String> {
     let lecteur = emplacements().lecteur.clone();

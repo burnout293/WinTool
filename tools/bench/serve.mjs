@@ -42,6 +42,20 @@ const server = createServer(async (req, res) => {
     return res.end(corps);
   }
 
+  // Le vrai catalogue, tel que le moteur l'a lu et analyse (voir le test
+  // `catalogue_reel_analyses`) : `?catalogue=reel`. Absent tant qu'on ne l'a
+  // pas produit.
+  if (chemin === '/__catalogue-reel.json') {
+    try {
+      const corps = await readFile(join(ICI, 'catalogue-reel.json'));
+      res.writeHead(200, { 'content-type': TYPES['.json'] });
+      return res.end(corps);
+    } catch {
+      res.writeHead(404);
+      return res.end('[]');
+    }
+  }
+
   const cible = normalize(join(RACINE, chemin));
   // Un chemin qui remonte hors de src/ est refuse : meme un banc local ne
   // sert pas le disque entier.

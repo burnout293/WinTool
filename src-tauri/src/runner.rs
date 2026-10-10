@@ -178,6 +178,13 @@ pub struct RunEnd {
     /// Vrai pour une analyse (`WINTOOL_MODE=scan`) : rien n'a ete modifie, et
     /// l'evenement `script:analysis` a precede celui-ci.
     pub analysis: bool,
+    /// Le temoin (§12.5) : ce qui a change, pendant le script, dans ce qu'un
+    /// logiciel malveillant modifie pour s'installer — taches planifiees,
+    /// services, demarrage, antivirus… Vide si rien n'a change.
+    pub changes: Vec<crate::temoin::Changement>,
+    /// Les familles que le temoin a pu lire avant ET apres : le bilan ne dit
+    /// jamais « rien n'a change » pour ce qu'il n'a pas regarde.
+    pub watched: Vec<String>,
     pub counts_ok: u32,
     pub counts_warn: u32,
     pub counts_err: u32,
@@ -214,11 +221,11 @@ impl<R: Runtime> Sortie for VersInterface<R> {
 
 /// Decode une ligne brute.
 ///
-/// PowerShell 7 ecrit en UTF-8. PowerShell 5.1 ecrit dans la page de codes de
-/// la console, qui n'est pas UTF-8 : une lecture stricte echouerait et
-/// tronquerait la sortie. On retombe alors sur une correspondance octet par
-/// octet, qui restitue l'ASCII intact et rend les accents de facon approchee.
-/// La sortie des scripts est en anglais (specification 10), donc le cas est rare.
+/// PowerShell 7 ecrit en UTF-8. PowerShell 5.1 ecrit dans la page de codes OEM
+/// de la console, qui n'est pas UTF-8 : une lecture stricte echouerait et
+/// tronquerait la sortie. On la decode alors dans cette page de codes. La
+/// sortie des scripts est en anglais (specification 10), mais les messages
+/// d'erreur de PowerShell lui-meme sont dans la langue de Windows.
 fn decoder(brut: &[u8]) -> String {
     let mut fin = brut.len();
     while fin > 0 && (brut[fin - 1] == b'\n' || brut[fin - 1] == b'\r') {
@@ -227,7 +234,9 @@ fn decoder(brut: &[u8]) -> String {
     let brut = &brut[..fin];
     match std::str::from_utf8(brut) {
         Ok(s) => s.trim_start_matches('\u{feff}').to_string(),
-        Err(_) => brut.iter().map(|&b| b as char).collect(),
+        Err(_) => {
+            systeme::depuis_oem(brut).unwrap_or_else(|| brut.iter().map(|&b| b as char).collect())
+        }
     }
 }
 
@@ -764,6 +773,9 @@ pub fn lancer(
     #[cfg(windows)]
     commande.creation_flags(CREATE_NO_WINDOW);
 
+    // Le temoin : l'etat de ce qui est sensible, juste avant le lancement.
+    let releve_avant = crate::temoin::relever();
+
     let mut enfant = commande
         .spawn()
         .map_err(|e| format!("lancement de {exe} : {e}"))?;
@@ -878,6 +890,17 @@ pub fn lancer(
 
             let duree = depart.elapsed().as_millis() as u64;
             let exit_code = statut.as_ref().ok().and_then(|s| s.code());
+
+            // ... et juste apres, avant de liberer la place : aucun autre script
+            // ne peut avoir tourne entre les deux releves.
+            let releve_apres = crate::temoin::relever();
+            let changes = crate::temoin::comparer(&releve_avant, &releve_apres);
+            let lues_avant = releve_avant.lues();
+            let watched: Vec<String> = releve_apres
+                .lues()
+                .into_iter()
+                .filter(|f| lues_avant.contains(f))
+                .collect();
             let tue_par_nous = tue.load(Ordering::Relaxed);
             let c = compteurs
                 .lock()
@@ -902,6 +925,10 @@ pub fn lancer(
                         "echec"
                     }
                 );
+                let _ = writeln!(f, "temoin     : {}", watched.join(", "));
+                for c in &changes {
+                    let _ = writeln!(f, "  {:<9}{:<14}{}", c.kind, c.family, c.name);
+                }
             }
 
             // L'emplacement est libere avant d'annoncer la fin : si l'interface
@@ -927,6 +954,8 @@ pub fn lancer(
                     n => Some(n),
                 },
                 analysis: analyse,
+                changes,
+                watched,
                 counts_ok: c.0,
                 counts_warn: c.1,
                 counts_err: c.2,
@@ -1380,6 +1409,9 @@ mod tests {
         assert_eq!(decoder(b"bonjour\n"), "bonjour");
         // Octet invalide en UTF-8 : la ligne doit survivre malgre tout.
         assert_eq!(decoder(&[b'a', 0x82, b'b']).chars().count(), 3);
+        // « Acces refuse » tel que PowerShell 5.1 l'ecrit sur un Windows
+        // francais (page OEM 850, comme la 437 pour ces deux lettres).
+        assert_eq!(decoder(b"Acc\x8as refus\x82"), "Accès refusé");
     }
 
     #[test]
@@ -2121,5 +2153,120 @@ exit 0
 
         // Le verrou est bien relache une fois l'execution terminee.
         std::fs::write(&lent, b"exit 0").expect("le fichier reste verrouille apres coup");
+    }
+
+    /// Banc de compatibilite du catalogue — lance a la main, jamais en CI :
+    ///
+    /// ```text
+    /// WINTOOL_CATALOGUE=..\WinTool-Catalogue\scripts cargo test --lib -- --ignored --nocapture catalogue
+    /// ```
+    ///
+    /// Chaque script est lu par le parseur de l'application ; chaque script
+    /// analysable est **analyse** par le vrai moteur (memes variables, meme
+    /// dossier courant, meme PSModulePath) et sa sortie lue par
+    /// `analyse::lire`, comme l'interface la recevrait. Seule l'analyse tourne,
+    /// jamais l'action : elle ne modifie rien par contrat — relire les branches
+    /// d'analyse avant de lancer ce banc sur un catalogue qu'on ne connait pas.
+    #[test]
+    #[ignore]
+    fn catalogue_reel_analyses() {
+        let Ok(dossier) = std::env::var("WINTOOL_CATALOGUE") else {
+            eprintln!("WINTOOL_CATALOGUE non defini : rien a verifier");
+            return;
+        };
+        let mut fichiers: Vec<PathBuf> = std::fs::read_dir(&dossier)
+            .expect("dossier du catalogue illisible")
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("ps1")))
+            .collect();
+        fichiers.sort();
+        let bac = Bac::neuf("catalogue");
+        let mut problemes = Vec::new();
+        // WINTOOL_CATALOGUE_EXPORT=<fichier.json> : ce que l'interface recevrait,
+        // pour le banc d'essai (`?catalogue=reel`, tools/bench/fixtures.js).
+        let mut export = Vec::new();
+
+        for chemin in fichiers {
+            let nom = chemin.file_name().unwrap().to_string_lossy().to_string();
+            let texte = std::fs::read_to_string(&chemin).expect("lecture");
+            let meta = crate::contract::parse(texte.trim_start_matches('\u{feff}'));
+            for f in &meta.findings {
+                problemes.push(format!(
+                    "{nom} : constat {} ligne {} — {}",
+                    f.code, f.line, f.message
+                ));
+            }
+            let empreinte_fichier = empreinte(&chemin);
+            if !meta.scan {
+                println!("{nom} : lu, sans analyse");
+                export.push(
+                    serde_json::json!({ "file": nom, "hash": empreinte_fichier, "meta": meta }),
+                );
+                continue;
+            }
+            let (collecteur, rx) = attelage();
+            let mut c = cible(chemin.clone(), true);
+            c.analyse = true;
+            c.engine = meta.engine.clone();
+            c.id = meta.id.clone();
+            if let Err(e) = lancer(
+                c,
+                BTreeMap::new(),
+                None,
+                &bac.0,
+                Arc::new(Runner::default()),
+                collecteur.clone(),
+            ) {
+                problemes.push(format!("{nom} : analyse refusee — {e}"));
+                continue;
+            }
+            let Ok(fin) = rx.recv_timeout(Duration::from_secs(300)) else {
+                problemes.push(format!("{nom} : analyse sans fin apres 5 minutes"));
+                continue;
+            };
+            let lignes = collecteur.lignes.lock().unwrap();
+            let sortie: Vec<String> = lignes
+                .iter()
+                .filter(|l| l.stream == "stdout")
+                .map(|l| l.text.clone())
+                .collect();
+            let erreurs: Vec<&str> = lignes
+                .iter()
+                .filter(|l| l.stream == "stderr")
+                .map(|l| l.text.as_str())
+                .collect();
+            let a = crate::analyse::lire(&meta, &sortie);
+            export.push(serde_json::json!({
+                "file": nom, "hash": empreinte_fichier, "meta": meta, "analysis": a, "lines": sortie,
+            }));
+            println!(
+                "{nom} : sortie {:?}, {} constat(s), {} element(s), {} mesure(s), {} note(s), {} ligne(s) ignoree(s), {:.1} s",
+                fin.exit_code,
+                a.finds.len(),
+                a.items.len(),
+                a.metrics.len(),
+                a.notes.len(),
+                a.anomalies.len(),
+                fin.duration_ms as f64 / 1000.0
+            );
+            if !fin.success {
+                problemes.push(format!("{nom} : l'analyse sort en {:?}", fin.exit_code));
+            }
+            for e in erreurs.iter().take(5) {
+                problemes.push(format!("{nom} : stderr — {e}"));
+            }
+            for an in &a.anomalies {
+                problemes.push(format!("{nom} : {an}"));
+            }
+            if a.finds.is_empty() && a.items.is_empty() && a.metrics.is_empty() {
+                problemes.push(format!("{nom} : l'analyse n'a rien rapporte"));
+            }
+        }
+        if let Ok(cible) = std::env::var("WINTOOL_CATALOGUE_EXPORT") {
+            std::fs::write(&cible, serde_json::to_vec_pretty(&export).unwrap())
+                .expect("ecriture de l'export");
+            println!("export : {cible}");
+        }
+        assert!(problemes.is_empty(), "\n{}", problemes.join("\n"));
     }
 }

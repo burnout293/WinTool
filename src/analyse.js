@@ -337,7 +337,7 @@ function brique(m, k, mode) {
     return `<label class="an-ligne${fait ? ' inactive' : ''}${s.bool[k] ? '' : ' decoche'}">
         <input type="checkbox" ${attrs(m, k, 'data-a-k="bool"')}${s.bool[k] ? ' checked' : ''}${fait ? ' disabled' : ''}>
         <span class="an-t"><b>${esc(lib)}</b><span class="an-badges">${etat}${meta}</span></span>
-        <span class="an-v">${f.size ? taille(f.size) : ''}</span></label>${notesPour(m, k, mode)}`;
+        <span class="an-v">${Number(f.size) > 0 ? taille(f.size) : ''}</span></label>${notesPour(m, k, mode)}`;
   }
   if (d.kind === 'multi') {
     if (d.view === 'bars' || d.view === 'donut') return d.view === 'bars' ? vueBarres(m, k, mode) : vueAnneau(m, k, mode);
@@ -407,7 +407,7 @@ function ligneItem(m, k, it, mode) {
     verrou ? `<span class="badge neutre">${ico('lock', 'i12')}${esc(verrouTexte(it.locked))}</span>` : '',
     it.date ? `<span class="an-pub">${esc(dateCourte(it.date))}</span>` : '',
     it.publisher ? `<span class="an-pub">${esc(it.publisher)}</span>` : '',
-    it.count && !it.size ? `<span class="an-pub">${esc(pl('an.n_elements', Number(it.count)))}</span>` : '',
+    it.count && !(Number(it.size) > 0) ? `<span class="an-pub">${esc(pl('an.n_elements', Number(it.count)))}</span>` : '',
   ].join('');
   const plie = !!s.plie[`${k}/${it.id}`];
   return `<label class="an-ligne${verrou || fait ? ' inactive' : ''}${cochee || partiel ? '' : ' decoche'}">
@@ -454,7 +454,7 @@ function briqueGarder(m, k, mode) {
         return `<div class="an-ligne${garde ? ' decoche' : ''}">
           <button class="an-garder${garde ? ' oui' : ''}" type="button" ${attrs(m, k, `data-a-garder="${esc(g)}" data-a-item="${esc(it.id)}"`)}>${esc(t(garde ? 'an.garde' : 'an.garder'))}</button>
           <span class="an-t"><b>${esc(it.name || it.id)}</b>${it.path ? `<span class="an-chemin">${esc(it.path)}</span>` : ''}<span class="an-badges">${it.date ? `<span class="an-pub">${esc(dateCourte(it.date))}</span>` : ''}${garde || !s.supprimer[k] ? '' : `<span class="badge med">${esc(t('an.sera_supprime'))}</span>`}</span></span>
-          <span class="an-v">${it.size ? taille(it.size) : ''}</span></div>`;
+          <span class="an-v">${Number(it.size) > 0 ? taille(it.size) : ''}</span></div>`;
       }).join('')}</div>`;
   }).join('');
   return `<div class="an-bloc"><div class="an-bloc-h"><span class="an-bh-t">${esc(libOption(m.entree, o.def))}</span>
@@ -566,7 +566,7 @@ function vueTuiles(m, k, mode) {
     return `<label class="an-tuile${c ? ' coche' : ''}${it.locked ? ' verrou' : ''}">
       <input type="checkbox" hidden ${attrs(m, k, `data-a-k="item" data-a-item="${esc(it.id)}" data-a-mode="${mode}"`)}${c ? ' checked' : ''}${it.locked ? ' disabled' : ''}>
       ${c ? `<span class="an-marque">${ico('check', 'i12')}</span>` : ''}<span class="an-av" style="background:${serie(i)}">${esc(nom.slice(0, 1).toUpperCase())}</span>
-      <b>${esc(nom)}</b><span class="muted">${it.locked ? esc(verrouTexte(it.locked)) : it.size ? taille(it.size) : ''}</span></label>`;
+      <b>${esc(nom)}</b><span class="muted">${it.locked ? esc(verrouTexte(it.locked)) : Number(it.size) > 0 ? taille(it.size) : ''}</span></label>`;
   }).join('')}</div>${notesPour(m, k, mode)}`;
 }
 
@@ -599,7 +599,7 @@ function vueTableau(m, k) {
       <input type="search" class="an-cherche" placeholder="${esc(t('an.chercher'))}" value="${esc(ETAT.recherche)}" data-a-cherche></div>
     <div class="an-defile-x"><table class="an-tab"><tr><th></th>${avecParent ? th('prog', t('an.col_parent')) : ''}${th('nom', t('an.col_element'))}${th('confiance', t('an.col_confiance'))}${th('taille', t('an.col_taille'))}</tr>
     ${lignes.map(({ it, prog }) => `<tr><td><input type="checkbox" ${attrs(m, k, `data-a-k="item" data-a-item="${esc(it.id)}"`)}${s.items[k][it.id] ? ' checked' : ''}></td>
-      ${avecParent ? `<td>${esc(prog)}</td>` : ''}<td>${esc(nomElement(m, it))}${it.path ? `<div class="an-chemin">${esc(it.path)}</div>` : ''}</td><td>${badge('confidence', it.confidence)}</td><td class="an-n">${it.size ? taille(it.size) : '—'}</td></tr>`).join('')}
+      ${avecParent ? `<td>${esc(prog)}</td>` : ''}<td>${esc(nomElement(m, it))}${it.path ? `<div class="an-chemin">${esc(it.path)}</div>` : ''}</td><td>${badge('confidence', it.confidence)}</td><td class="an-n">${Number(it.size) > 0 ? taille(it.size) : '—'}</td></tr>`).join('')}
     ${lignes.length ? '' : `<tr><td colspan="5" class="an-tab-vide">${esc(t('an.rien_ne_correspond', { q: ETAT.recherche }))}</td></tr>`}</table></div></div>`;
 }
 
@@ -684,10 +684,15 @@ function vueFeu(m, mode) {
   const ordre = ['ok', 'warn', 'crit'];
   const pire = ms.reduce((a, x) => (ordre.indexOf(x.health) > ordre.indexOf(a) ? x.health : a), 'ok');
   const groupes = [...new Set(ms.map((x) => x.group).filter(Boolean))];
-  const detail = groupes.map((g) => {
-    const h = ms.filter((x) => x.group === g).reduce((a, x) => (ordre.indexOf(x.health) > ordre.indexOf(a) ? x.health : a), 'ok');
-    return `${esc(rapport(m.entree, g)?.label || g)} : ${esc(t(JETONS.health[h][0]))}`;
-  }).join(' · ');
+  const detail = groupes.length
+    ? groupes.map((g) => {
+      const h = ms.filter((x) => x.group === g).reduce((a, x) => (ordre.indexOf(x.health) > ordre.indexOf(a) ? x.health : a), 'ok');
+      return `${esc(rapport(m.entree, g)?.label || g)} : ${esc(t(JETONS.health[h][0]))}`;
+    }).join(' · ')
+    : ms.filter((x) => x.health && x.health !== 'ok').map((x) => {
+      const valeur = (UNITES[x.unit] || nb)(x.value);
+      return `${esc(rapport(m.entree, x.cle)?.label || x.cle)} : ${esc(valeur)} — ${esc(t(JETONS.health[x.health]?.[0] || 'an.health.ok'))}`;
+    }).join(' · ');
   return `<div class="an-feu"><span class="an-lampe ${pire}">${ico(pire === 'ok' ? 'shield-check' : 'warn', 'i20')}</span>
     <span><b>${esc(t(`an.feu.${pire}`))}</b><span>${detail}</span></span></div>`;
 }

@@ -26,3 +26,6 @@ dist/
 
 # Modele NSIS derive a chaque construction par tools/modele-installeur.mjs.
 src-tauri/installeur/installer.nsi
+
+# Export du vrai catalogue pour le banc d'essai (test catalogue_reel_analyses).
+tools/bench/catalogue-reel.json

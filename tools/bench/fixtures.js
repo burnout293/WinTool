@@ -24,6 +24,9 @@
    *   modifie    installe, un script officiel modifie sur le PC
    *   signature  l'installation echoue sur une signature refusee
    *   horsligne  la verification echoue faute de reseau
+   *   reel       les VRAIS scripts du catalogue et leurs VRAIES analyses, tels
+   *              que le moteur les a lus (tools/bench/catalogue-reel.json,
+   *              produit par le test `catalogue_reel_analyses`)
    */
   const SCENARIO = new URLSearchParams(location.search).get('catalogue') || '';
   let catalogueInstalle = !['vide', 'neuf', 'perso', 'signature'].includes(SCENARIO);
@@ -264,6 +267,34 @@
   SCRIPTS.privacy.push(ANALYSABLES[3]);
   SCRIPTS.health.push(ANALYSABLES[4]);
 
+  /** `?catalogue=reel` : ce que le moteur a vraiment lu du catalogue. Lecture
+   *  synchrone : l'interface demande ses scripts des son demarrage. */
+  const REEL = (() => {
+    if (SCENARIO !== 'reel') return null;
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', '/__catalogue-reel.json', false);
+    xhr.send();
+    try { return xhr.status === 200 ? JSON.parse(xhr.responseText) : []; } catch { return []; }
+  })();
+  const ANALYSES_REELLES = {};
+  if (REEL) {
+    // Les tokens francais de `category` rejoignent leur lot, comme le fait
+    // `factory_aliases` cote Rust.
+    const ALIAS = { nettoyage: 'cleaning', vieprivee: 'privacy', applications: 'apps', sante: 'health', outillage: 'tools' };
+    Object.values(SCRIPTS).forEach((liste) => liste.splice(0));
+    for (const r of REEL) {
+      const entree = {
+        id: r.meta.id, path: r.file, abs_path: `${CATALOGUE_ROOT}\\${r.file}`,
+        origin: 'official', verified: true, hash: r.hash, declared_id: true, meta: r.meta, attention: [],
+      };
+      const cat = ALIAS[r.meta.category] || r.meta.category;
+      if (SCRIPTS[cat]) SCRIPTS[cat].push(entree);
+      if (r.analysis) {
+        ANALYSES_REELLES[r.meta.id] = { lignes: r.lines || [], analyse: r.analysis };
+      }
+    }
+  }
+
   /** Ce que chaque analyse rapporte, au format de `analyse::Analyse`. */
   const ANALYSES = {
     'free-space': {
@@ -346,7 +377,7 @@
   function analyserBanc(req) {
     const s = TOUS.find((x) => x.id === req?.script_id);
     if (!s?.meta.scan) throw new Error('SANS_ANALYSE');
-    const a = ANALYSES[s.id];
+    const a = ANALYSES[s.id] || ANALYSES_REELLES[s.id];
     compteur += 1;
     const run_id = `run-${compteur}`;
     enCours = { run_id, script_id: s.id, arrete: false };
@@ -366,7 +397,7 @@
       emettre('script:analysis', { run_id, script_id: s.id, success: !tue, analysis: a.analyse });
       emettre('script:end', {
         run_id, script_id: s.id, exit_code: tue ? null : 0, success: !tue, killed: tue, duration_ms: 900,
-        checkpoint_reached: false, reboot_requested: false, freed: null, analysis: true,
+        checkpoint_reached: false, reboot_requested: false, freed: null, analysis: true, changes: [], watched: [],
         counts_ok: 0, counts_warn: 0, counts_err: 0, log_path: `C:\\Users\\Buly\\AppData\\Local\\WinTool\\logs\\${s.id}-analyse.log`,
       });
     }, 80 + lignes.length * 120 + 200);
@@ -556,6 +587,16 @@
         // `[FREED]` : seule l'action « Faire de la place » l'annonce sur le banc.
         freed: script_id === 'free-space' ? 917504000 : null,
         analysis: false,
+        // Struct `temoin::Changement` (§12.5). `?temoin=1` : la telemetrie
+        // touche des services et des taches, comme le vrai script.
+        watched: ['tasks', 'services', 'autorun', 'environment', 'hosts', 'certificates', 'firewall'],
+        changes: new URLSearchParams(location.search).has('temoin') && /telemetry|privacy|telemetrie/i.test(script_id)
+          ? [
+            { family: 'services', kind: 'modified', name: 'DiagTrack' },
+            { family: 'services', kind: 'modified', name: 'dmwappushservice' },
+            { family: 'tasks', kind: 'modified', name: '\\Microsoft\\Windows\\Autochk\\Proxy' },
+          ]
+          : [],
         counts_ok: 2, counts_warn: 1, counts_err: 1,
         log_path: 'C:\\Users\\Buly\\AppData\\Local\\WinTool\\logs\\2026-09-24_101200-set-dns.log',
       });
@@ -573,7 +614,7 @@
   }
 
   const REPONSES = {
-    app_info: () => ({ version: '1.4.0', elevated: !new URLSearchParams(location.search).has('sansadmin') }),
+    app_info: () => ({ version: '1.5.0', elevated: !new URLSearchParams(location.search).has('sansadmin') }),
     // Mise a jour. ?maj=1.1.1 annonce une version ; ?maj=signature la fait
     // refuser a l'installation ; ?maj=horsligne fait echouer la verification.
     // Sans parametre, WinTool est a jour.
@@ -581,8 +622,8 @@
       const maj = new URLSearchParams(location.search).get('maj');
       if (maj === 'horsligne') throw new Error('error sending request for url (https://github.com/...)');
       if (!maj) return null;
-      const version = maj === 'signature' ? '1.4.1' : maj;
-      return { version, actuelle: '1.4.0', notes: 'Notes de version', date: '2026-10-01 10:00:00 +00:00:00' };
+      const version = maj === 'signature' ? '1.5.1' : maj;
+      return { version, actuelle: '1.5.0', notes: 'Notes de version', date: '2026-10-01 10:00:00 +00:00:00' };
     },
     install_update: async () => {
       const maj = new URLSearchParams(location.search).get('maj');

@@ -538,6 +538,16 @@ espaces se met entre guillemets : `name="Google Chrome"`. Une valeur illisible �
 là où il faut un nombre, un jeton hors liste — est **ignorée et relevée, jamais
 interprétée au mieux**.
 
+**Une seconde ligne `[FIND]` sur la même case la complète** (depuis la 1.5) : ses champs
+s'ajoutent, et sur un même champ la dernière valeur l'emporte. C'est ce qui permet de ne
+recommander un choix qu'une fois tous mesurés :
+
+```
+[FIND] DnsProvider.cloudflare ms=24 current=false
+[FIND] DnsProvider.google ms=26 current=true
+[FIND] DnsProvider.cloudflare recommended=true
+```
+
 #### Les champs de `[FIND]`
 
 | Champ | Valeur | Sens |
@@ -1351,6 +1361,22 @@ foreach ($dossier in ("$($CONFIG.CustomPaths)" -split ';' | ForEach-Object { $_.
     # ... nettoyage de $plein
 }
 ```
+
+---
+
+## Ce que WinTool relève autour de votre script
+
+Avant et après chaque script, WinTool relève ce qu'un logiciel malveillant modifie pour
+s'installer durablement — tâches planifiées, services, démarrage, variables du système,
+exclusions de l'antivirus, fichier `hosts`, certificats racine, règles du pare-feu — et le
+dit dans le bilan (§12.5 de la spécification). Avant l'approbation, il repère aussi ces
+gestes dans le texte du script (points d'attention, §12.2).
+
+Rien ne vous est interdit : un script qui désactive des services ou crée une tâche
+planifiée le fait, et le bilan le montre. **Dites-le dans `desc`** : l'utilisateur qui lit
+« Programmes de fond de Windows : 2 modifiés » doit pouvoir le rapprocher de ce que
+l'action annonçait. Et une action simulée, ou une analyse, qui modifie l'une de ces
+familles est signalée comme ne tenant pas sa promesse.
 
 ---
 

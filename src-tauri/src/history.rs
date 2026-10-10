@@ -38,6 +38,9 @@ pub struct ScriptRunRecord {
     /// remplace jamais un chiffre mesure par une estimation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub freed: Option<u64>,
+    /// Ce que le temoin (§12.5) a vu changer pendant ce passage.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub changes: Vec<crate::temoin::Changement>,
 }
 
 /// `alias` : jusqu'a la 1.2.1, un lot s'appelait une categorie, et l'historique
@@ -128,6 +131,7 @@ mod tests {
             duration_ms: 1_420,
             simulated: true,
             freed: Some(795_278_422),
+            changes: Vec::new(),
         };
         // `to_value` puis `from_value` : exactement le chemin d'une commande.
         let valeur = serde_json::to_value(&record).expect("serialisation");
@@ -187,6 +191,7 @@ mod tests {
             duration_ms: 100,
             simulated: false,
             freed: None,
+            changes: Vec::new(),
         });
         save_to(&chemin, &h).unwrap();
 
@@ -200,6 +205,7 @@ mod tests {
             duration_ms: 50,
             simulated: false,
             freed: None,
+            changes: Vec::new(),
         });
         save_to(&chemin, &h2).unwrap();
 

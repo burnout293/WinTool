@@ -471,6 +471,13 @@ du mode Simple. Comportement modifiable en mode Expert.
   défaut sur beaucoup d'installations Windows 10/11, et Windows refuse plus d'un point par
   24 h. L'interface l'a promis à l'étape 2 — elle doit donc dire clairement ce qui s'est
   réellement passé.
+- **Le verdict ne dépend pas de la langue de Windows** (1.5) : WinTool compare le dernier
+  point avant et après, et lit l'identifiant stable de l'erreur. Windows n'échoue pas
+  quand un point existe déjà depuis moins de 24 h — il avertit et ne crée rien : ce cas
+  n'est plus pris pour un succès. En mode Simple, une phrase ; le message brut de Windows
+  part au journal.
+- **Pendant une simulation, aucun point n'est créé** : une action simulée ne modifie rien,
+  et la simulation promet de ne rien modifier non plus.
 
 ### 6.5 Redémarrage
 
@@ -820,7 +827,10 @@ Tout script est identifié par un **hash de son contenu**, calculé à l'analyse
 Sur l'écran d'approbation (§12.1), WinTool signale la présence de motifs à risque connu
 dans le script — `Invoke-Expression`, `DownloadString`/`DownloadFile`, `-EncodedCommand`,
 désactivation de Windows Defender, suppression récursive forcée hors dossiers temporaires,
-etc.
+etc. Depuis la 1.5, aussi les gestes qu'un logiciel malveillant fait pour s'installer
+durablement, ceux-là mêmes que le témoin (§12.5) relève après coup : tâche planifiée,
+service créé, démarrage automatique, certificat racine, règle de pare-feu, fichier `hosts`,
+variable d'environnement du système.
 
 **Explicitement non garanti** : cette détection se contourne trivialement (obfuscation,
 concaténation de chaînes, `iex` déguisé). Elle est étiquetée dans l'interface comme
@@ -962,6 +972,44 @@ inviolable ; elles évitent que WinTool soit **le chemin le plus simple**. Quand
 est un compte standard et qu'un administrateur saisit son mot de passe, WinTool élevé
 tourne sous le profil de l'administrateur : les fichiers et variables du compte standard ne
 le concernent plus.
+
+### 12.5 Le témoin des changements sensibles (1.5)
+
+Aucun bac à sable n'est possible pour un script administrateur : WinTool ne peut pas
+l'*empêcher* de toucher au démarrage de Windows ou à l'antivirus. Il peut en revanche
+**relever, avant et après chaque script**, ce qu'un logiciel malveillant modifie pour
+s'installer durablement, et **le dire dans le bilan**.
+
+| Famille | Ce qui est relevé |
+|---|---|
+| Tâches planifiées | Chaque fichier de `System32\Tasks`, et son contenu |
+| Services | Chaque service et pilote : commande et mode de démarrage |
+| Démarrage | Les clés `Run` et `RunOnce` (machine, 32 bits, compte), `Shell` et `Userinit` de `Winlogon`, les dossiers « Démarrage » |
+| Variables d'environnement | Celles du système et celles du compte |
+| Antivirus | Les exclusions de Microsoft Defender (chemins, extensions, processus, adresses) |
+| Fichier `hosts` | Chaque ligne active |
+| Certificats racine | Les magasins racine de la machine — pas `AuthRoot`, que Windows met à jour seul |
+| Pare-feu | Chaque règle, son texte entier |
+
+- **Tout se lit dans le registre ou sur le disque, sans PowerShell, et rien ne s'écrit.**
+  Un relevé prend quelques dizaines de millisecondes. Le second est fait avant de libérer
+  la place d'exécution : aucun autre script ne peut avoir tourné entre les deux.
+- **Une famille illisible n'est jamais dite intacte.** Le bilan ne dit « rien n'a changé »
+  que pour ce qu'il a pu lire avant *et* après.
+- **Le bilan du mode Simple** le dit en langage courant (« Programmes de fond de Windows :
+  2 modifiés »), avec la phrase qui situe : c'est attendu quand l'action le fait par
+  nature — désactiver la télémétrie arrête des services —, sinon, montrer ce bilan à
+  quelqu'un de confiance. Quand rien n'a changé, il le dit aussi.
+- **Le journal** (mode Expert) donne le détail exact : la tâche, le service, la valeur.
+  L'historique garde ces changements avec chaque passage.
+- **Une simulation qui modifie se trahit** : une action simulée dont le témoin voit des
+  changements est signalée comme ne simulant pas vraiment.
+- **Une analyse qui modifie aussi** (§17.4) : elle promettait de ne rien changer ; le
+  témoin le dit là où l'analyse s'affiche, et dans le journal.
+
+**Ce que le témoin n'est pas.** Il ne voit que ces familles, et seulement ce qui a changé
+pendant le script : un script peut agir ailleurs, ou programmer un changement pour plus
+tard. Comme les points d'attention, c'est un regard, jamais une garantie.
 
 ---
 

@@ -16,7 +16,9 @@ d'un cran (1.1, 1.2…), une version de corrections seules prend un troisième c
 | | — catalogues multiples : ajouter, modifier, retirer, activer ; consulter et choisir ses actions (§16) ; présentation modifiable sans code (`src/presentation.json`, §13) ; « action » au lieu d'« entretien » (§3) | Fait |
 | | — analyser → cocher → nettoyer (§17), avec une norme qui laisse les scripts composer l'écran : listes d'éléments, arborescences, confiance, mesures, notes ; résumé à déplier en Simple (anneau par défaut, graphique au choix), vues et panneaux en Expert, un seul affichage réglé par `show` (`docs/FORMAT_SCRIPT.md`, exemple `docs/mockups/exemple-analyse.ps1`) | Fait |
 | | — catégories distinctes des lots, onglets Scripts / Lots en Expert, réglages de la 1.2 migrés sans perte (§4.1) | Fait |
-| **1.5** | Témoin des changements sensibles (voir ci-dessous) | À faire |
+| **1.5** | Témoin des changements sensibles (§12.5) : relevé avant et après chaque script, bilan en langage courant, points d'attention étendus aux mêmes gestes | Fait |
+| | — icône de l'application, aux couleurs de l'accent orange | Fait |
+| | — compatibilité du catalogue vérifiée par un banc : chaque analyse lue par le vrai moteur et affichée par la vraie interface (`?catalogue=reel`) ; un second `[FIND]` complète le premier ; sortie de PowerShell 5.1 décodée dans la page de codes de la console | Fait |
 | | — couleur d'accent au choix, orange par défaut (§15.4) | Fait |
 | | — mode Simple en quatre étapes : Choisir, Vérifier (une case par action), Analyser, Entretien ; depuis l'Expert, « Exécuter » et « Lancer ce lot » passent par l'analyse (§2) | Fait |
 | | — journal : filtre par famille de lignes (infos, étapes, réussites, avertissements, erreurs, analyse, canaux, texte brut) | Fait |
@@ -68,7 +70,7 @@ lu), avec une décision en plus : qui les ajoute, et avec quelle clé (§16.2).
   mais tel script — « vérifier les fichiers de Windows » — a le droit de recevoir
   `C:\Windows`, sans ouvrir la porte aux autres. Même rangement que la liste (`HKLM`,
   administrateur), rattaché à l'identifiant du script.
-- **Témoin des changements sensibles — retenu pour la 1.5.** Aucun bac à sable n'est
+- **Témoin des changements sensibles — fait en 1.5 (§12.5).** Aucun bac à sable n'est
   possible pour un script administrateur (§12) : WinTool ne peut pas l'*empêcher* de
   toucher aux tâches planifiées ou aux variables d'environnement. Il peut en revanche
   **relever, avant et après chaque script**, ce qu'un logiciel malveillant modifie pour
