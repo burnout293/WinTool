@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sindry — Braise</title>
+<!--
+  Braise, retenu parmi les thèmes de Sindry (docs/mockups/sindry-themes.html) :
+  trois variantes de couleurs, chacune en sombre et en clair, sur les trois
+  écrans clés — et une galerie de graphiques « à engrenages », dans l'esprit de
+  l'anneau-engrenage que l'utilisateur veut garder.
+-->
+<style>
+@font-face { font-family: 'Inter'; font-weight: 100 900; font-display: swap;
+  src: url('../../src/fonts/inter-latin-wght-normal.woff2') format('woff2-variations'); }
+
+/* ==========================================================================
+   Jetons : trois variantes × deux modes
+   ========================================================================== */
+body {
+  --or: #FEC923; --ambre: #FD9E21; --orange: #FD7D26; --vermillon: #FD5632;
+  --rose: #F8304B; --magenta: #DC1178; --prune: #89088B; --indigo: #3B066C;
+  --ciel: #4AB2E7; --roi: #332BD9; --violet: #775FD7; --orchidee: #CA28B1; --pourpre: #8816BF;
+}
+
+/* --- Ardente : la flamme en accent, l'engrenage en second ---------------- */
+body[data-v="ardente"][data-mode="sombre"] {
+  --bg: #0F0A14; --surface: #18111F; --surface-2: #211829; --surface-3: #2B2034;
+  --border: #2C2236; --border-2: #3D3049; --text: #F7F1FA; --text-2: #B9A9C6; --text-3: #8E7E9C;
+  --acc-a: var(--or); --acc-b: var(--vermillon); --acc-on: #FFB35C; --on-acc: #1A0B12; --soft: #2A1A14;
+  --rouage-a: var(--ciel); --rouage-b: var(--orchidee);
+  --c1: var(--or); --c2: var(--vermillon); --c3: var(--magenta); --c4: var(--ciel);
+  --ok: #3FD69B; --warn: #FFB340; --err: #FF6B7A;
+  --term-bg: #0B0710; --term-text: #D9CFE2; --term-dim: #6F6080;
+  --vague-a: #3A1530; --vague-b: #6B1E3C; --vague-c: #C2402E;
+}
+body[data-v="ardente"][data-mode="clair"] {
+  --bg: #FBF6F2; --surface: #FFFFFF; --surface-2: #F6EEE8; --surface-3: #EFE4DB;
+  --border: #EADFD6; --border-2: #DCCBBE; --text: #1F1426; --text-2: #6A5873; --text-3: #7D6B86;
+  --acc-a: var(--ambre); --acc-b: var(--vermillon); --acc-on: #B23A0C; --on-acc: #1A0B12; --soft: #FFF0E4;
+  --rouage-a: var(--roi); --rouage-b: var(--orchidee);
+  --c1: var(--ambre); --c2: var(--vermillon); --c3: var(--magenta); --c4: var(--roi);
+  --ok: #14915C; --warn: #9A650F; --err: #C0263F;
+  --term-bg: #1E1222; --term-text: #E6DCEB; --term-dim: #8C7B95;
+  --vague-a: #FFE3C9; --vague-b: #FFC59B; --vague-c: #FF9A6B;
+}
+
+/* --- Crépuscule : le magenta et le violet du bas de l'icône ---------------- */
+body[data-v="crepuscule"][data-mode="sombre"] {
+  --bg: #110A1C; --surface: #1A1128; --surface-2: #231833; --surface-3: #2E2042;
+  --border: #2D2140; --border-2: #423058; --text: #F8F0FC; --text-2: #BCA9D0; --text-3: #9180A6;
+  --acc-a: var(--vermillon); --acc-b: var(--magenta); --acc-on: #FF86B0; --on-acc: #1C0614; --soft: #2C1229;
+  --rouage-a: var(--violet); --rouage-b: var(--orchidee);
+  --c1: var(--orange); --c2: var(--magenta); --c3: var(--orchidee); --c4: var(--violet);
+  --ok: #45DCA3; --warn: #FFBF57; --err: #FF6B8F;
+  --term-bg: #0A0612; --term-text: #DDD0EA; --term-dim: #73628A;
+  --vague-a: #2A1244; --vague-b: #561A5E; --vague-c: #A8235F;
+}
+body[data-v="crepuscule"][data-mode="clair"] {
+  --bg: #FBF5FA; --surface: #FFFFFF; --surface-2: #F5ECF5; --surface-3: #EDE0EE;
+  --border: #EAD9EA; --border-2: #D9C2DB; --text: #22102C; --text-2: #6B5378; --text-3: #7E6589;
+  --acc-a: var(--vermillon); --acc-b: var(--magenta); --acc-on: #B0145F; --on-acc: #1C0614; --soft: #FCE8F1;
+  --rouage-a: var(--violet); --rouage-b: var(--orchidee);
+  --c1: var(--orange); --c2: var(--magenta); --c3: var(--orchidee); --c4: var(--violet);
+  --ok: #138A58; --warn: #94600E; --err: #C0214A;
+  --term-bg: #20122C; --term-text: #EADDF2; --term-dim: #8E7AA0;
+  --vague-a: #F6DDF0; --vague-b: #EFB7DA; --vague-c: #E886B6;
+}
+
+/* --- Cendre : un graphite chaud, la flamme rare et précieuse --------------- */
+body[data-v="cendre"][data-mode="sombre"] {
+  --bg: #121012; --surface: #1A181A; --surface-2: #222023; --surface-3: #2C292D;
+  --border: #2B282C; --border-2: #3B373C; --text: #F4F1EF; --text-2: #ADA6A8; --text-3: #8A8386;
+  --acc-a: var(--ambre); --acc-b: var(--vermillon); --acc-on: #FFAE63; --on-acc: #1A0D08; --soft: #2A1D16;
+  --rouage-a: var(--ciel); --rouage-b: var(--violet);
+  --c1: var(--ambre); --c2: var(--vermillon); --c3: var(--ciel); --c4: #8A8386;
+  --ok: #46D39A; --warn: #FFB648; --err: #FF6F6F;
+  --term-bg: #0B0A0B; --term-text: #D8D3D1; --term-dim: #6E686B;
+  --vague-a: #1E1B1E; --vague-b: #2A2327; --vague-c: #5B2A1D;
+}
+body[data-v="cendre"][data-mode="clair"] {
+  --bg: #F6F4F2; --surface: #FFFFFF; --surface-2: #EFECE9; --surface-3: #E6E2DE;
+  --border: #E3DEDA; --border-2: #D1CAC5; --text: #1B1817; --text-2: #635C5A; --text-3: #756D6A;
+  --acc-a: var(--ambre); --acc-b: var(--vermillon); --acc-on: #A8430A; --on-acc: #1A0D08; --soft: #FCEEE2;
+  --rouage-a: var(--roi); --rouage-b: var(--violet);
+  --c1: var(--ambre); --c2: var(--vermillon); --c3: var(--roi); --c4: #8A8386;
+  --ok: #14855A; --warn: #925F10; --err: #BE2A2A;
+  --term-bg: #1D1A1B; --term-text: #E4DFDC; --term-dim: #857E80;
+  --vague-a: #ECE6E1; --vague-b: #E2D6CE; --vague-c: #F2B38C;
+}
+
+/* ==========================================================================
+   La page
+   ========================================================================== */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #0A0A0F; }
+body { font-family: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; color: #EDEAF5;
+       padding: 24px 16px 60px; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; border: none; background: none; cursor: pointer; }
+svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+.page-h { max-width: 1180px; margin: 0 auto 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px 22px; }
+.page-h img { width: 64px; height: 64px; }
+.page-h h1 { font-size: 26px; letter-spacing: -.6px; font-weight: 800; }
+.page-h p { color: #A49DB6; font-size: 14px; margin-top: 2px; max-width: 520px; }
+.choix { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; }
+.pseg { display: inline-flex; padding: 4px; border-radius: 12px; background: #16141F; border: 1px solid #26232F; }
+.pseg button { padding: 8px 14px; border-radius: 9px; font-size: 13.5px; font-weight: 600; color: #A49DB6; }
+.pseg button[aria-pressed="true"] { color: #170A12; background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); }
+.sommaire { max-width: 1180px; margin: 0 auto 14px; display: flex; gap: 8px; }
+.sommaire a { color: #C9C3D8; font-size: 13px; text-decoration: none; padding: 6px 12px; border-radius: 999px; border: 1px solid #26232F; }
+
+.intro { max-width: 1180px; margin: 0 auto 26px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px;
+         background: #121019; border: 1px solid #221F2C; border-radius: 18px; padding: 20px 22px; }
+.intro h2 { font-size: 20px; letter-spacing: -.3px; }
+.intro h2 small { font-weight: 500; color: #A49DB6; font-size: 14px; margin-left: 8px; }
+.intro ul { margin-top: 10px; padding-left: 18px; color: #C9C3D8; font-size: 13.5px; line-height: 1.6; }
+.intro .pal { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; align-content: start; }
+.intro .pal span { display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: #A49DB6; }
+.intro .pal i { display: block; height: 38px; border-radius: 10px; border: 1px solid rgba(255,255,255,.08); }
+.v-only { display: none !important; }
+body[data-v="ardente"] .v-ardente, body[data-v="crepuscule"] .v-crepuscule, body[data-v="cendre"] .v-cendre { display: grid !important; }
+
+.bloc-t { max-width: 1180px; margin: 40px auto 14px; font-size: 22px; letter-spacing: -.4px; }
+.bloc-t small { display: block; font-size: 13.5px; color: #A49DB6; font-weight: 400; letter-spacing: 0; margin-top: 4px; }
+.ecrans { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 34px; }
+.ecran figcaption { font-size: 13px; color: #A49DB6; margin: 0 0 10px 4px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
+@media (max-width: 760px) { .intro { grid-template-columns: 1fr; } }
+
+/* ==========================================================================
+   L'application, structure Braise (celle d'aujourd'hui)
+   ========================================================================== */
+.app { position: relative; overflow: hidden; border-radius: 16px; background: var(--bg); color: var(--text);
+       border: 1px solid var(--border-2); min-height: 600px; display: flex; flex-direction: column;
+       box-shadow: 0 30px 80px rgba(0,0,0,.45); isolation: isolate; font-size: 14px; }
+.deco { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.tb { height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--border); }
+.marque { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 15.5px; letter-spacing: -.3px; }
+.marque img { width: 28px; height: 28px; }
+.marque small { font: 500 11px ui-monospace, Consolas, monospace; color: var(--text-3); }
+.fil { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-3); margin-left: 6px; }
+.fil span { display: inline-flex; align-items: center; gap: 6px; }
+.fil i { width: 6px; height: 6px; border-radius: 50%; background: var(--border-2); }
+.fil .fait { color: var(--text-2); } .fil .fait i { background: var(--ok); }
+.fil .actif { color: var(--text); font-weight: 700; } .fil .actif i { background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); }
+.tb-d { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
+.seg span { padding: 5px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.seg span.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.pilule { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+          color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent); }
+.rond { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--text-2); border: 1px solid var(--border); }
+.contenu { flex: 1; min-width: 0; padding: 26px 30px 24px; display: flex; flex-direction: column; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px; border-radius: 12px;
+       font-weight: 700; font-size: 14px; border: 1px solid var(--border-2); background: var(--surface-2); color: var(--text); }
+.btn.prim { border: none; color: var(--on-acc); background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); }
+.btn.grand { height: 48px; padding: 0 26px; font-size: 15px; border-radius: 14px; }
+.badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+         color: var(--acc-on); background: var(--soft); border: 1px solid color-mix(in srgb, var(--acc-b) 30%, transparent); }
+.badge.n { color: var(--text-2); background: var(--surface-2); border-color: var(--border); }
+.badge.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); border-color: color-mix(in srgb, var(--ok) 30%, transparent); }
+.titre { font-size: 30px; font-weight: 800; letter-spacing: -.8px; text-align: center; }
+.sous { color: var(--text-2); text-align: center; margin-top: 6px; }
+.coche { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; flex-shrink: 0;
+         background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); color: var(--on-acc); }
+.coche.vide { background: transparent; border: 2px solid var(--border-2); color: transparent; }
+.coche svg { width: 13px; height: 13px; stroke-width: 3.2; }
+.inter { width: 40px; height: 22px; border-radius: 999px; position: relative; background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); flex-shrink: 0; }
+.inter::after { content: ''; position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+.inter.off { background: var(--surface-3); } .inter.off::after { right: auto; left: 3px; background: var(--text-3); }
+.puce { display: inline-flex; align-items: center; padding: 5px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--border-2); color: var(--text-2); }
+.puce.on { color: var(--acc-on); background: var(--soft); border-color: color-mix(in srgb, var(--acc-b) 40%, transparent); }
+
+.s1 { align-items: center; }
+.reco { margin-top: 22px; display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 18px; width: min(560px, 100%);
+        background: var(--surface); border: 1px solid color-mix(in srgb, var(--acc-a) 45%, var(--border-2));
+        box-shadow: 0 12px 34px color-mix(in srgb, var(--acc-b) 18%, transparent); }
+.reco-i { width: 52px; height: 52px; border-radius: 15px; display: grid; place-items: center; color: var(--on-acc); background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); }
+.reco-i svg { width: 26px; height: 26px; }
+.reco b { font-size: 18px; letter-spacing: -.3px; }
+.reco p { color: var(--text-2); font-size: 13px; margin-top: 3px; }
+.reco .go { margin-left: auto; color: var(--text-3); }
+.sect { margin-top: 26px; font-size: 13px; color: var(--text-2); font-weight: 600; }
+.lots { margin: 16px 0 70px; width: 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 22px; }
+.lot { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 116px; text-align: center; }
+.lot:nth-child(odd) { transform: translateY(18px); }
+.lot-i { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 2px solid var(--border-2); color: var(--text-2); box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+.lot-i svg { width: 24px; height: 24px; }
+.lot b { font-size: 13px; line-height: 1.25; } .lot small { font-size: 11.5px; color: var(--text-3); }
+.lot.on .lot-i { border-color: transparent; color: var(--on-acc); background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); box-shadow: 0 10px 26px color-mix(in srgb, var(--acc-b) 45%, transparent); }
+.barre { margin-top: auto; width: 100%; padding-top: 22px; display: flex; align-items: center; justify-content: center; gap: 18px; font-size: 13.5px; color: var(--text-2); position: relative; z-index: 1; }
+.barre b { color: var(--text); }
+
+.carte { background: var(--surface); border: 1px solid var(--border-2); border-radius: 18px; }
+.resume { margin: 20px auto 0; width: min(880px, 100%); display: grid; grid-template-columns: 250px 1fr; gap: 22px; padding: 20px; align-items: center; }
+.postes { display: flex; flex-direction: column; gap: 8px; }
+.poste { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 13px; background: var(--surface-2); border: 1px solid var(--border); }
+.poste .pt { flex: 1; min-width: 0; } .poste .pt b { font-size: 13.5px; display: block; } .poste .pt span { font-size: 12px; color: var(--text-2); }
+.poste .pv { font-weight: 800; font-size: 13.5px; } .poste .chev { color: var(--text-3); }
+.poste.off { opacity: .62; } .poste .avert { display: block; margin-top: 4px; font-size: 11.5px; color: var(--warn); font-style: normal; }
+.pastille { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.note { margin: 14px auto 0; width: min(880px, 100%); display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 12px;
+        font-size: 12.5px; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border); }
+.pied { margin-top: auto; padding-top: 18px; display: flex; justify-content: center; align-items: center; gap: 16px; color: var(--text-2); font-size: 13.5px; position: relative; z-index: 1; }
+.pied b { color: var(--text); }
+
+.ex { flex: 1; display: grid; grid-template-columns: 290px 1fr; min-height: 0; }
+.ex-l { border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 14px 12px 0; gap: 10px; min-width: 0; }
+.onglets { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 11px; background: var(--surface-2); border: 1px solid var(--border); }
+.onglets span { text-align: center; padding: 6px; border-radius: 8px; font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+.onglets span.on { background: var(--surface); color: var(--text); }
+.cherche { display: flex; align-items: center; gap: 8px; padding: 8px 11px; border-radius: 11px; border: 1px solid var(--border); color: var(--text-3); font-size: 12.5px; }
+.rub { font-size: 10.5px; font-weight: 800; letter-spacing: .9px; color: var(--text-3); text-transform: uppercase; margin: 6px 6px 0; display: flex; align-items: center; gap: 6px; }
+.rub em { margin-left: auto; font-style: normal; }
+.ligne { display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: 10px; font-size: 12.5px; }
+.ligne code { font: 600 11px ui-monospace, Consolas, monospace; color: var(--text-3); }
+.ligne.on { background: var(--soft); box-shadow: inset 3px 0 0 var(--acc-a); } .ligne.on code { color: var(--acc-on); }
+.journal { margin: auto -12px 0; background: var(--term-bg); color: var(--term-text); font: 11px/1.7 ui-monospace, Consolas, monospace; padding: 10px 14px; border-top: 1px solid var(--border); }
+.journal .k { color: var(--term-dim); display: block; font-size: 10px; letter-spacing: 1px; margin-bottom: 2px; }
+.journal .s { color: var(--c4); } .journal .o { color: var(--ok); } .journal .w { color: var(--warn); }
+.ex-d { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.fiche { padding: 18px 20px; }
+.fiche-h { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.fiche-i { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; color: var(--on-acc); background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); }
+.fiche-h h3 { font-size: 19px; letter-spacing: -.4px; } .fiche-h p { color: var(--text-2); font-size: 13px; margin-top: 3px; }
+.fiche-a { margin-left: auto; display: flex; gap: 8px; } .fiche-a .btn { height: 36px; padding: 0 14px; font-size: 13px; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.mini { display: grid; grid-template-columns: 150px 1fr; gap: 18px; padding: 16px 18px; align-items: center; }
+.reglages { padding: 6px 18px; }
+.reg { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.reg:last-child { border-bottom: none; }
+.reg .rt { flex: 1; } .reg .rt b { font-size: 13.5px; display: block; } .reg .rt span { font-size: 12px; color: var(--text-2); }
+.reg .puces { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 55%; }
+.champ { padding: 6px 12px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--border); font-weight: 700; font-size: 13px; }
+
+/* ==========================================================================
+   Les graphiques à engrenages
+   ========================================================================== */
+.galerie { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 18px; }
+.graphe { background: var(--bg); color: var(--text); border: 1px solid var(--border-2); border-radius: 18px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.graphe.prefere { border-color: color-mix(in srgb, var(--acc-a) 55%, var(--border-2)); box-shadow: 0 10px 34px color-mix(in srgb, var(--acc-b) 18%, transparent); }
+.graphe h3 { font-size: 16px; letter-spacing: -.2px; display: flex; align-items: center; gap: 8px; }
+.graphe h3 .badge { font-size: 10.5px; }
+.graphe p { font-size: 12.5px; color: var(--text-2); line-height: 1.5; }
+.graphe .pour { font-size: 11.5px; color: var(--text-3); }
+.graphe .pour code { font: 600 11px ui-monospace, Consolas, monospace; color: var(--acc-on); }
+.scene { position: relative; display: grid; place-items: center; min-height: 230px; }
+.scene svg { max-width: 100%; }
+.centre { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; pointer-events: none; }
+.centre b { font-size: 27px; letter-spacing: -.8px; } .centre span { font-size: 11.5px; color: var(--text-2); }
+.legende { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--text-2); }
+.legende span { display: inline-flex; align-items: center; gap: 6px; }
+.tourne { animation: tourne var(--duree, 18s) linear infinite; transform-box: fill-box; transform-origin: center; }
+.tourne.inverse { animation-direction: reverse; }
+@keyframes tourne { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .tourne { animation: none; } }
+
+@media (max-width: 860px) {
+  .resume, .mini { grid-template-columns: 1fr; }
+  .ex { grid-template-columns: 1fr; } .ex-l { border-right: none; }
+  .fil { display: none; }
+}
+</style>
+</head>
+<body data-v="ardente" data-mode="sombre">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g-rouage" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" style="stop-color:var(--rouage-a)" /><stop offset="1" style="stop-color:var(--rouage-b)" />
+    </linearGradient>
+    <linearGradient id="g-feu" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" style="stop-color:var(--c3)" /><stop offset=".55" style="stop-color:var(--c2)" /><stop offset="1" style="stop-color:var(--c1)" />
+    </linearGradient>
+    <linearGradient id="g-acc" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" style="stop-color:var(--acc-a)" /><stop offset="1" style="stop-color:var(--acc-b)" />
+    </linearGradient>
+  </defs>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /></symbol>
+  <symbol id="i-broom" viewBox="0 0 24 24"><path d="M13.5 10.5 22 2" /> <path d="M14.734 13.841a2 2 0 00-.314-2.42L12.58 9.58a2 2 0 00-2.421-.314l-7.657 4.461A1 1 0 002.3 15.3l6.403 6.403a1 1 0 001.571-.204z" /> <path d="m5 18 2-2" /> <path d="m7.699 10.7 5.602 5.601" /></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z" /></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></symbol>
+  <symbol id="i-app-window" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2" /> <path d="M10 4v4" /> <path d="M2 8h20" /> <path d="M6 4v4" /></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" /> <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /> <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /> <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /> <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /> <circle cx="12" cy="12" r="3" /></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /> <path d="M12 2v2" /> <path d="M12 20v2" /> <path d="m4.93 4.93 1.41 1.41" /> <path d="m17.66 17.66 1.41 1.41" /> <path d="M2 12h2" /> <path d="M20 12h2" /> <path d="m6.34 17.66-1.41 1.41" /> <path d="m19.07 4.93-1.41 1.41" /></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></symbol>
+  <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4" /> <path d="M3.34 19a10 10 0 1 1 17.32 0" /></symbol>
+  <symbol id="i-house" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" /></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M3 5h.01" /> <path d="M3 12h.01" /> <path d="M3 19h.01" /> <path d="M8 5h13" /> <path d="M8 12h13" /> <path d="M8 19h13" /></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /> <path d="M12 7v5l4 2" /></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><path d="M12 19h8" /> <path d="m4 17 6-6-6-6" /></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" /></symbol>
+  <symbol id="i-shield-check" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /> <path d="m9 12 2 2 4-4" /></symbol>
+  <symbol id="i-triangle-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></symbol>
+  <symbol id="i-hard-drive" viewBox="0 0 24 24"><path d="M10 16h.01" /> <path d="M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /> <path d="M21.946 12.013H2.054" /> <path d="M6 16h.01" /></symbol>
+  <symbol id="i-trash-2" viewBox="0 0 24 24"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /> <path d="M2 12h20" /></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><path d="M12 20v2" /> <path d="M12 2v2" /> <path d="M17 20v2" /> <path d="M17 2v2" /> <path d="M2 12h2" /> <path d="M2 17h2" /> <path d="M2 7h2" /> <path d="M20 12h2" /> <path d="M20 17h2" /> <path d="M20 7h2" /> <path d="M7 20v2" /> <path d="M7 2v2" /> <rect x="4" y="4" width="16" height="16" rx="2" /> <rect x="8" y="8" width="8" height="8" rx="1" /></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <path d="M12 16v-4" /> <path d="M12 8h.01" /></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" /></symbol>
+  <symbol id="i-cog" viewBox="0 0 24 24"><path d="M11 10.27 7 3.34" /> <path d="m11 13.73-4 6.93" /> <path d="M12 22v-2" /> <path d="M12 2v2" /> <path d="M14 12h8" /> <path d="m17 20.66-1-1.73" /> <path d="m17 3.34-1 1.73" /> <path d="M2 12h2" /> <path d="m20.66 17-1.73-1" /> <path d="m20.66 7-1.73 1" /> <path d="m3.34 17 1.73-1" /> <path d="m3.34 7 1.73 1" /> <circle cx="12" cy="12" r="2" /> <circle cx="12" cy="12" r="8" /></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5" /> <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" /></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0" /> <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14" /> <path d="M12 5v14" /></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14" /></symbol>
+  <symbol id="i-square" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /></symbol>
+</svg>
+
+<header class="page-h">
+  <img src="sindry-256.png" alt="">
+  <div>
+    <h1>Sindry — Braise</h1>
+    <p>Trois variantes de couleurs du thème retenu, chacune en sombre et en clair, et des graphiques à engrenages dans l'esprit de l'anneau.</p>
+  </div>
+  <nav class="choix">
+    <div class="pseg"><button type="button" data-v="ardente" aria-pressed="true">Ardente</button><button type="button" data-v="crepuscule" aria-pressed="false">Crépuscule</button><button type="button" data-v="cendre" aria-pressed="false">Cendre</button></div>
+    <div class="pseg"><button type="button" data-m="sombre" aria-pressed="true">Sombre</button><button type="button" data-m="clair" aria-pressed="false">Clair</button></div>
+  </nav>
+</header>
+<nav class="sommaire"><a href="#graphiques">Graphiques à engrenages</a><a href="#ecrans">Les trois écrans</a></nav>
+
+<section class="intro v-only v-ardente">
+  <div>
+    <h2>Ardente <small>la flamme en accent, l'engrenage en second</small></h2>
+    <ul>
+      <li>Le cœur du feu : or → vermillon pour tout ce qui agit.</li>
+      <li>Les graphiques suivent la flamme (or, vermillon, magenta) ; le bleu de l'engrenage ferme la marche.</li>
+      <li>Fond prune profond, houle de braise rouge et orange.</li>
+    </ul>
+  </div>
+  <div class="pal">
+    <span><i style="background:linear-gradient(135deg,#FEC923,#FD5632)"></i>Accent</span><span><i style="background:#FEC923"></i>Série 1</span>
+    <span><i style="background:#FD5632"></i>Série 2</span><span><i style="background:#DC1178"></i>Série 3</span>
+    <span><i style="background:#4AB2E7"></i>Série 4</span><span><i style="background:#0F0A14"></i>Fond</span>
+  </div>
+</section>
+<section class="intro v-only v-crepuscule">
+  <div>
+    <h2>Crépuscule <small>le magenta et le violet du bas de l'icône</small></h2>
+    <ul>
+      <li>Un accent plus chaud et plus rose : vermillon → magenta.</li>
+      <li>Les graphiques glissent de l'orange vers l'orchidée et le violet, comme la flamme vers l'engrenage.</li>
+      <li>Fond violet nuit, houle prune et framboise : la plus « soirée ».</li>
+    </ul>
+  </div>
+  <div class="pal">
+    <span><i style="background:linear-gradient(135deg,#FD5632,#DC1178)"></i>Accent</span><span><i style="background:#FD7D26"></i>Série 1</span>
+    <span><i style="background:#DC1178"></i>Série 2</span><span><i style="background:#CA28B1"></i>Série 3</span>
+    <span><i style="background:#775FD7"></i>Série 4</span><span><i style="background:#110A1C"></i>Fond</span>
+  </div>
+</section>
+<section class="intro v-only v-cendre">
+  <div>
+    <h2>Cendre <small>un graphite chaud, la flamme rare et précieuse</small></h2>
+    <ul>
+      <li>Fond neutre, presque noir : la couleur ne sert plus qu'à ce qui compte.</li>
+      <li>Accent ambre → vermillon ; les graphiques ajoutent le bleu de l'engrenage et un gris cendre.</li>
+      <li>La houle devient une braise qui couve sous la cendre : la plus sobre, la plus « pro ».</li>
+    </ul>
+  </div>
+  <div class="pal">
+    <span><i style="background:linear-gradient(135deg,#FD9E21,#FD5632)"></i>Accent</span><span><i style="background:#FD9E21"></i>Série 1</span>
+    <span><i style="background:#FD5632"></i>Série 2</span><span><i style="background:#4AB2E7"></i>Série 3</span>
+    <span><i style="background:#8A8386"></i>Série 4</span><span><i style="background:#121012"></i>Fond</span>
+  </div>
+</section>
+
+<!-- =================================================================== -->
+<h2 class="bloc-t" id="graphiques">Graphiques à engrenages<small>Tous partent de l'anneau-engrenage. Chacun dit à quelle vue de la norme d'analyse il répondrait.</small></h2>
+<section class="galerie">
+  <article class="graphe prefere">
+    <h3>L'anneau-engrenage <span class="badge">Retenu</span></h3>
+    <div class="scene" data-g="anneau"></div>
+    <div class="legende" data-legende></div>
+    <p>Chaque poste est un arc à bouts arrondis ; un contour d'engrenage l'entoure. Le poste décoché reste visible, éteint.</p>
+    <span class="pour">Pour : résumé du mode Simple, <code>view : donut</code></span>
+  </article>
+  <article class="graphe">
+    <h3>La jauge à dents</h3>
+    <div class="scene" data-g="jauge"></div>
+    <p>Une seule mesure : les dents s'allument une à une, de l'or au magenta. Le reste de la roue reste froid.</p>
+    <span class="pour">Pour : une mesure avec maximum, <code>view : gauge</code></span>
+  </article>
+  <article class="graphe">
+    <h3>Les rouages proportionnels</h3>
+    <div class="scene" data-g="rouages"></div>
+    <p>Un engrenage par poste, sa taille selon ce qu'il pèse ; ils s'entraînent et tournent doucement. Le plus gros saute aux yeux.</p>
+    <span class="pour">Pour : vue d'ensemble, à la place des rectangles, <code>view : treemap</code></span>
+  </article>
+  <article class="graphe">
+    <h3>La crémaillère</h3>
+    <div class="scene" data-g="cremaillere"></div>
+    <p>Des barres dentées, comme une crémaillère : longueur selon la taille, une dent pour 50 Mo.</p>
+    <span class="pour">Pour : comparer des choix, <code>view : bars</code></span>
+  </article>
+  <article class="graphe">
+    <h3>La gaufre de rouages</h3>
+    <div class="scene" data-g="gaufre"></div>
+    <p>Chaque petit engrenage vaut 25 Mo. Ce qui est coché brûle ; le reste attend, en gris.</p>
+    <span class="pour">Pour : rendre une quantité concrète, <code>graphique « gaufre »</code></span>
+  </article>
+  <article class="graphe">
+    <h3>La double couronne</h3>
+    <div class="scene" data-g="couronne"></div>
+    <p>Au centre les postes, autour leur détail, entourés des dents : on voit d'un coup le poste et ce qui le compose.</p>
+    <span class="pour">Pour : un résumé qui se déplie, <code>view : tree</code></span>
+  </article>
+  <article class="graphe">
+    <h3>La roue qui chauffe</h3>
+    <div class="scene" data-g="chauffe"></div>
+    <p>L'entretien en cours : la braise monte dans la roue, une dent s'allume par action terminée, et la roue tourne tant qu'elle travaille.</p>
+    <span class="pour">Pour : l'étape « Entretien », à la place de la marée qui monte</span>
+  </article>
+  <article class="graphe">
+    <h3>Le feu de santé</h3>
+    <div class="scene" data-g="sante"></div>
+    <p>L'état du PC : un engrenage par famille de mesures, sa couleur dit bon, à surveiller ou critique.</p>
+    <span class="pour">Pour : un diagnostic, <code>view : light</code></span>
+  </article>
+</section>
+
+<!-- =================================================================== -->
+<h2 class="bloc-t" id="ecrans">Les trois écrans<small>La structure d'aujourd'hui, dans la variante choisie en haut.</small></h2>
+<main class="ecrans">
+  <figure class="ecran">
+    <figcaption>1 · Choisir — mode Simple</figcaption>
+    <div class="app">
+      <div class="deco" data-houle="230"></div>
+      <div class="tb">
+        <div class="marque"><img src="sindry-256.png" alt=""><span>Sindry</span><small>2.0.0</small></div>
+        <div class="fil"><span class="actif"><i></i>Choisir</span><span><i></i>Vérifier</span><span><i></i>Analyser</span><span><i></i>Entretien</span></div>
+        <div class="tb-d"><div class="seg"><span class="on">Simple</span><span>Expert</span></div>
+          <span class="pilule"><svg class="i" style="width:14px;height:14px"><use href="#i-shield-check"/></svg>Administrateur</span>
+          <span class="rond"><svg class="i" style="width:16px;height:16px"><use href="#i-settings"/></svg></span></div>
+      </div>
+      <div class="contenu s1">
+        <h2 class="titre">Que souhaitez-vous faire ?</h2>
+        <p class="sous">Choisissez une option. Vous pourrez revenir en arrière à tout moment.</p>
+        <div class="reco"><span class="reco-i"><svg class="i"><use href="#i-sparkles"/></svg></span>
+          <div><b>Entretien complet</b> <span class="badge">Recommandé</span><p>On s'occupe de tout — environ 31 minutes</p></div>
+          <svg class="i go"><use href="#i-arrow-right"/></svg></div>
+        <p class="sect">Ou choisissez un domaine précis</p>
+        <div class="lots">
+          <div class="lot on"><span class="lot-i"><svg class="i"><use href="#i-broom"/></svg></span><b>Faire le ménage</b><small>6 min</small></div>
+          <div class="lot"><span class="lot-i"><svg class="i"><use href="#i-zap"/></svg></span><b>Accélérer le PC</b><small>4 min</small></div>
+          <div class="lot"><span class="lot-i"><svg class="i"><use href="#i-shield"/></svg></span><b>Protéger ma vie privée</b><small>3 min</small></div>
+          <div class="lot"><span class="lot-i"><svg class="i"><use href="#i-app-window"/></svg></span><b>Retirer les applications</b><small>8 min</small></div>
+          <div class="lot"><span class="lot-i"><svg class="i"><use href="#i-activity"/></svg></span><b>Vérifier l'état du PC</b><small>5 min</small></div>
+          <div class="lot"><span class="lot-i"><svg class="i"><use href="#i-palette"/></svg></span><b>Personnaliser</b><small>2 min</small></div>
+        </div>
+        <div class="barre"><span>Choisi : <b>Faire le ménage</b> · 6 min</span><button class="btn prim grand" type="button">Continuer <svg class="i"><use href="#i-arrow-right"/></svg></button></div>
+      </div>
+    </div>
+  </figure>
+
+  <figure class="ecran">
+    <figcaption>2 · Voici ce que j'ai trouvé — avec l'anneau-engrenage</figcaption>
+    <div class="app">
+      <div class="deco" data-houle="110"></div>
+      <div class="tb">
+        <div class="marque"><img src="sindry-256.png" alt=""><span>Sindry</span><small>2.0.0</small></div>
+        <div class="fil"><span class="fait"><i></i>Choisir</span><span class="fait"><i></i>Vérifier</span><span class="actif"><i></i>Analyser</span><span><i></i>Entretien</span></div>
+        <div class="tb-d"><div class="seg"><span class="on">Simple</span><span>Expert</span></div>
+          <span class="rond"><svg class="i" style="width:16px;height:16px"><use href="#i-settings"/></svg></span></div>
+      </div>
+      <div class="contenu">
+        <h2 class="titre">Voici ce que j'ai trouvé</h2>
+        <p class="sous">Cochez ce que vous voulez traiter. Rien n'a encore été modifié.</p>
+        <div class="carte resume">
+          <div class="scene" data-g="anneau"></div>
+          <div class="postes">
+            <div class="poste"><span class="coche"><svg class="i"><use href="#i-check"/></svg></span><span class="pastille" style="background:var(--c1)"></span>
+              <span class="pt"><b>Fichiers inutiles</b><span>Fichiers temporaires et corbeille</span></span><span class="pv">612 Mo</span><svg class="i chev"><use href="#i-chevron-right"/></svg></div>
+            <div class="poste"><span class="coche"><svg class="i"><use href="#i-check"/></svg></span><span class="pastille" style="background:var(--c2)"></span>
+              <span class="pt"><b>Cache des navigateurs</b><span>Chrome, Edge — 3 profils</span></span><span class="pv">318 Mo</span><svg class="i chev"><use href="#i-chevron-right"/></svg></div>
+            <div class="poste"><span class="coche"><svg class="i"><use href="#i-check"/></svg></span><span class="pastille" style="background:var(--c3)"></span>
+              <span class="pt"><b>Vidages après plantage</b><span>Rapports d'erreur de Windows</span></span><span class="pv">204 Mo</span><svg class="i chev"><use href="#i-chevron-right"/></svg></div>
+            <div class="poste off"><span class="coche vide"><svg class="i"><use href="#i-check"/></svg></span><span class="pastille" style="background:var(--c4)"></span>
+              <span class="pt"><b>Anciennes mises à jour</b><span>Ce que Windows garde après installation<em class="avert">Montré, pas coché : peut encore servir.</em></span></span><span class="pv">287 Mo</span><svg class="i chev"><use href="#i-chevron-right"/></svg></div>
+          </div>
+        </div>
+        <div class="note"><svg class="i" style="width:16px;height:16px"><use href="#i-info"/></svg>Vos mots de passe, vos favoris et votre historique ne sont pas touchés.</div>
+        <div class="pied"><span>À libérer : <b>1,1 Go</b></span><button class="btn prim grand" type="button"><svg class="i"><use href="#i-play"/></svg>Lancer</button></div>
+      </div>
+    </div>
+  </figure>
+
+  <figure class="ecran">
+    <figcaption>3 · Mode Expert — la fiche, son analyse en jauge à dents</figcaption>
+    <div class="app">
+      <div class="tb">
+        <div class="marque"><img src="sindry-256.png" alt=""><span>Sindry</span><small>2.0.0</small></div>
+        <div class="tb-d"><div class="seg"><span>Simple</span><span class="on">Expert</span></div>
+          <span class="pilule"><svg class="i" style="width:14px;height:14px"><use href="#i-shield-check"/></svg>Administrateur</span>
+          <span class="rond"><svg class="i" style="width:16px;height:16px"><use href="#i-settings"/></svg></span></div>
+      </div>
+      <div class="ex">
+        <aside class="ex-l">
+          <div class="onglets"><span class="on">Actions 28</span><span>Lots 7</span></div>
+          <div class="cherche"><svg class="i" style="width:15px;height:15px"><use href="#i-search"/></svg>Filtrer…</div>
+          <div class="rub"><svg class="i" style="width:13px;height:13px"><use href="#i-activity"/></svg>Santé<em>2</em></div>
+          <div class="ligne on"><code>502</code>Vérifier la santé des disques</div>
+          <div class="ligne"><code>503</code>Réparer les fichiers de Windows</div>
+          <div class="rub"><svg class="i" style="width:13px;height:13px"><use href="#i-broom"/></svg>Nettoyage<em>5</em></div>
+          <div class="ligne"><code>100</code>Supprimer les fichiers temporaires</div>
+          <div class="ligne"><code>102</code>Vider la corbeille</div>
+          <div class="journal"><span class="k">JOURNAL · VÉRIFIER LA SANTÉ DES DISQUES</span>
+            <span class="s">[STEP] 2/2 Reading free space</span><br><span class="o">[METRIC] Health value=2 health=ok</span><br><span class="w">[METRIC] FreeSpace value=7 health=crit</span></div>
+        </aside>
+        <section class="ex-d">
+          <div class="carte fiche">
+            <div class="fiche-h">
+              <span class="fiche-i"><svg class="i"><use href="#i-hard-drive"/></svg></span>
+              <div><h3>Vérifier la santé des disques</h3><p>Lit les indicateurs de santé, sans rien modifier</p></div>
+              <div class="fiche-a"><button class="btn" type="button">Relancer l'analyse</button><button class="btn prim" type="button">Exécuter</button></div>
+            </div>
+            <div class="badges"><span class="badge ok">Risque faible</span><span class="badge n">Rapide</span><span class="badge">Officiel</span><span class="badge n">Analyse de 14:20</span></div>
+          </div>
+          <div class="carte mini">
+            <div class="scene" data-g="jauge-petite"></div>
+            <div class="reglages" style="padding:0">
+              <div class="reg"><span class="rt"><b>Espace libre le plus bas</b><span>disque D: — à libérer en priorité</span></span><span class="badge" style="color:var(--err);border-color:color-mix(in srgb,var(--err) 40%,transparent);background:color-mix(in srgb,var(--err) 10%,transparent)">Critique</span></div>
+              <div class="reg"><span class="rt"><b>Disques en bonne santé</b><span>2 sur 2</span></span><span class="badge ok">Bon</span></div>
+              <div class="reg"><span class="rt"><b>Température la plus haute</b><span>SSD système</span></span><span class="champ">41 °C</span></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </figure>
+</main>
+
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (s, r = document) => [...r.querySelectorAll(s)];
+const lire = (v) => getComputedStyle(document.body).getPropertyValue(v).trim();
+
+/** Un engrenage : `dents` dents, rayon extérieur r1, intérieur r2, rotation `a0`. */
+function engrenage(cx, cy, r1, r2, dents, a0 = 0) {
+  const pts = [], pas = (Math.PI * 2) / dents;
+  for (let i = 0; i < dents; i++) {
+    const a = a0 + i * pas;
+    for (const [ang, r] of [[a - pas * .22, r2], [a - pas * .14, r1], [a + pas * .14, r1], [a + pas * .22, r2]]) {
+      pts.push([cx + r * Math.cos(ang), cy + r * Math.sin(ang)]);
+    }
+  }
+  return 'M' + pts.map((p) => p.map((v) => v.toFixed(1)).join(',')).join('L') + 'Z';
+}
+/** Une seule dent (trapèze), pour les allumer une à une. */
+function dent(cx, cy, r1, r2, i, dents, largeur = .3) {
+  const pas = (Math.PI * 2) / dents, a = -Math.PI / 2 + i * pas;
+  const p = [[a - pas * largeur, r2], [a - pas * largeur * .62, r1], [a + pas * largeur * .62, r1], [a + pas * largeur, r2]]
+    .map(([ang, r]) => `${(cx + r * Math.cos(ang)).toFixed(1)},${(cy + r * Math.sin(ang)).toFixed(1)}`);
+  return `M${p.join('L')}Z`;
+}
+/** Un arc de couronne, de l'angle a à b (radians), épaisseur e. */
+function arc(cx, cy, r, a, b, e) {
+  const ri = r - e / 2, re = r + e / 2, g = b - a > Math.PI ? 1 : 0;
+  const P = (rr, t) => `${(cx + rr * Math.cos(t)).toFixed(1)},${(cy + rr * Math.sin(t)).toFixed(1)}`;
+  return `M${P(re, a)}A${re},${re} 0 ${g} 1 ${P(re, b)}L${P(ri, b)}A${ri},${ri} 0 ${g} 0 ${P(ri, a)}Z`;
+}
+/** Mélange deux couleurs hexadécimales. */
+function melange(h1, h2, t) {
+  const c = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [a, b] = [c(h1), c(h2)];
+  return '#' + a.map((v, i) => Math.round(v + (b[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+/** La couleur d'une flamme à la position t (0 = c1, 1 = c3). */
+function flamme(t) {
+  const [c1, c2, c3] = ['--c1', '--c2', '--c3'].map(lire).map((v) => (v.startsWith('#') ? v : '#888888'));
+  return t < .5 ? melange(c1, c2, t * 2) : melange(c2, c3, (t - .5) * 2);
+}
+
+const POSTES = [
+  { nom: 'Fichiers inutiles', v: 612, c: 'var(--c1)', on: true },
+  { nom: 'Cache des navigateurs', v: 318, c: 'var(--c2)', on: true },
+  { nom: 'Vidages après plantage', v: 204, c: 'var(--c3)', on: true },
+  { nom: 'Anciennes mises à jour', v: 287, c: 'var(--c4)', on: false },
+];
+const TOTAL = POSTES.reduce((a, p) => a + p.v, 0);
+
+/* --- 1. L'anneau-engrenage : celui qui est retenu -------------------------- */
+function gAnneau() {
+  const r = 78, c = 2 * Math.PI * r;
+  let pos = 0;
+  const arcs = POSTES.map((p) => {
+    const l = (p.v / TOTAL) * c;
+    const s = `<circle cx="100" cy="100" r="${r}" fill="none" stroke="${p.c}" stroke-opacity="${p.on ? 1 : .22}" stroke-width="24"
+      stroke-dasharray="${Math.max(0, l - 3)} ${c}" stroke-dashoffset="${-pos}" stroke-linecap="round"/>`;
+    pos += l;
+    return s;
+  }).join('');
+  return `<svg viewBox="-14 -14 228 228" width="230" height="230">
+      <path d="${engrenage(100, 100, 113, 103, 14)}" fill="none" stroke="url(#g-rouage)" stroke-width="2" opacity=".6"/>
+      <g transform="rotate(-90 100 100)"><circle cx="100" cy="100" r="${r}" fill="none" stroke="var(--surface-3)" stroke-width="24"/>${arcs}</g>
+    </svg><div class="centre"><b>1,1 Go</b><span>à libérer<br>sur 1,4 Go</span></div>`;
+}
+
+/* --- 2. La jauge à dents ------------------------------------------------------ */
+function gJauge(valeur = 61, taille = 230, libelle = 'espace occupé', unite = ' %') {
+  const n = 28, allumees = Math.round((valeur / 100) * n);
+  const dents = Array.from({ length: n }, (_, i) => {
+    const on = i < allumees;
+    return `<path d="${dent(100, 100, 96, 78, i, n)}" fill="${on ? flamme(i / Math.max(1, n - 1)) : 'var(--surface-3)'}" ${on ? '' : 'opacity=".9"'}/>`;
+  }).join('');
+  return `<svg viewBox="0 0 200 200" width="${taille}" height="${taille}">${dents}
+      <circle cx="100" cy="100" r="72" fill="none" stroke="var(--border-2)" stroke-width="1.5"/>
+      <circle cx="100" cy="100" r="60" fill="var(--surface)" stroke="url(#g-rouage)" stroke-width="2" opacity=".9"/>
+    </svg><div class="centre"><b>${valeur}${unite}</b><span>${libelle}</span></div>`;
+}
+
+/* --- 3. Les rouages proportionnels -------------------------------------------- */
+function gRouages() {
+  // Le plus gros au centre, les autres engrènent autour de lui.
+  const r = POSTES.map((p) => 18 + Math.sqrt(p.v / POSTES[0].v) * 40);
+  const centres = [[150, 115]];
+  // Gauche, haut-droite, bas-droite : chacun engrene le grand, sans se toucher.
+  const angles = [Math.PI, -.6, .75];
+  for (let k = 1; k < POSTES.length; k++) {
+    const d = r[0] + r[k] - 6;
+    centres.push([150 + d * Math.cos(angles[k - 1]), 115 + d * Math.sin(angles[k - 1])]);
+  }
+  const g = POSTES.map((p, k) => {
+    const [x, y] = centres[k];
+    const dents = Math.round(r[k] / 4.2);
+    const duree = (r[k] / r[0]) * 16;
+    return `<g class="tourne ${k ? 'inverse' : ''}" style="--duree:${duree.toFixed(1)}s">
+        <path d="${engrenage(x, y, r[k], r[k] - 8, dents)}" fill="${p.c}" fill-opacity="${p.on ? .92 : .25}"/>
+        <circle cx="${x}" cy="${y}" r="${(r[k] * .32).toFixed(1)}" fill="var(--bg)"/>
+      </g>
+      <text x="${x}" y="${y + r[k] * .62}" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--text)">${p.v} Mo</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 300 236" width="320" height="250">${g}</svg>`;
+}
+
+/* --- 4. La crémaillère --------------------------------------------------------- */
+function gCremaillere() {
+  const max = Math.max(...POSTES.map((p) => p.v));
+  const lignes = POSTES.map((p, k) => {
+    const y = 18 + k * 50, l = (p.v / max) * 220;
+    const nbDents = Math.floor(p.v / 50);
+    const dents = Array.from({ length: nbDents }, (_, i) => {
+      const x = 6 + (i + .5) * (l / Math.max(1, nbDents)) - 3;
+      return `<rect x="${x.toFixed(1)}" y="${y - 5}" width="6" height="6" rx="1.5" fill="${p.c}" opacity="${p.on ? 1 : .3}"/>`;
+    }).join('');
+    return `<text x="6" y="${y - 10}" font-size="11.5" font-weight="700" fill="var(--text)">${p.nom}</text>
+      <text x="294" y="${y - 10}" font-size="11.5" font-weight="800" fill="var(--text)" text-anchor="end">${p.v} Mo</text>
+      <rect x="6" y="${y}" width="288" height="14" rx="7" fill="var(--surface-3)"/>
+      <rect x="6" y="${y}" width="${l.toFixed(1)}" height="14" rx="7" fill="${p.c}" opacity="${p.on ? 1 : .3}"/>${dents}`;
+  }).join('');
+  return `<svg viewBox="0 0 300 210" width="320" height="224">${lignes}</svg>`;
+}
+
+/* --- 5. La gaufre de rouages --------------------------------------------------- */
+function gGaufre() {
+  const unite = 25, cases = [];
+  POSTES.forEach((p) => { for (let i = 0; i < Math.round(p.v / unite); i++) cases.push(p); });
+  const col = 12, pas = 24;
+  const g = cases.map((p, i) => {
+    const x = 14 + (i % col) * pas, y = 14 + Math.floor(i / col) * pas;
+    return `<path d="${engrenage(x, y, 10, 7.6, 8)}" fill="${p.c}" fill-opacity="${p.on ? 1 : .2}"/><circle cx="${x}" cy="${y}" r="3" fill="var(--bg)"/>`;
+  }).join('');
+  const lignes = Math.ceil(cases.length / col);
+  return `<svg viewBox="0 0 ${col * pas + 4} ${lignes * pas + 6}" width="300">${g}</svg>`;
+}
+
+/* --- 6. La double couronne ----------------------------------------------------- */
+function gCouronne() {
+  const detail = [[340, 180, 92], [120, 110, 88], [150, 54], [287]];
+  let a = -Math.PI / 2;
+  let interne = '', externe = '';
+  POSTES.forEach((p, k) => {
+    const da = (p.v / TOTAL) * Math.PI * 2;
+    interne += `<path d="${arc(100, 100, 52, a + .02, a + da - .02, 22)}" fill="${p.c}" opacity="${p.on ? 1 : .22}"/>`;
+    let b = a;
+    const somme = detail[k].reduce((x, y) => x + y, 0);
+    detail[k].forEach((v, j) => {
+      const db = (v / somme) * da;
+      externe += `<path d="${arc(100, 100, 80, b + .025, b + db - .025, 18)}" fill="${p.c}" opacity="${p.on ? (j % 2 ? .62 : .85) : .16}"/>`;
+      b += db;
+    });
+    a += da;
+  });
+  return `<svg viewBox="-14 -14 228 228" width="230" height="230">
+      <path d="${engrenage(100, 100, 113, 103, 18)}" fill="none" stroke="url(#g-rouage)" stroke-width="2" opacity=".6"/>${externe}${interne}
+    </svg><div class="centre"><b style="font-size:20px">4 postes</b><span>11 éléments</span></div>`;
+}
+
+/* --- 7. La roue qui chauffe ----------------------------------------------------- */
+let chaleur = 0;
+function gChauffe() {
+  const n = 7, fait = Math.floor((chaleur / 100) * n), h = 140 * (chaleur / 100);
+  const lumieres = Array.from({ length: n }, (_, i) => `<path d="${dent(100, 100, 100, 88, i, n, .18)}" fill="${i < fait ? flamme(i / (n - 1)) : 'var(--surface-3)'}"/>`).join('');
+  return `<svg viewBox="0 0 200 200" width="230" height="230">
+      <defs><clipPath id="roue"><circle cx="100" cy="100" r="66"/></clipPath></defs>
+      ${lumieres}
+      <g class="tourne" style="--duree:24s">
+        <path d="${engrenage(100, 100, 80, 68, 12)}" fill="var(--surface-2)" stroke="url(#g-rouage)" stroke-width="2"/>
+      </g>
+      <!-- La braise reste horizontale : seule la denture tourne. -->
+      <g clip-path="url(#roue)">
+        <rect x="0" y="${170 - h}" width="200" height="${h + 40}" fill="url(#g-feu)" opacity=".95"/>
+      </g>
+      <circle cx="100" cy="100" r="34" fill="var(--bg)"/>
+    </svg><div class="centre"><b>${chaleur} %</b><span>${fait} action${fait > 1 ? 's' : ''} sur ${n}</span></div>`;
+}
+
+/* --- 8. Le feu de santé ---------------------------------------------------------- */
+function gSante() {
+  const f = [['Disques', 'ok', 'Bon'], ['Espace', 'crit', 'Critique'], ['Chaleur', 'warn', 'À surveiller']];
+  const coul = { ok: 'var(--ok)', warn: 'var(--warn)', crit: 'var(--err)' };
+  const g = f.map(([nom, h, txt], k) => {
+    const x = 52 + k * 98;
+    return `<g class="tourne ${k % 2 ? 'inverse' : ''}" style="--duree:${h === 'crit' ? 6 : 20}s">
+        <path d="${engrenage(x, 70, 40, 32, 10)}" fill="${coul[h]}" fill-opacity=".18" stroke="${coul[h]}" stroke-width="2"/></g>
+      <circle cx="${x}" cy="70" r="19" fill="${coul[h]}" opacity=".9"/>
+      <text x="${x}" y="134" text-anchor="middle" font-size="12" font-weight="700" fill="var(--text)">${nom}</text>
+      <text x="${x}" y="150" text-anchor="middle" font-size="11" fill="${coul[h]}" font-weight="700">${txt}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 300 160" width="320" height="170">${g}</svg>`;
+}
+
+const RENDUS = {
+  anneau: gAnneau, jauge: () => gJauge(61), 'jauge-petite': () => gJauge(93, 150, 'disque D: plein', ' %'),
+  rouages: gRouages, cremaillere: gCremaillere, gaufre: gGaufre, couronne: gCouronne, chauffe: gChauffe, sante: gSante,
+};
+
+function rendre() {
+  $('[data-g]').forEach((z) => (z.innerHTML = RENDUS[z.dataset.g]()));
+  $('[data-legende]').forEach((z) => (z.innerHTML = POSTES.map((p) => `<span><i class="pastille" style="background:${p.c};opacity:${p.on ? 1 : .35}"></i>${p.nom}</span>`).join('')));
+  $('[data-houle]').forEach((d) => {
+    const h = Number(d.dataset.houle);
+    d.innerHTML = `<svg viewBox="0 0 1200 ${h}" preserveAspectRatio="none" style="position:absolute;left:0;right:0;bottom:0;width:100%;height:${h}px">
+      <path d="M0,${h * .38} C200,${h * .1} 400,${h * .62} 600,${h * .36} C800,${h * .1} 1000,${h * .58} 1200,${h * .3} L1200,${h} L0,${h}Z" fill="var(--vague-a)"/>
+      <path d="M0,${h * .55} C220,${h * .32} 430,${h * .78} 640,${h * .52} C850,${h * .28} 1030,${h * .7} 1200,${h * .5} L1200,${h} L0,${h}Z" fill="var(--vague-b)" opacity=".85"/>
+      <path d="M0,${h * .74} C240,${h * .56} 470,${h * .92} 700,${h * .72} C900,${h * .56} 1060,${h * .86} 1200,${h * .7} L1200,${h} L0,${h}Z" fill="var(--vague-c)" opacity=".55"/></svg>`;
+  });
+}
+
+// La roue qui chauffe : un entretien qui avance, en boucle.
+setInterval(() => {
+  chaleur = chaleur >= 100 ? 0 : chaleur + 1;
+  $('[data-g="chauffe"]').forEach((z) => (z.innerHTML = gChauffe()));
+}, 120);
+
+function choisir(attr, valeur) {
+  document.body.dataset[attr === 'v' ? 'v' : 'mode'] = valeur;
+  $(`.choix [data-${attr}]`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset[attr] === valeur)));
+  rendre();
+}
+$('.choix [data-v]').forEach((b) => (b.onclick = () => choisir('v', b.dataset.v)));
+$('.choix [data-m]').forEach((b) => (b.onclick = () => choisir('m', b.dataset.m)));
+rendre();
+</script>
+</body>
+</html>
