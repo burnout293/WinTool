@@ -1,0 +1,760 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sindry — thèmes</title>
+<!--
+  Maquette des thèmes de Sindry (WinTool 2.0), inspirés de la nouvelle icône :
+  un engrenage bleu → violet enveloppé de flammes or → orange → magenta → prune.
+
+    Braise  — la palette de l'icône, sur la structure actuelle (la marée devient
+              une houle de braise).
+    Forge   — la direction artistique de l'icône : volutes de flammes qui
+              enveloppent, engrenages, dégradés vifs et brillants.
+    Aurore  — une refonte moderne : rail de navigation, grille « bento », verre
+              dépoli sur une aurore floutée, bordures en dégradé.
+
+  Chaque thème existe en sombre et en clair. Rien de cette page n'est embarqué
+  dans l'application.
+-->
+<style>
+@font-face { font-family: 'Inter'; font-weight: 100 900; font-display: swap;
+  src: url('../../src/fonts/inter-latin-wght-normal.woff2') format('woff2-variations'); }
+
+/* ==========================================================================
+   Jetons, par thème et par mode
+   ========================================================================== */
+body {
+  /* Palette de l'icône (relevée sur Sindry.png) */
+  --or: #FEC923; --ambre: #FD9E21; --orange: #FD7D26; --vermillon: #FD5632;
+  --rose: #F8304B; --magenta: #DC1178; --prune: #89088B; --indigo: #3B066C;
+  --ciel: #4AB2E7; --roi: #332BD9; --violet: #775FD7; --orchidee: #CA28B1; --pourpre: #8816BF;
+}
+
+/* --- Braise : la palette, sur la structure actuelle --------------------- */
+body[data-theme="braise"][data-mode="sombre"] {
+  --bg: #0F0A14; --surface: #18111F; --surface-2: #211829; --surface-3: #2B2034;
+  --border: #2C2236; --border-2: #3D3049; --text: #F7F1FA; --text-2: #B9A9C6; --text-3: #8E7E9C;
+  --acc-a: var(--or); --acc-b: var(--vermillon); --acc-on: #FFB35C; --on-acc: #1A0B12;
+  --gear-a: var(--ciel); --gear-b: var(--violet); --soft: #2A1A14;
+  --ok: #3FD69B; --warn: #FFB340; --err: #FF6B7A;
+  --c1: var(--ambre); --c2: var(--rose); --c3: var(--violet); --c4: var(--ciel);
+  --term-bg: #0B0710; --term-text: #D9CFE2; --term-dim: #6F6080;
+  --vague-a: #3A1530; --vague-b: #6B1E3C; --vague-c: #C2402E;
+}
+body[data-theme="braise"][data-mode="clair"] {
+  --bg: #FBF6F2; --surface: #FFFFFF; --surface-2: #F6EEE8; --surface-3: #EFE4DB;
+  --border: #EADFD6; --border-2: #DCCBBE; --text: #1F1426; --text-2: #6A5873; --text-3: #7D6B86;
+  --acc-a: var(--ambre); --acc-b: var(--vermillon); --acc-on: #B23A0C; --on-acc: #1A0B12;
+  --gear-a: var(--ciel); --gear-b: var(--violet); --soft: #FFF0E4;
+  --ok: #14915C; --warn: #9A650F; --err: #C0263F;
+  --c1: var(--ambre); --c2: var(--rose); --c3: var(--violet); --c4: var(--ciel);
+  --term-bg: #1E1222; --term-text: #E6DCEB; --term-dim: #8C7B95;
+  --vague-a: #FFE3C9; --vague-b: #FFC59B; --vague-c: #FF9A6B;
+}
+
+/* --- Forge : la direction artistique de l'icône -------------------------- */
+body[data-theme="forge"][data-mode="sombre"] {
+  --bg: #12061F; --surface: #1C0D2C; --surface-2: #261338; --surface-3: #321A47;
+  --border: #33194A; --border-2: #4A2766; --text: #FFF5FB; --text-2: #C8B3D9; --text-3: #9C86B0;
+  --acc-a: var(--or); --acc-b: var(--magenta); --acc-on: #FF9F6B; --on-acc: #20051A;
+  --gear-a: var(--ciel); --gear-b: var(--orchidee); --soft: #2A0F2E;
+  --ok: #45E0A8; --warn: #FFC24D; --err: #FF5C86;
+  --c1: var(--or); --c2: var(--vermillon); --c3: var(--magenta); --c4: var(--ciel);
+  --term-bg: #0B0314; --term-text: #E5D6F0; --term-dim: #7A6290;
+}
+body[data-theme="forge"][data-mode="clair"] {
+  --bg: #FFF6EE; --surface: #FFFFFF; --surface-2: #FFEFE3; --surface-3: #FBE2D2;
+  --border: #F4D9C8; --border-2: #E9BFA6; --text: #24082C; --text-2: #6E4A6E; --text-3: #85607F;
+  --acc-a: var(--ambre); --acc-b: var(--magenta); --acc-on: #A3104F; --on-acc: #20051A;
+  --gear-a: var(--roi); --gear-b: var(--orchidee); --soft: #FFE9EF;
+  --ok: #138A58; --warn: #9A5B0C; --err: #C2183F;
+  --c1: var(--ambre); --c2: var(--vermillon); --c3: var(--magenta); --c4: var(--roi);
+  --term-bg: #22082B; --term-text: #F3E3F2; --term-dim: #9B7C9E;
+}
+
+/* --- Aurore : refonte moderne --------------------------------------------- */
+body[data-theme="aurore"][data-mode="sombre"] {
+  --bg: #07060D; --surface: rgba(255,255,255,.045); --surface-2: rgba(255,255,255,.07); --surface-3: rgba(255,255,255,.1);
+  --border: rgba(255,255,255,.09); --border-2: rgba(255,255,255,.16); --text: #F4F2FA; --text-2: #A9A3BD; --text-3: #7C7690;
+  --acc-a: var(--orange); --acc-b: var(--magenta); --acc-on: #FF9A62; --on-acc: #15060F;
+  --gear-a: var(--ciel); --gear-b: var(--violet); --soft: rgba(253,125,38,.1);
+  --ok: #4BE0A6; --warn: #FFC15C; --err: #FF6B8A;
+  --c1: var(--orange); --c2: var(--magenta); --c3: var(--violet); --c4: var(--ciel);
+  --term-bg: rgba(0,0,0,.35); --term-text: #DCD7EA; --term-dim: #6E6884;
+  --plein: #15121F;
+  --aurore-1: rgba(51,43,217,.55); --aurore-2: rgba(220,17,120,.42); --aurore-3: rgba(253,125,38,.38); --aurore-4: rgba(74,178,231,.3);
+}
+body[data-theme="aurore"][data-mode="clair"] {
+  --bg: #F6F4FB; --surface: rgba(255,255,255,.62); --surface-2: rgba(255,255,255,.8); --surface-3: #FFFFFF;
+  --border: rgba(40,20,70,.09); --border-2: rgba(40,20,70,.16); --text: #17122A; --text-2: #5D5675; --text-3: #6F6888;
+  --acc-a: var(--orange); --acc-b: var(--magenta); --acc-on: #B0145F; --on-acc: #15060F;
+  --gear-a: var(--roi); --gear-b: var(--violet); --soft: rgba(253,125,38,.1);
+  --ok: #10855A; --warn: #976010; --err: #C1214A;
+  --c1: var(--orange); --c2: var(--magenta); --c3: var(--violet); --c4: var(--ciel);
+  --term-bg: #1A1530; --term-text: #E2DEF0; --term-dim: #857FA0;
+  --plein: #FFFFFF;
+  --aurore-1: rgba(119,95,215,.35); --aurore-2: rgba(220,17,120,.22); --aurore-3: rgba(253,158,33,.3); --aurore-4: rgba(74,178,231,.28);
+}
+
+/* ==========================================================================
+   La page de présentation
+   ========================================================================== */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { background: #0A0A0F; }
+body { font-family: 'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif; color: #EDEAF5;
+       background: #0A0A0F; padding: 24px 16px 60px; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; border: none; background: none; cursor: pointer; }
+svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+
+.page-h { max-width: 1180px; margin: 0 auto 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px 22px; }
+.page-h img { width: 64px; height: 64px; }
+.page-h h1 { font-size: 26px; letter-spacing: -.6px; font-weight: 800; }
+.page-h p { color: #A49DB6; font-size: 14px; margin-top: 2px; max-width: 520px; }
+.choix { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; }
+.pseg { display: inline-flex; padding: 4px; border-radius: 12px; background: #16141F; border: 1px solid #26232F; }
+.pseg button { padding: 8px 14px; border-radius: 9px; font-size: 13.5px; font-weight: 600; color: #A49DB6; }
+.pseg button[aria-pressed="true"] { color: #170A12; background: linear-gradient(135deg, var(--or), var(--vermillon) 55%, var(--magenta)); }
+
+.intro { max-width: 1180px; margin: 0 auto 26px; display: grid; grid-template-columns: 1.2fr 1fr; gap: 18px;
+         background: #121019; border: 1px solid #221F2C; border-radius: 18px; padding: 20px 22px; }
+.intro h2 { font-size: 20px; letter-spacing: -.3px; }
+.intro h2 small { font-weight: 500; color: #A49DB6; font-size: 14px; margin-left: 8px; }
+.intro ul { margin-top: 10px; padding-left: 18px; color: #C9C3D8; font-size: 13.5px; line-height: 1.6; }
+.intro .pal { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; align-content: start; }
+.intro .pal span { display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: #A49DB6; }
+.intro .pal i { display: block; height: 38px; border-radius: 10px; border: 1px solid rgba(255,255,255,.08); }
+.t-only { display: none !important; }
+body[data-theme="braise"] .t-braise, body[data-theme="forge"] .t-forge, body[data-theme="aurore"] .t-aurore { display: revert !important; }
+body[data-theme="braise"] .intro.t-braise, body[data-theme="forge"] .intro.t-forge, body[data-theme="aurore"] .intro.t-aurore { display: grid !important; }
+
+.ecrans { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 34px; }
+.ecran figcaption { font-size: 13px; color: #A49DB6; margin: 0 0 10px 4px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; }
+
+@media (max-width: 760px) { .intro { grid-template-columns: 1fr; } }
+
+/* ==========================================================================
+   La fenêtre de l'application — commune aux trois thèmes
+   ========================================================================== */
+.app { position: relative; overflow: hidden; border-radius: 16px; background: var(--bg); color: var(--text);
+       border: 1px solid var(--border-2); min-height: 600px; display: flex; flex-direction: column;
+       box-shadow: 0 30px 80px rgba(0,0,0,.45); isolation: isolate; font-size: 14px; }
+.deco { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.tb { height: 52px; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-bottom: 1px solid var(--border); position: relative; }
+.marque { display: flex; align-items: center; gap: 9px; font-weight: 800; font-size: 15.5px; letter-spacing: -.3px; }
+.marque img { width: 28px; height: 28px; }
+.marque small { font: 500 11px ui-monospace, Consolas, monospace; color: var(--text-3); }
+.fil { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-3); margin-left: 6px; }
+.fil span { display: inline-flex; align-items: center; gap: 6px; }
+.fil i { width: 6px; height: 6px; border-radius: 50%; background: var(--border-2); }
+.fil .fait { color: var(--text-2); } .fil .fait i { background: var(--ok); }
+.fil .actif { color: var(--text); font-weight: 700; } .fil .actif i { background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); }
+.tb-d { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.seg { display: inline-flex; padding: 3px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--border); }
+.seg span { padding: 5px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.seg span.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.pilule { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 600;
+          color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent); }
+.rond { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--text-2); border: 1px solid var(--border); }
+.corps { flex: 1; position: relative; display: flex; min-height: 0; }
+.contenu { flex: 1; min-width: 0; padding: 26px 30px 24px; display: flex; flex-direction: column; }
+
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px; border-radius: 12px;
+       font-weight: 700; font-size: 14px; border: 1px solid var(--border-2); background: var(--surface-2); color: var(--text); }
+.btn.prim { border: none; color: var(--on-acc); background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); }
+.btn.grand { height: 48px; padding: 0 26px; font-size: 15px; border-radius: 14px; }
+.badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+         color: var(--acc-on); background: var(--soft); border: 1px solid color-mix(in srgb, var(--acc-b) 30%, transparent); }
+.badge.n { color: var(--text-2); background: var(--surface-2); border-color: var(--border); }
+.badge.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); border-color: color-mix(in srgb, var(--ok) 30%, transparent); }
+.titre { font-size: 30px; font-weight: 800; letter-spacing: -.8px; text-align: center; }
+.sous { color: var(--text-2); text-align: center; margin-top: 6px; }
+.coche { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; flex-shrink: 0;
+         background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); color: var(--on-acc); }
+.coche.vide { background: transparent; border: 2px solid var(--border-2); color: transparent; }
+.coche svg { width: 13px; height: 13px; stroke-width: 3.2; }
+.inter { width: 40px; height: 22px; border-radius: 999px; position: relative; background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); flex-shrink: 0; }
+.inter::after { content: ''; position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+.inter.off { background: var(--surface-3); } .inter.off::after { right: auto; left: 3px; background: var(--text-3); }
+.puce { display: inline-flex; align-items: center; padding: 5px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 600;
+        border: 1px solid var(--border-2); color: var(--text-2); }
+.puce.on { color: var(--acc-on); background: var(--soft); border-color: color-mix(in srgb, var(--acc-b) 40%, transparent); }
+
+/* --- Écran 1 : Choisir ---------------------------------------------------- */
+.s1 { align-items: center; }
+.reco { margin-top: 22px; display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-radius: 18px; width: min(560px, 100%);
+        background: var(--surface); border: 1px solid var(--border-2); position: relative; }
+.reco-i { width: 52px; height: 52px; border-radius: 15px; display: grid; place-items: center; color: var(--on-acc);
+          background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); }
+.reco-i svg { width: 26px; height: 26px; }
+.reco b { font-size: 18px; letter-spacing: -.3px; }
+.reco p { color: var(--text-2); font-size: 13px; margin-top: 3px; }
+.reco .go { margin-left: auto; color: var(--text-3); }
+.sect { margin-top: 26px; font-size: 13px; color: var(--text-2); font-weight: 600; }
+.lots { margin-top: 16px; width: 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 22px; position: relative; }
+.lot { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 116px; text-align: center; }
+.lot-i { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 2px solid var(--border-2); color: var(--text-2); }
+.lot-i svg { width: 24px; height: 24px; }
+.lot b { font-size: 13px; line-height: 1.25; }
+.lot small { font-size: 11.5px; color: var(--text-3); }
+.lot.on .lot-i { border-color: transparent; color: var(--on-acc); background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); }
+.barre { margin-top: auto; width: 100%; padding-top: 22px; display: flex; align-items: center; justify-content: center; gap: 18px; font-size: 13.5px; color: var(--text-2); }
+.barre b { color: var(--text); }
+
+/* --- Écran 2 : Analyse ---------------------------------------------------- */
+.carte { background: var(--surface); border: 1px solid var(--border-2); border-radius: 18px; }
+.resume { margin: 20px auto 0; width: min(860px, 100%); display: grid; grid-template-columns: 220px 1fr; gap: 22px; padding: 20px; align-items: center; }
+.anneau { position: relative; width: 200px; height: 200px; margin: 0 auto; }
+.anneau svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.anneau .centre { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.anneau .centre b { font-size: 27px; letter-spacing: -.8px; }
+.anneau .centre span { font-size: 11.5px; color: var(--text-2); }
+.postes { display: flex; flex-direction: column; gap: 8px; }
+.poste { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 13px; background: var(--surface-2); border: 1px solid var(--border); }
+.poste .pt { flex: 1; min-width: 0; } .poste .pt b { font-size: 13.5px; display: block; } .poste .pt span { font-size: 12px; color: var(--text-2); }
+.poste .pv { font-weight: 800; font-size: 13.5px; } .poste .chev { color: var(--text-3); }
+.pastille { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.poste.off { opacity: .62; }
+.poste .avert { display: block; margin-top: 4px; font-size: 11.5px; color: var(--warn); }
+.note { margin: 14px auto 0; width: min(860px, 100%); display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 12px;
+        font-size: 12.5px; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border); }
+.pied { margin-top: auto; padding-top: 18px; display: flex; justify-content: center; align-items: center; gap: 16px; color: var(--text-2); font-size: 13.5px; }
+.pied b { color: var(--text); }
+.etapes { display: none; }
+
+/* --- Écran 3 : Expert ----------------------------------------------------- */
+.ex { flex: 1; display: grid; grid-template-columns: 290px 1fr; min-height: 0; }
+.ex-l { border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 14px 12px 0; gap: 10px; min-width: 0; }
+.onglets { display: grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 11px; background: var(--surface-2); border: 1px solid var(--border); }
+.onglets span { text-align: center; padding: 6px; border-radius: 8px; font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+.onglets span.on { background: var(--surface); color: var(--text); }
+.cherche { display: flex; align-items: center; gap: 8px; padding: 8px 11px; border-radius: 11px; border: 1px solid var(--border); color: var(--text-3); font-size: 12.5px; }
+.rub { font-size: 10.5px; font-weight: 800; letter-spacing: .9px; color: var(--text-3); text-transform: uppercase; margin: 6px 6px 0; display: flex; align-items: center; gap: 6px; }
+.rub em { margin-left: auto; font-style: normal; }
+.ligne { display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: 10px; font-size: 12.5px; }
+.ligne code { font: 600 11px ui-monospace, Consolas, monospace; color: var(--text-3); }
+.ligne.on { background: var(--soft); box-shadow: inset 3px 0 0 var(--acc-b); }
+.ligne.on code { color: var(--acc-on); }
+.journal { margin: auto -12px 0; background: var(--term-bg); color: var(--term-text); font: 11px/1.7 ui-monospace, Consolas, monospace; padding: 10px 14px; border-top: 1px solid var(--border); }
+.journal .k { color: var(--term-dim); display: block; font-size: 10px; letter-spacing: 1px; margin-bottom: 2px; }
+.journal .s { color: var(--c4); } .journal .o { color: var(--ok); } .journal .w { color: var(--warn); }
+.ex-d { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.fiche { padding: 18px 20px; }
+.fiche-h { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+.fiche-i { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; color: var(--on-acc); background: linear-gradient(135deg, var(--acc-a), var(--acc-b)); }
+.fiche-h h3 { font-size: 19px; letter-spacing: -.4px; }
+.fiche-h p { color: var(--text-2); font-size: 13px; margin-top: 3px; }
+.fiche-a { margin-left: auto; display: flex; gap: 8px; }
+.fiche-a .btn { height: 36px; padding: 0 14px; font-size: 13px; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.reglages { padding: 6px 18px; }
+.reg { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.reg:last-child { border-bottom: none; }
+.reg .rt { flex: 1; } .reg .rt b { font-size: 13.5px; display: block; } .reg .rt span { font-size: 12px; color: var(--text-2); }
+.reg .puces { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 55%; }
+.champ { padding: 6px 12px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--border); font-weight: 700; font-size: 13px; }
+.temoin { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; font-size: 12.5px; color: var(--ok);
+          background: color-mix(in srgb, var(--ok) 10%, transparent); border: 1px solid color-mix(in srgb, var(--ok) 28%, transparent); }
+
+/* ==========================================================================
+   BRAISE — la structure d'aujourd'hui, la palette de l'icône
+   ========================================================================== */
+body[data-theme="braise"] .lots { margin-bottom: 70px; }
+body[data-theme="braise"] .lot:nth-child(odd) { transform: translateY(18px); }
+body[data-theme="braise"] .lot-i { box-shadow: 0 6px 18px rgba(0,0,0,.18); }
+body[data-theme="braise"] .lot.on .lot-i { box-shadow: 0 10px 26px color-mix(in srgb, var(--acc-b) 45%, transparent); }
+body[data-theme="braise"] .reco { border-color: color-mix(in srgb, var(--acc-a) 45%, var(--border-2)); box-shadow: 0 12px 34px color-mix(in srgb, var(--acc-b) 18%, transparent); }
+body[data-theme="braise"] .barre { position: relative; z-index: 1; }
+body[data-theme="braise"] .ex-l .ligne.on { box-shadow: inset 3px 0 0 var(--acc-a); }
+
+/* ==========================================================================
+   FORGE — volutes de flammes, engrenages, dégradés brillants
+   ========================================================================== */
+body[data-theme="forge"] .titre { background: linear-gradient(100deg, var(--or), var(--orange) 30%, var(--magenta) 70%, var(--orchidee));
+  -webkit-background-clip: text; background-clip: text; color: transparent; font-size: 34px; letter-spacing: -1px; }
+body[data-theme="forge"] .btn.prim { background: linear-gradient(120deg, var(--or), var(--orange) 35%, var(--rose) 70%, var(--magenta));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 10px 28px color-mix(in srgb, var(--magenta) 35%, transparent); }
+body[data-theme="forge"] .reco { border: none; background:
+  linear-gradient(var(--surface), var(--surface)) padding-box,
+  linear-gradient(120deg, var(--or), var(--magenta), var(--violet)) border-box; border: 2px solid transparent; border-radius: 22px; overflow: hidden; }
+body[data-theme="forge"] .reco::before { content: ''; position: absolute; right: -70px; top: -90px; width: 200px; height: 200px; border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--orange) 22%, transparent), transparent 62%); }
+body[data-theme="forge"] .reco-i { border-radius: 50%; background: conic-gradient(from 200deg, var(--ciel), var(--violet), var(--orchidee), var(--ciel)); color: #fff; }
+body[data-theme="forge"] .lots { gap: 20px; max-width: 760px; }
+body[data-theme="forge"] .lot { width: 128px; }
+body[data-theme="forge"] .lot-i { width: 76px; height: 76px; border: none; background: none; position: relative; color: var(--text); }
+body[data-theme="forge"] .lot-i .rouage { position: absolute; inset: 0; width: 100%; height: 100%; }
+body[data-theme="forge"] .lot-i svg.i { position: relative; width: 24px; height: 24px; }
+body[data-theme="forge"] .lot.on .lot-i { background: none; color: #fff; }
+body[data-theme="forge"] .lot.on b { color: var(--acc-on); }
+body[data-theme="forge"] .carte { border-radius: 22px; border: 1px solid var(--border-2);
+  box-shadow: 0 20px 50px color-mix(in srgb, var(--indigo) 25%, transparent), inset 0 1px 0 rgba(255,255,255,.06); }
+body[data-theme="forge"] .poste { border-radius: 16px; }
+body[data-theme="forge"] .coche { border-radius: 50%; }
+body[data-theme="forge"] .fiche-i { border-radius: 50%; background: conic-gradient(from 200deg, var(--ciel), var(--violet), var(--orchidee), var(--ciel)); color: #fff; }
+body[data-theme="forge"] .ex-l { background: linear-gradient(180deg, color-mix(in srgb, var(--indigo) 18%, transparent), transparent 60%); }
+body[data-theme="forge"] .ligne.on { background: linear-gradient(90deg, color-mix(in srgb, var(--orange) 22%, transparent), color-mix(in srgb, var(--magenta) 10%, transparent)); box-shadow: none; }
+body[data-theme="forge"] .marque span { background: linear-gradient(100deg, var(--or), var(--magenta)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+body[data-theme="forge"] .anneau .dents { position: absolute; inset: -14px; width: calc(100% + 28px); height: calc(100% + 28px); transform: none; }
+
+/* ==========================================================================
+   AURORE — refonte : rail, bento, verre dépoli, bordures en dégradé
+   ========================================================================== */
+body[data-theme="aurore"] .app { border-radius: 22px; }
+body[data-theme="aurore"] .tb { height: 56px; border-bottom: none; }
+body[data-theme="aurore"] .tb .seg { display: none; }
+body[data-theme="aurore"] .fil { display: none; }
+body[data-theme="aurore"] .rail { display: flex; }
+body[data-theme="aurore"] .contenu { padding: 8px 30px 26px 18px; }
+body[data-theme="aurore"] .carte, body[data-theme="aurore"] .reco, body[data-theme="aurore"] .poste, body[data-theme="aurore"] .lot {
+  background: var(--surface); border: 1px solid var(--border); backdrop-filter: blur(22px) saturate(1.4); -webkit-backdrop-filter: blur(22px) saturate(1.4); }
+body[data-theme="aurore"] .titre { text-align: left; font-size: 36px; letter-spacing: -1.4px; font-weight: 750; }
+body[data-theme="aurore"] .sous { text-align: left; }
+body[data-theme="aurore"] .s1 { align-items: stretch; }
+/* Bordure en degrade : le calque du dessus doit etre opaque (--plein), sinon le
+   degrade de la bordure transparait dans toute la carte. */
+body[data-theme="aurore"] .reco { width: 100%; margin-top: 20px; padding: 22px; border-radius: 22px;
+  background: linear-gradient(120deg, rgba(253,125,38,.12), rgba(220,17,120,.08) 50%, rgba(119,95,215,.1)) padding-box,
+    linear-gradient(var(--plein), var(--plein)) padding-box,
+    linear-gradient(120deg, var(--orange), var(--magenta) 50%, var(--violet)) border-box;
+  border: 1px solid transparent; }
+body[data-theme="aurore"] .reco-i { border-radius: 16px; }
+body[data-theme="aurore"] .sect { margin-top: 22px; }
+body[data-theme="aurore"] .lots { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 110px; gap: 12px; margin-top: 12px; }
+body[data-theme="aurore"] .lot { width: auto; border-radius: 20px; padding: 16px; align-items: flex-start; justify-content: space-between; text-align: left; flex-direction: column; }
+body[data-theme="aurore"] .lot:nth-child(1) { grid-column: span 2; grid-row: span 2; }
+body[data-theme="aurore"] .lot:nth-child(1) b { font-size: 20px; letter-spacing: -.4px; }
+body[data-theme="aurore"] .lot:nth-child(4), body[data-theme="aurore"] .lot:nth-child(5), body[data-theme="aurore"] .lot:nth-child(6) { grid-column: span 2; }
+body[data-theme="aurore"] .lot-i { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--border-2); background: var(--surface-2); }
+body[data-theme="aurore"] .lot-i svg { width: 19px; height: 19px; }
+body[data-theme="aurore"] .lot.on { background: linear-gradient(135deg, rgba(253,125,38,.16), rgba(220,17,120,.1)) padding-box,
+    linear-gradient(var(--plein), var(--plein)) padding-box, linear-gradient(135deg, var(--orange), var(--magenta)) border-box; border: 1px solid transparent; }
+body[data-theme="aurore"] .lot.on .lot-i { border-radius: 12px; }
+body[data-theme="aurore"] .barre { justify-content: space-between; padding: 14px 18px; margin-top: 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border); backdrop-filter: blur(22px); }
+body[data-theme="aurore"] .btn { border-radius: 999px; }
+body[data-theme="aurore"] .btn.prim { background: linear-gradient(120deg, var(--orange), var(--magenta)); color: #fff; box-shadow: 0 8px 30px color-mix(in srgb, var(--magenta) 35%, transparent); }
+body[data-theme="aurore"] .etapes { display: flex; gap: 8px; margin-bottom: 18px; }
+body[data-theme="aurore"] .etapes span { flex: 1; display: flex; flex-direction: column; gap: 7px; font-size: 11.5px; font-weight: 700; color: var(--text-3); }
+body[data-theme="aurore"] .etapes span::before { content: ''; height: 4px; border-radius: 4px; background: var(--surface-3); }
+body[data-theme="aurore"] .etapes .fait { color: var(--text-2); } body[data-theme="aurore"] .etapes .fait::before { background: var(--text-2); }
+body[data-theme="aurore"] .etapes .actif { color: var(--text); } body[data-theme="aurore"] .etapes .actif::before { background: linear-gradient(90deg, var(--orange), var(--magenta)); }
+body[data-theme="aurore"] .resume { width: 100%; grid-template-columns: 1fr; gap: 16px; padding: 22px; border-radius: 22px; }
+body[data-theme="aurore"] .anneau { display: none; }
+body[data-theme="aurore"] .chiffre { display: flex; }
+body[data-theme="aurore"] .postes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+body[data-theme="aurore"] .poste { border-radius: 16px; padding: 14px; }
+body[data-theme="aurore"] .note, body[data-theme="aurore"] .pied { width: 100%; }
+body[data-theme="aurore"] .pied { justify-content: space-between; padding: 14px 18px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border); backdrop-filter: blur(22px); }
+body[data-theme="aurore"] .s3 .titre, body[data-theme="aurore"] .s3 .sous { text-align: left; }
+body[data-theme="aurore"] .ex { grid-template-columns: 270px 1fr; }
+body[data-theme="aurore"] .ex-l { border-right: none; margin: 0 0 14px; padding: 14px 12px 0; border-radius: 22px; background: var(--surface); border: 1px solid var(--border); backdrop-filter: blur(22px); overflow: hidden; }
+body[data-theme="aurore"] .journal { background: var(--term-bg); }
+body[data-theme="aurore"] .ligne.on { background: var(--surface-3); box-shadow: inset 0 0 0 1px var(--border-2); }
+body[data-theme="aurore"] .ligne.on code { color: var(--acc-on); }
+body[data-theme="aurore"] .ex-d { padding: 0 18px 14px; }
+body[data-theme="aurore"] .fiche { border-radius: 22px; }
+body[data-theme="aurore"] .fiche-i { border-radius: 16px; }
+body[data-theme="aurore"] .temoin { border-radius: 16px; }
+body[data-theme="aurore"] .puce.on { color: var(--text); background: var(--surface-3); border-color: var(--border-2); }
+body[data-theme="aurore"] .inter:not(.off) { background: linear-gradient(120deg, var(--orange), var(--magenta)); }
+
+.rail { display: none; flex-direction: column; align-items: center; gap: 8px; padding: 10px 10px 18px; width: 68px; flex-shrink: 0; }
+.rail a { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; color: var(--text-3); position: relative; }
+.rail a.on { color: var(--text); background: var(--surface-2); border: 1px solid var(--border-2); }
+.rail a.on::before { content: ''; position: absolute; left: -10px; top: 12px; bottom: 12px; width: 3px; border-radius: 3px; background: linear-gradient(var(--orange), var(--magenta)); }
+.rail .bas { margin-top: auto; }
+.chiffre { display: none; align-items: flex-end; gap: 18px; flex-wrap: wrap; }
+.chiffre b { font-size: 54px; letter-spacing: -2.4px; line-height: .95; font-weight: 750;
+  background: linear-gradient(100deg, var(--text), color-mix(in srgb, var(--acc-on) 70%, var(--text))); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.chiffre span { color: var(--text-2); font-size: 13px; padding-bottom: 6px; }
+.chiffre .bande { flex-basis: 100%; height: 12px; border-radius: 999px; display: flex; overflow: hidden; gap: 3px; background: var(--surface-3); }
+.chiffre .bande i { display: block; height: 100%; border-radius: 999px; }
+
+@media (max-width: 860px) {
+  .resume { grid-template-columns: 1fr; }
+  .ex { grid-template-columns: 1fr; } .ex-l { border-right: none; }
+  body[data-theme="aurore"] .lots { grid-template-columns: repeat(2, 1fr); }
+  body[data-theme="aurore"] .postes { grid-template-columns: 1fr; }
+  .fil { display: none; }
+}
+</style>
+</head>
+<body data-theme="braise" data-mode="sombre">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g-flamme" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FEC923" /><stop offset=".35" stop-color="#FD7D26" />
+      <stop offset=".7" stop-color="#F8304B" /><stop offset="1" stop-color="#DC1178" />
+    </linearGradient>
+    <linearGradient id="g-flamme-sombre" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FD7D26" /><stop offset=".5" stop-color="#DC1178" /><stop offset="1" stop-color="#3B066C" />
+    </linearGradient>
+    <linearGradient id="g-rouage" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4AB2E7" /><stop offset=".5" stop-color="#775FD7" /><stop offset="1" stop-color="#CA28B1" />
+    </linearGradient>
+  </defs>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /></symbol>
+  <symbol id="i-broom" viewBox="0 0 24 24"><path d="M13.5 10.5 22 2" /> <path d="M14.734 13.841a2 2 0 00-.314-2.42L12.58 9.58a2 2 0 00-2.421-.314l-7.657 4.461A1 1 0 002.3 15.3l6.403 6.403a1 1 0 001.571-.204z" /> <path d="m5 18 2-2" /> <path d="m7.699 10.7 5.602 5.601" /></symbol>
+  <symbol id="i-zap" viewBox="0 0 24 24"><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z" /></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /></symbol>
+  <symbol id="i-app-window" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2" /> <path d="M10 4v4" /> <path d="M2 8h20" /> <path d="M6 4v4" /></symbol>
+  <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" /> <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /> <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /> <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /> <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34" /> <circle cx="11" cy="11" r="8" /></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" /> <circle cx="12" cy="12" r="3" /></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /> <path d="M12 2v2" /> <path d="M12 20v2" /> <path d="m4.93 4.93 1.41 1.41" /> <path d="m17.66 17.66 1.41 1.41" /> <path d="M2 12h2" /> <path d="M20 12h2" /> <path d="m6.34 17.66-1.41 1.41" /> <path d="m19.07 4.93-1.41 1.41" /></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" /></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /></symbol>
+  <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7" /> <path d="M19 12H5" /></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2" /> <path d="M17 3h2a2 2 0 0 1 2 2v2" /> <path d="M21 17v2a2 2 0 0 1-2 2h-2" /> <path d="M7 21H5a2 2 0 0 1-2-2v-2" /></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4" /> <path d="M3.34 19a10 10 0 1 1 17.32 0" /></symbol>
+  <symbol id="i-house" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /> <path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" /> <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" /> <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" /></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M3 5h.01" /> <path d="M3 12h.01" /> <path d="M3 19h.01" /> <path d="M8 5h13" /> <path d="M8 12h13" /> <path d="M8 19h13" /></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /> <path d="M3 3v5h5" /> <path d="M12 7v5l4 2" /></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><path d="M12 19h8" /> <path d="m4 17 6-6-6-6" /></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" /></symbol>
+  <symbol id="i-shield-check" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /> <path d="m9 12 2 2 4-4" /></symbol>
+  <symbol id="i-triangle-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" /> <path d="M12 9v4" /> <path d="M12 17h.01" /></symbol>
+  <symbol id="i-hard-drive" viewBox="0 0 24 24"><path d="M10 16h.01" /> <path d="M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /> <path d="M21.946 12.013H2.054" /> <path d="M6 16h.01" /></symbol>
+  <symbol id="i-trash-2" viewBox="0 0 24 24"><path d="M10 11v6" /> <path d="M14 11v6" /> <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /> <path d="M3 6h18" /> <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" /> <path d="M2 12h20" /></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><path d="M12 20v2" /> <path d="M12 2v2" /> <path d="M17 20v2" /> <path d="M17 2v2" /> <path d="M2 12h2" /> <path d="M2 17h2" /> <path d="M2 7h2" /> <path d="M20 12h2" /> <path d="M20 17h2" /> <path d="M20 7h2" /> <path d="M7 20v2" /> <path d="M7 2v2" /> <rect x="4" y="4" width="16" height="16" rx="2" /> <rect x="8" y="8" width="8" height="8" rx="1" /></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <path d="M12 16v-4" /> <path d="M12 8h.01" /></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4" /></symbol>
+  <symbol id="i-cog" viewBox="0 0 24 24"><path d="M11 10.27 7 3.34" /> <path d="m11 13.73-4 6.93" /> <path d="M12 22v-2" /> <path d="M12 2v2" /> <path d="M14 12h8" /> <path d="m17 20.66-1-1.73" /> <path d="m17 3.34-1 1.73" /> <path d="M2 12h2" /> <path d="m20.66 17-1.73-1" /> <path d="m20.66 7-1.73 1" /> <path d="m3.34 17 1.73-1" /> <path d="m3.34 7 1.73 1" /> <circle cx="12" cy="12" r="2" /> <circle cx="12" cy="12" r="8" /></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5" /> <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" /></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0" /> <path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326" /></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /> <path d="M12 6v6l4 2" /></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14" /> <path d="M12 5v14" /></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14" /></symbol>
+  <symbol id="i-square" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" /></symbol>
+</svg>
+
+<header class="page-h">
+  <img src="sindry-256.png" alt="">
+  <div>
+    <h1>Sindry — trois thèmes</h1>
+    <p>Inspirés de la nouvelle icône : un engrenage bleu-violet enveloppé de flammes. Chaque thème en sombre et en clair, sur les trois écrans clés.</p>
+  </div>
+  <nav class="choix">
+    <div class="pseg" id="segTheme">
+      <button type="button" data-t="braise" aria-pressed="true">Braise</button>
+      <button type="button" data-t="forge" aria-pressed="false">Forge</button>
+      <button type="button" data-t="aurore" aria-pressed="false">Aurore</button>
+    </div>
+    <div class="pseg" id="segMode">
+      <button type="button" data-m="sombre" aria-pressed="true">Sombre</button>
+      <button type="button" data-m="clair" aria-pressed="false">Clair</button>
+    </div>
+  </nav>
+</header>
+
+<!-- Les trois intentions ----------------------------------------------- -->
+<section class="intro t-only t-braise">
+  <div>
+    <h2>Braise <small>la palette de l'icône</small></h2>
+    <ul>
+      <li>La structure d'aujourd'hui, inchangée : assistant, bouées, master-détail.</li>
+      <li>La marée devient une <b>houle de braise</b> : mêmes vagues, teintes de feu.</li>
+      <li>L'accent est la flamme (or → vermillon) ; l'engrenage (bleu → violet) sert de seconde couleur, pour les graphiques et l'information.</li>
+      <li>Le changement le plus sûr : rien à réapprendre.</li>
+    </ul>
+  </div>
+  <div class="pal">
+    <span><i style="background:#FEC923"></i>Or</span><span><i style="background:#FD9E21"></i>Ambre</span>
+    <span><i style="background:#FD5632"></i>Vermillon</span><span><i style="background:#F8304B"></i>Rose</span>
+    <span><i style="background:#4AB2E7"></i>Ciel</span><span><i style="background:#775FD7"></i>Violet</span>
+    <span><i style="background:#0F0A14"></i>Fond sombre</span><span><i style="background:#FBF6F2"></i>Fond clair</span>
+  </div>
+</section>
+<section class="intro t-only t-forge">
+  <div>
+    <h2>Forge <small>la direction artistique de l'icône</small></h2>
+    <ul>
+      <li>Des <b>volutes de flammes</b> qui enveloppent l'écran comme elles enveloppent l'engrenage.</li>
+      <li>Les lots deviennent des <b>engrenages</b>, et l'anneau de l'analyse prend des dents.</li>
+      <li>Dégradés vifs et brillants, titres en dégradé, fond indigo profond : l'énergie de l'icône.</li>
+      <li>Le plus expressif : une identité forte, à doser pour rester lisible.</li>
+    </ul>
+  </div>
+  <div class="pal">
+    <span><i style="background:linear-gradient(135deg,#FEC923,#FD7D26)"></i>Flamme</span><span><i style="background:linear-gradient(135deg,#F8304B,#DC1178)"></i>Braise vive</span>
+    <span><i style="background:linear-gradient(135deg,#4AB2E7,#775FD7)"></i>Engrenage</span><span><i style="background:linear-gradient(135deg,#775FD7,#CA28B1)"></i>Orchidée</span>
+    <span><i style="background:#12061F"></i>Indigo</span><span><i style="background:#FFF6EE"></i>Fond clair</span>
+  </div>
+</section>
+<section class="intro t-only t-aurore">
+  <div>
+    <h2>Aurore <small>une refonte moderne</small></h2>
+    <ul>
+      <li>Un <b>rail de navigation</b> remplace la bascule Simple / Expert : Accueil, Lots, Actions, Historique, Réglages.</li>
+      <li>Une grille <b>« bento »</b> pour les lots, des cartes en <b>verre dépoli</b> sur une aurore floutée aux couleurs de l'icône.</li>
+      <li>Des bordures fines en dégradé, de grands chiffres, une barre d'étapes à la place du fil d'Ariane.</li>
+      <li>Le plus contemporain : la couleur se retire du décor pour ne garder que l'essentiel.</li>
+    </ul>
+  </div>
+  <div class="pal">
+    <span><i style="background:linear-gradient(120deg,#FD7D26,#DC1178)"></i>Accent</span><span><i style="background:radial-gradient(circle at 30% 30%,#332BD9,#07060D 70%)"></i>Aurore bleue</span>
+    <span><i style="background:radial-gradient(circle at 70% 60%,#DC1178,#07060D 70%)"></i>Aurore rose</span><span><i style="background:rgba(255,255,255,.08)"></i>Verre</span>
+    <span><i style="background:#07060D"></i>Nuit</span><span><i style="background:#F6F4FB"></i>Brume</span>
+  </div>
+</section>
+
+<main class="ecrans">
+
+  <!-- =============================================================== -->
+  <figure class="ecran">
+    <figcaption>1 · Choisir — mode Simple</figcaption>
+    <div class="app">
+      <div class="deco" data-deco="1"></div>
+      <div class="tb">
+        <div class="marque"><img src="sindry-256.png" alt=""><span>Sindry</span><small>2.0.0</small></div>
+        <div class="fil"><span class="actif"><i></i>Choisir</span><span><i></i>Vérifier</span><span><i></i>Analyser</span><span><i></i>Entretien</span></div>
+        <div class="tb-d">
+          <div class="seg"><span class="on">Simple</span><span>Expert</span></div>
+          <span class="pilule"><svg class="i" style="width:14px;height:14px"><use href="#i-shield-check"/></svg>Administrateur</span>
+          <span class="rond"><svg class="i" style="width:16px;height:16px"><use href="#i-settings"/></svg></span>
+        </div>
+      </div>
+      <div class="corps">
+        <nav class="rail">
+          <a class="on"><svg class="i"><use href="#i-house"/></svg></a><a><svg class="i"><use href="#i-layers"/></svg></a>
+          <a><svg class="i"><use href="#i-list"/></svg></a><a><svg class="i"><use href="#i-history"/></svg></a>
+          <a class="bas"><svg class="i"><use href="#i-settings"/></svg></a>
+        </nav>
+        <div class="contenu s1">
+          <h2 class="titre">Que souhaitez-vous faire ?</h2>
+          <p class="sous">Choisissez une option. Vous pourrez revenir en arrière à tout moment.</p>
+          <div class="reco">
+            <span class="reco-i"><svg class="i"><use href="#i-sparkles"/></svg></span>
+            <div><b>Entretien complet</b> <span class="badge">Recommandé</span><p>On s'occupe de tout — environ 31 minutes</p></div>
+            <svg class="i go"><use href="#i-arrow-right"/></svg>
+          </div>
+          <p class="sect">Ou choisissez un domaine précis</p>
+          <div class="lots">
+            <div class="lot on"><span class="lot-i"><svg class="i"><use href="#i-broom"/></svg></span><b>Faire le ménage</b><small>6 min</small></div>
+            <div class="lot"><span class="lot-i"><svg class="i"><use href="#i-zap"/></svg></span><b>Accélérer le PC</b><small>4 min</small></div>
+            <div class="lot"><span class="lot-i"><svg class="i"><use href="#i-shield"/></svg></span><b>Protéger ma vie privée</b><small>3 min</small></div>
+            <div class="lot"><span class="lot-i"><svg class="i"><use href="#i-app-window"/></svg></span><b>Retirer les applications</b><small>8 min</small></div>
+            <div class="lot"><span class="lot-i"><svg class="i"><use href="#i-activity"/></svg></span><b>Vérifier l'état du PC</b><small>5 min</small></div>
+            <div class="lot"><span class="lot-i"><svg class="i"><use href="#i-palette"/></svg></span><b>Personnaliser</b><small>2 min</small></div>
+          </div>
+          <div class="barre"><span>Choisi : <b>Faire le ménage</b> · 6 min</span><button class="btn prim grand" type="button">Continuer <svg class="i"><use href="#i-arrow-right"/></svg></button></div>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- =============================================================== -->
+  <figure class="ecran">
+    <figcaption>2 · Voici ce que j'ai trouvé — l'analyse</figcaption>
+    <div class="app">
+      <div class="deco" data-deco="2"></div>
+      <div class="tb">
+        <div class="marque"><img src="sindry-256.png" alt=""><span>Sindry</span><small>2.0.0</small></div>
+        <div class="fil"><span class="fait"><i></i>Choisir</span><span class="fait"><i></i>Vérifier</span><span class="actif"><i></i>Analyser</span><span><i></i>Entretien</span></div>
+        <div class="tb-d">
+          <div class="seg"><span class="on">Simple</span><span>Expert</span></div>
+          <span class="rond"><svg class="i" style="width:16px;height:16px"><use href="#i-settings"/></svg></span>
+        </div>
+      </div>
+      <div class="corps">
+        <nav class="rail">
+          <a class="on"><svg class="i"><use href="#i-house"/></svg></a><a><svg class="i"><use href="#i-layers"/></svg></a>
+          <a><svg class="i"><use href="#i-list"/></svg></a><a><svg class="i"><use href="#i-history"/></svg></a>
+          <a class="bas"><svg class="i"><use href="#i-settings"/></svg></a>
+        </nav>
+        <div class="contenu s3">
+          <div class="etapes"><span class="fait">Choisir</span><span class="fait">Vérifier</span><span class="actif">Analyser</span><span>Entretien</span></div>
+          <h2 class="titre">Voici ce que j'ai trouvé</h2>
+          <p class="sous">Cochez ce que vous voulez traiter. Rien n'a encore été modifié.</p>
+          <div class="carte resume">
+            <div class="anneau" data-anneau></div>
+            <div class="chiffre"><b>1,1 Go</b><span>à libérer, sur 1,4 Go trouvés</span>
+              <div class="bande"><i style="width:44%;background:var(--c1)"></i><i style="width:23%;background:var(--c2)"></i><i style="width:15%;background:var(--c3)"></i></div>
+            </div>
+            <div class="postes">
+              <div class="poste"><span class="coche"><svg class="i"><use href="#i-check"/></svg></span><span class="pastille" style="background:var(--c1)"></span>
+                <span class="pt"><b>Fichiers inutiles</b><span>Fichiers temporaires et corbeille</span></span><span class="pv">612 Mo</span><svg class="i chev"><use href="#i-chevron-right"/></svg></div>
+              <div class="poste"><span class="coche"><svg class="i"><use href="#i-check"/></svg></span><span class="pastille" style="background:var(--c2)"></span>
+                <span class="pt"><b>Cache des navigateurs</b><span>Chrome, Edge — 3 profils</span></span><span class="pv">318 Mo</span><svg class="i chev"><use href="#i-chevron-right"/></svg></div>
+              <div class="poste"><span class="coche"><svg class="i"><use href="#i-check"/></svg></span><span class="pastille" style="background:var(--c3)"></span>
+                <span class="pt"><b>Vidages après plantage</b><span>Rapports d'erreur de Windows</span></span><span class="pv">204 Mo</span><svg class="i chev"><use href="#i-chevron-right"/></svg></div>
+              <div class="poste off"><span class="coche vide"><svg class="i"><use href="#i-check"/></svg></span><span class="pastille" style="background:var(--c4)"></span>
+                <span class="pt"><b>Anciennes mises à jour</b><span>Ce que Windows garde après installation<em class="avert" style="font-style:normal">Montré, pas coché : peut encore servir.</em></span></span><span class="pv">287 Mo</span><svg class="i chev"><use href="#i-chevron-right"/></svg></div>
+            </div>
+          </div>
+          <div class="note"><svg class="i" style="width:16px;height:16px"><use href="#i-info"/></svg>Vos mots de passe, vos favoris et votre historique ne sont pas touchés.</div>
+          <div class="pied"><span>À libérer : <b>1,1 Go</b></span><button class="btn prim grand" type="button"><svg class="i"><use href="#i-play"/></svg>Lancer</button></div>
+        </div>
+      </div>
+    </div>
+  </figure>
+
+  <!-- =============================================================== -->
+  <figure class="ecran">
+    <figcaption>3 · Mode Expert — une action, ses réglages, son journal</figcaption>
+    <div class="app">
+      <div class="deco" data-deco="3"></div>
+      <div class="tb">
+        <div class="marque"><img src="sindry-256.png" alt=""><span>Sindry</span><small>2.0.0</small></div>
+        <div class="tb-d">
+          <div class="seg"><span>Simple</span><span class="on">Expert</span></div>
+          <span class="pilule"><svg class="i" style="width:14px;height:14px"><use href="#i-shield-check"/></svg>Administrateur</span>
+          <span class="rond"><svg class="i" style="width:16px;height:16px"><use href="#i-settings"/></svg></span>
+        </div>
+      </div>
+      <div class="corps">
+        <nav class="rail">
+          <a><svg class="i"><use href="#i-house"/></svg></a><a><svg class="i"><use href="#i-layers"/></svg></a>
+          <a class="on"><svg class="i"><use href="#i-list"/></svg></a><a><svg class="i"><use href="#i-history"/></svg></a>
+          <a class="bas"><svg class="i"><use href="#i-settings"/></svg></a>
+        </nav>
+        <div class="ex">
+          <aside class="ex-l">
+            <div class="onglets"><span class="on">Actions 28</span><span>Lots 7</span></div>
+            <div class="cherche"><svg class="i" style="width:15px;height:15px"><use href="#i-search"/></svg>Filtrer…</div>
+            <div class="rub"><svg class="i" style="width:13px;height:13px"><use href="#i-broom"/></svg>Nettoyage<em>5</em></div>
+            <div class="ligne on"><code>100</code>Supprimer les fichiers temporaires</div>
+            <div class="ligne"><code>101</code>Nettoyer les données des navigateurs</div>
+            <div class="ligne"><code>102</code>Vider la corbeille</div>
+            <div class="rub"><svg class="i" style="width:13px;height:13px"><use href="#i-shield"/></svg>Vie privée<em>4</em></div>
+            <div class="ligne"><code>300</code>Réduire la télémétrie</div>
+            <div class="ligne"><code>301</code>Désactiver la publicité ciblée</div>
+            <div class="journal"><span class="k">JOURNAL · SUPPRIMER LES FICHIERS TEMPORAIRES</span>
+              <span class="s">[STEP] 2/5 Cleaning wintemp</span><br><span class="o">[OK] usertemp: 1 938 files, 612 MB</span><br><span class="w">[WARN] 3 files in use, left in place</span></div>
+          </aside>
+          <section class="ex-d">
+            <div class="carte fiche">
+              <div class="fiche-h">
+                <span class="fiche-i"><svg class="i"><use href="#i-trash-2"/></svg></span>
+                <div><h3>Supprimer les fichiers temporaires</h3><p>Libère la place prise par les fichiers temporaires oubliés</p></div>
+                <div class="fiche-a"><button class="btn" type="button">Analyser</button><button class="btn prim" type="button">Exécuter</button></div>
+              </div>
+              <div class="badges"><span class="badge ok">Risque faible</span><span class="badge n">Rapide</span><span class="badge n">Interruptible</span><span class="badge">Officiel</span><span class="badge n">Fait le 9 octobre</span></div>
+            </div>
+            <div class="carte reglages">
+              <div class="reg"><span class="rt"><b>Quoi nettoyer</b><span>un ou plusieurs éléments</span></span>
+                <span class="puces"><span class="puce on">Temporaires</span><span class="puce on">Windows</span><span class="puce on">Rapports</span><span class="puce">Miniatures</span></span></div>
+              <div class="reg"><span class="rt"><b>Tous les profils</b><span>chaque compte de ce PC, pas seulement le vôtre</span></span><span class="inter off"></span></div>
+              <div class="reg"><span class="rt"><b>Ancienneté minimale</b><span>ne touche pas aux fichiers plus récents</span></span><span class="champ">24 h</span></div>
+              <div class="reg"><span class="rt"><b>Nécessite un point de restauration</b><span>pré-coché : le script n'est pas réversible</span></span><span class="inter"></span></div>
+            </div>
+            <div class="temoin"><svg class="i" style="width:16px;height:16px"><use href="#i-shield-check"/></svg>Rien de sensible n'a changé dans Windows au dernier passage.</div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </figure>
+</main>
+
+<script>
+/* --- Décors, dessinés selon le thème ------------------------------------- */
+const NS = 'http://www.w3.org/2000/svg';
+
+/** Un engrenage : `dents` dents, rayon extérieur r1, intérieur r2. */
+function engrenage(cx, cy, r1, r2, dents) {
+  const pts = [];
+  const pas = (Math.PI * 2) / dents;
+  for (let i = 0; i < dents; i++) {
+    const a = i * pas;
+    const coins = [[a - pas * .22, r2], [a - pas * .14, r1], [a + pas * .14, r1], [a + pas * .22, r2]];
+    for (const [ang, r] of coins) pts.push([cx + r * Math.cos(ang), cy + r * Math.sin(ang)]);
+  }
+  return 'M' + pts.map((p) => p.map((v) => v.toFixed(1)).join(',')).join('L') + 'Z';
+}
+
+/** La houle de Braise : trois vagues, comme la marée d'aujourd'hui. */
+function houle(h) {
+  return `<svg viewBox="0 0 1200 ${h}" preserveAspectRatio="none" style="position:absolute;left:0;right:0;bottom:0;width:100%;height:${h}px">
+    <path d="M0,${h * .38} C200,${h * .1} 400,${h * .62} 600,${h * .36} C800,${h * .1} 1000,${h * .58} 1200,${h * .3} L1200,${h} L0,${h}Z" fill="var(--vague-a)"/>
+    <path d="M0,${h * .55} C220,${h * .32} 430,${h * .78} 640,${h * .52} C850,${h * .28} 1030,${h * .7} 1200,${h * .5} L1200,${h} L0,${h}Z" fill="var(--vague-b)" opacity=".85"/>
+    <path d="M0,${h * .74} C240,${h * .56} 470,${h * .92} 700,${h * .72} C900,${h * .56} 1060,${h * .86} 1200,${h * .7} L1200,${h} L0,${h}Z" fill="var(--vague-c)" opacity=".55"/>
+  </svg>`;
+}
+
+/** Les volutes de Forge : des croissants de flamme qui enveloppent l'écran. */
+function volutes(intense) {
+  const o = intense ? 1 : .55;
+  return `<svg viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%">
+    <path d="M-40,640 C-60,420 120,190 420,110 C250,230 190,380 250,520 C300,630 470,680 640,650 C430,760 90,760 -40,640Z" fill="url(#g-flamme)" opacity="${.2 * o}"/>
+    <path d="M1240,-30 C1250,170 1130,330 930,390 C1040,300 1060,190 1010,100 C960,10 860,-20 760,-30Z" fill="url(#g-flamme)" opacity="${.24 * o}"/>
+    <path d="M1260,640 C1230,500 1100,430 960,440 C1060,480 1110,560 1100,640Z" fill="url(#g-flamme-sombre)" opacity="${.3 * o}"/>
+    <path d="M60,-20 C40,90 90,170 190,210 C130,150 130,80 170,-20Z" fill="url(#g-rouage)" opacity="${.22 * o}"/>
+    <path d="${engrenage(1060, 560, 150, 122, 9)}" fill="none" stroke="url(#g-rouage)" stroke-width="2" opacity="${.18 * o}"/>
+  </svg>`;
+}
+
+/** L'aurore : des halos floutés aux couleurs de l'icône. */
+function aurore() {
+  return `<div style="position:absolute;inset:-20%;filter:blur(70px);
+    background: radial-gradient(40% 45% at 18% 20%, var(--aurore-1), transparent 70%),
+                radial-gradient(35% 40% at 82% 18%, var(--aurore-2), transparent 70%),
+                radial-gradient(45% 40% at 70% 90%, var(--aurore-3), transparent 70%),
+                radial-gradient(30% 35% at 10% 85%, var(--aurore-4), transparent 70%);"></div>`;
+}
+
+function rendreDecors() {
+  const theme = document.body.dataset.theme;
+  document.querySelectorAll('[data-deco]').forEach((d) => {
+    const n = d.dataset.deco;
+    if (theme === 'braise') d.innerHTML = n === '1' ? houle(230) : n === '2' ? houle(110) : '';
+    else if (theme === 'forge') d.innerHTML = volutes(n !== '3');
+    else d.innerHTML = aurore();
+  });
+  // Forge : chaque lot dans un engrenage, plein et en dégradé pour le choisi.
+  document.querySelectorAll('.lot-i').forEach((l) => {
+    l.querySelector('.rouage')?.remove();
+    if (theme !== 'forge') return;
+    const on = l.closest('.lot').classList.contains('on');
+    const s = document.createElementNS(NS, 'svg');
+    s.setAttribute('viewBox', '0 0 100 100');
+    s.setAttribute('class', 'rouage');
+    s.innerHTML = `<path d="${engrenage(50, 50, 48, 39, 9)}" fill="${on ? 'url(#g-flamme)' : 'var(--surface)'}" stroke="${on ? 'none' : 'url(#g-rouage)'}" stroke-width="2.4"/>
+      <circle cx="50" cy="50" r="27" fill="${on ? 'rgba(0,0,0,.18)' : 'var(--surface-2)'}"/>`;
+    l.prepend(s);
+  });
+  rendreAnneau(theme);
+}
+
+/** L'anneau du résumé : quatre postes, le dernier décoché. */
+function rendreAnneau(theme) {
+  const zone = document.querySelector('[data-anneau]');
+  const parts = [[612, 'var(--c1)', 1], [318, 'var(--c2)', 1], [204, 'var(--c3)', 1], [287, 'var(--c4)', .22]];
+  const total = parts.reduce((a, p) => a + p[0], 0);
+  const r = 78, c = 2 * Math.PI * r;
+  let pos = 0;
+  const arcs = parts.map(([v, col, op]) => {
+    const l = (v / total) * c;
+    const a = `<circle cx="100" cy="100" r="${r}" fill="none" stroke="${col}" stroke-opacity="${op}" stroke-width="${theme === 'forge' ? 24 : 20}"
+      stroke-dasharray="${Math.max(0, l - 3)} ${c}" stroke-dashoffset="${-pos}" stroke-linecap="${theme === 'forge' ? 'round' : 'butt'}"/>`;
+    pos += l;
+    return a;
+  }).join('');
+  const dents = theme === 'forge'
+    ? `<svg class="dents" viewBox="0 0 228 228"><path d="${engrenage(114, 114, 113, 103, 14)}" fill="none" stroke="url(#g-rouage)" stroke-width="2" opacity=".55"/></svg>`
+    : '';
+  zone.innerHTML = `${dents}<svg viewBox="0 0 200 200"><circle cx="100" cy="100" r="${r}" fill="none" stroke="var(--surface-3)" stroke-width="20"/>${arcs}</svg>
+    <div class="centre"><b>1,1 Go</b><span>à libérer<br>sur 1,4 Go</span></div>`;
+}
+
+function choisir(attr, valeur) {
+  document.body.dataset[attr === 't' ? 'theme' : 'mode'] = valeur;
+  document.querySelectorAll(`[data-${attr}]`).forEach((b) => b.setAttribute('aria-pressed', String(b.dataset[attr] === valeur)));
+  rendreDecors();
+}
+document.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => choisir('t', b.dataset.t)));
+document.querySelectorAll('[data-m]').forEach((b) => (b.onclick = () => choisir('m', b.dataset.m)));
+rendreDecors();
+</script>
+</body>
+</html>
