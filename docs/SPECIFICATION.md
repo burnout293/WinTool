@@ -44,15 +44,23 @@ comportement.
 
 ### Mode Simple — assistant pas-à-pas
 
-Destiné aux débutants et aux personnes âgées. Trois étapes :
+Destiné aux débutants et aux personnes âgées. Quatre étapes (1.5) :
 
 | Étape | Rôle | Ne fait jamais |
 |---|---|---|
 | **1 · Choisir** | Le lot épinglé en grand, puis les autres lots | — |
-| **2 · Vérifier** ou **Analyser** | Récapitulatif de ce qui va être fait, réglages repliés, annonce du point de restauration — ou, si le lot contient une action qui sait analyser, l'analyse elle-même (§17.2) | **Ne modifie rien** |
-| **3 · Entretien** | Progression, liste des tâches, puis bilan | — |
+| **2 · Vérifier** | Ce qui va être fait : une case par action, à décocher pour ce lancement seulement, réglages repliés, annonce du point de restauration | **Ne modifie rien** |
+| **3 · Analyser** | « Voici ce que j'ai trouvé » : on coche ce qu'on veut traiter (§17.2). **Sautée** quand aucune action retenue ne sait analyser. | **Ne modifie rien** |
+| **4 · Entretien** | Progression, liste des tâches, puis bilan | — |
 
-Une seule décision par écran. Retour possible à tout moment avant l'étape 3.
+Une seule décision par écran. Retour possible à tout moment avant l'étape 4. Le fil
+d'Ariane ne montre que les étapes de ce lancement.
+
+**Lancer depuis l'Expert.** « Exécuter » sur la fiche d'une action, et « Lancer ce lot »
+sur un lot, passent par les mêmes écrans, **à partir de l'étape 3** : le choix et les
+réglages, l'Expert les a déjà faits. Une analyse déjà faite et cochée dans la fiche est
+reprise telle quelle. Lancé ainsi, un lot comprend aussi ses actions `show : expert`. Le
+bilan ramène à l'Expert, sur ce qu'on avait ouvert.
 
 ### Mode Expert — master-détail
 
@@ -1434,11 +1442,10 @@ case, et une vue qui ne trouve pas de quoi s'afficher retombe sur la liste à co
 
 ### 17.2 Dans le mode Simple
 
-L'étape 2 de l'assistant devient l'analyse elle-même dès que le lot contient au moins une
-action qui sait analyser ; sinon elle reste le récapitulatif. Le fil d'Ariane le dit :
-« Analyser » ou « Vérifier ».
+L'étape 3 de l'assistant (§2) : elle suit « Vérifier » dès qu'une action retenue sait
+analyser, et elle est sautée sinon.
 
-1. **Choisir** — inchangé : un lot.
+1. **Choisir** — un lot ; **Vérifier** — les actions retenues pour ce lancement.
 2. **Analyser** — WinTool interroge une à une les actions analysables du lot (« J'examine
    votre PC… », une barre, « Action 2 sur 3 »), puis affiche **« Voici ce que j'ai
    trouvé »** :
@@ -1482,9 +1489,9 @@ sera fait, ce que recevra le script (le JSON exact de `WINTOOL_CONFIG`), points
 d'attention, historique de ce que l'action a libéré, provenance, espace disque. Le script
 en ouvre certains d'office (`panels`) ; l'utilisateur ouvre et ferme les autres.
 
-**« Lancer » reprend la sélection.** Après une analyse, l'action reçoit ce qui est coché,
-comme en Simple. Sans analyse — ou si le fichier a changé depuis — elle reçoit sa
-configuration, comme n'importe quel script.
+**« Exécuter » passe par l'écran d'analyse du Simple** (§2) : l'analyse faite dans la
+fiche, et ce qui y est coché, y sont repris ; sinon elle y est lancée. Une action qui ne
+sait pas analyser va directement à l'entretien.
 
 C'est l'outil de l'utilisateur avancé qui veut comprendre avant de composer un lot, et
 celui de l'auteur de script qui vérifie ce que son analyse rapporte.

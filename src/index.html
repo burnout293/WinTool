@@ -32,6 +32,7 @@
         <span data-crumb="1"><span id="crumb1"></span><i class="dot"></i></span>
         <span data-crumb="2"><span id="crumb2"></span><i class="dot"></i></span>
         <span data-crumb="3"><span id="crumb3"></span><i class="dot"></i></span>
+        <span data-crumb="4"><span id="crumb4"></span><i class="dot"></i></span>
       </nav>
 
       <span class="tb-lieu" id="tbReglages"></span>
@@ -121,8 +122,10 @@
 
       <div id="problems" class="problems-bar" hidden></div>
 
-      <!-- Mode Simple (specification §2/§3/§15) : assistant en trois etapes,
-           un seul domaine choisi a la fois. -->
+      <!-- Mode Simple (specification §2/§3/§15) : assistant en quatre etapes —
+           Choisir, Verifier, Analyser, Entretien —, un seul lot a la fois.
+           « Analyser » est sautee quand aucune action retenue ne sait
+           analyser ; un lancement depuis l'Expert commence a « Analyser ». -->
       <section class="simple" id="simple" hidden>
         <div class="s-step" data-s="1">
           <div class="s-scroll">
@@ -151,15 +154,37 @@
           <div class="s-scroll">
             <div class="s-wrap">
               <div class="s-head">
-                <button class="iconbtn" type="button" data-s-back>
+                <button class="iconbtn" type="button" data-s-back="1">
                   <svg class="ico i17" aria-hidden="true"><use href="#arrow-left" /></svg>
                 </button>
                 <h2 id="recapTitre"></h2>
               </div>
-              <!-- Analyse (specification §17) : quand le lot compte une action
-                   qui sait analyser, l'etape 2 devient « Voici ce que j'ai
-                   trouve » — on coche, puis on lance. -->
-              <div id="analyseZone" hidden>
+              <p class="muted recap-aide" id="recapAide"></p>
+              <div class="box" id="recapBox">
+                <div class="box-h" id="recapBoxTitre"></div>
+                <div class="box-b list" id="recapZone"></div>
+              </div>
+              <p class="restore-note" id="restoreNote" hidden></p>
+              <p class="restore-note" id="rebootNote" hidden></p>
+              <div class="s-nav center">
+                <button class="btn primary big lancer" type="button" id="btnSuivantVerifier"></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analyse (specification §17) : « Voici ce que j'ai trouve » — on
+             coche, puis on lance. -->
+        <div class="s-step" data-s="3" hidden>
+          <div class="s-scroll">
+            <div class="s-wrap">
+              <div class="s-head">
+                <button class="iconbtn" type="button" data-s-back="2">
+                  <svg class="ico i17" aria-hidden="true"><use href="#arrow-left" /></svg>
+                </button>
+                <h2 id="anLotTitre"></h2>
+              </div>
+              <div id="analyseZone">
                 <div class="s-head-center an-entete">
                   <h1 id="anTitre"></h1>
                   <p class="muted" id="anSous"></p>
@@ -171,12 +196,8 @@
                 <div id="anResume"></div>
                 <div id="anAutres"></div>
               </div>
-              <div class="box" id="recapBox">
-                <div class="box-h" id="recapBoxTitre"></div>
-                <div class="box-b list" id="recapZone"></div>
-              </div>
-              <p class="restore-note" id="restoreNote" hidden></p>
-              <p class="restore-note" id="rebootNote" hidden></p>
+              <p class="restore-note" id="anRestoreNote" hidden></p>
+              <p class="restore-note" id="anRebootNote" hidden></p>
               <div class="s-nav center">
                 <span class="an-total-bas" id="anTotal"></span>
                 <button class="btn primary big lancer" type="button" id="btnLancerEntretien"></button>
@@ -185,7 +206,7 @@
           </div>
         </div>
 
-        <div class="s-step" data-s="3" hidden>
+        <div class="s-step" data-s="4" hidden>
           <div class="rise" id="riseZone">
             <div class="rise-fill" id="riseFill">
               <svg class="rise-crest" viewBox="0 0 2360 44" preserveAspectRatio="none" aria-hidden="true">

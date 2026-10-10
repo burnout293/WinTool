@@ -229,7 +229,22 @@ function scriptsActifs(groupe) {
  *  reservee a l'Expert (`show : expert`, §17) n'y est ni montree ni lancee —
  *  un debutant ne lance pas ce qu'il n'a pas pu voir. */
 function scriptsSimples(groupe) {
+  // Lance depuis l'Expert, un lot montre tout ce que l'Expert montre.
+  if (groupe.expert) return scriptsActifs(groupe);
   return scriptsActifs(groupe).filter((s) => s.meta.show !== 'expert');
+}
+
+/** Le lot en cours de lancement, du choix au bilan. Un lancement depuis
+ *  l'Expert y pose une copie marquee `expert` ; pour une seule action, un lot
+ *  qui n'existe que le temps de ce lancement (`LOT_EXPERT`). */
+const LOT_EXPERT = '__expert';
+let groupeLancement = null;
+/** Les actions decochees a l'etape « Verifier » : pour ce lancement seulement. */
+let exclusLancement = new Set();
+
+/** Les actions retenues pour ce lancement. */
+function scriptsRetenus(groupe) {
+  return scriptsSimples(groupe).filter((s) => !exclusLancement.has(s.id));
 }
 
 /** Champ de l'override correspondant a chaque booleen WinTool (specification 4.2). */
@@ -757,6 +772,7 @@ async function rendreDetailLot(id) {
     ? ''
     : `
     <div class="dact">
+      <button class="btn primary" type="button" data-lancer-lot="${esc(cat.id)}"${scriptsActifs(groupe).length ? '' : ' disabled'}>${esc(t('expert.lancer_lot'))}</button>
       <button class="iconbtn" type="button" data-renommer-lot="${esc(cat.id)}" data-tip="${esc(t('expert.renommer'))}">
         <svg class="ico i17" aria-hidden="true"><use href="#pencil" /></svg>
       </button>
@@ -2132,9 +2148,8 @@ async function basculerSimulation() {
   await rafraichirSimulation();
   rendreDetail();
   // L'etape 2 du mode Simple affiche quels scripts seront simules.
-  if (entretienEnCours && !entretienActif && document.querySelector('[data-script-recap]')) {
-    const groupe = etatGroupes?.lots.find((g) => g.lot.id === entretienEnCours.lotId);
-    if (groupe) await rendreEtapeVerifier(groupe);
+  if (entretienEnCours && !entretienActif && !document.querySelector('.s-step[data-s="2"]').hidden) {
+    if (groupeLancement) await rendreEtapeVerifier(groupeLancement);
   }
 }
 
@@ -2502,54 +2517,6 @@ function cablerConfiance() {
 /* -------------------------------------------------------------------------
    Lancement
    ------------------------------------------------------------------------- */
-async function lancer(id) {
-  if (course) return;
-  const entree = catalogue.get(id);
-  if (!entree) return;
-
-  const ok = await assurerApprobation(entree);
-  if (!ok) return;
-
-  const carte = document.querySelector(`.card[data-id="${CSS.escape(id)}"]`);
-  const bouton = carte?.querySelector('[data-run]');
-
-  try {
-    const demarre = await invoke('run_script', {
-      req: {
-        script_id: id,
-        // L'empreinte vue a la decouverte : le moteur refuse de lancer un
-        // fichier modifie depuis, plutot que d'executer autre chose que ce
-        // que l'interface a montre.
-        expected_hash: entree.hash,
-        // Apres une analyse, ce qui est coche part avec le reste (§17).
-        config: { ...lireConfig(carte), ...configAnalysePour(entree) },
-        policy: reglagesActuels?.exec_policy || null,
-      },
-    });
-
-    departCourse = Date.now();
-    course = { runId: demarre.run_id, id, logPath: demarre.log_path, simule: !!demarre.simulated };
-    if (bouton) bouton.disabled = true;
-    document.querySelectorAll('[data-run]').forEach((b) => (b.disabled = true));
-    ouvrirTerminal(entree, demarre);
-    rendreLots(); // pastille "en cours" dans la colonne de gauche
-  } catch (e) {
-    // Filet de securite : `assurerApprobation` a du montrer l'ecran de
-    // confiance juste avant, ce refus ne devrait donc jamais arriver — sauf
-    // si l'approbation a echoue en silence (voir le commentaire ci-dessus).
-    if (String(e).includes(NON_APPROUVE_MARQUEUR)) {
-      const reessayer = await assurerApprobation(entree);
-      if (reessayer) return void lancer(id);
-      return;
-    }
-    // Le journal garde la trace, le panneau explique : les deux, parce qu'un
-    // refus qu'on ne peut pas relire plus tard est un refus a moitie dit.
-    const raison = messageLancement(e, entree);
-    journaliserRefus(entree, raison);
-    alerterEchecLancement(entree, raison);
-  }
-}
-
 /** Un refus de lancement doit se voir : il ne part pas dans la console. */
 /**
  * Ecrit un refus de lancement dans le journal, comme s'il venait du script.
@@ -2743,7 +2710,8 @@ function appliquerTraductionsStatiques() {
 
   document.getElementById('crumb1').textContent = t('crumb.choisir');
   document.getElementById('crumb2').textContent = t('crumb.verifier');
-  document.getElementById('crumb3').textContent = t('crumb.entretien');
+  document.getElementById('crumb3').textContent = t('crumb.analyser');
+  document.getElementById('crumb4').textContent = t('crumb.entretien');
 }
 
 /**
@@ -2956,7 +2924,9 @@ function cablerInteractions() {
     }
 
     const run = ev.target.closest('[data-run]');
-    if (run && !run.disabled) return void lancer(run.dataset.run);
+    if (run && !run.disabled) return void lancerDepuisExpert({ type: 'script', id: run.dataset.run });
+    const lancerLot = ev.target.closest('[data-lancer-lot]');
+    if (lancerLot && !lancerLot.disabled) return void lancerDepuisExpert({ type: 'lot', id: lancerLot.dataset.lancerLot });
 
     const reinit = ev.target.closest('[data-reinit]');
     if (reinit) {
@@ -3085,7 +3055,7 @@ let selectionSimpleId = null;
  *  progression de la tache active (voir cablerMoteur). */
 let etapeEntretienActuelle = null;
 
-function basculerMode(mode) {
+function basculerMode(mode, { etape = 1 } = {}) {
   modeCourant = mode;
   if (mode !== 'simple') retirerVaguesArriere();
   document.body.dataset.mode = mode;
@@ -3094,8 +3064,9 @@ function basculerMode(mode) {
   document.querySelectorAll('#modeSeg [data-mode-btn]').forEach((b) => {
     b.setAttribute('aria-pressed', String(b.dataset.modeBtn === mode));
   });
-  if (mode === 'simple') afficherEtapeSimple(1);
-  else majMaree();
+  if (mode === 'simple') {
+    if (etape) afficherEtapeSimple(etape);
+  } else majMaree();
   // Les reglages restent ouverts, sur la meme section si elle existe dans ce
   // mode (§8) : changer de mode ne demande plus de les quitter.
   if (reglagesOuverts()) {
@@ -3106,9 +3077,17 @@ function basculerMode(mode) {
 }
 
 function majRepere(etape) {
-  for (let i = 1; i <= 3; i++) {
+  // Les reperes disent le chemin de CE lancement : « Analyser » disparait
+  // quand aucune action retenue ne sait analyser, « Choisir » et « Verifier »
+  // quand on vient de l'Expert, qui a deja choisi et regle.
+  const g = etape > 1 ? groupeLancement : null;
+  const depuisExpert = !!(g && entretienEnCours?.depuisExpert);
+  const analyse = !g || scriptsRetenus(g).some((x) => x.meta.scan);
+  const masque = { 1: depuisExpert, 2: depuisExpert, 3: !analyse, 4: false };
+  for (let i = 1; i <= 4; i++) {
     const ligne = document.getElementById(`crumb${i}`)?.parentElement;
     if (!ligne) continue;
+    ligne.hidden = masque[i];
     ligne.classList.toggle('actif', i === etape);
     ligne.classList.toggle('done', i < etape);
   }
@@ -3473,12 +3452,69 @@ function selectionnerChoix(id) {
 async function choisirLot(id) {
   const groupe = etatGroupes?.lots.find((g) => g.lot.id === id);
   if (!groupe || !scriptsSimples(groupe).length) return;
+  groupeLancement = groupe;
+  exclusLancement = new Set();
   entretienEnCours = { lotId: id, total: scriptsSimples(groupe).length, resultats: [] };
   afficherEtapeSimple(2);
-  // L'etape 2 devient l'analyse des que le lot compte une action qui sait
-  // analyser (§17.2) ; sinon elle reste le recapitulatif d'avant.
-  if (scriptsSimples(groupe).some((s) => s.meta.scan)) await rendreEtapeAnalyse(groupe);
-  else await rendreEtapeVerifier(groupe);
+  await rendreEtapeVerifier(groupe);
+}
+
+/** Apres « Verifier » : l'analyse si une action retenue sait analyser (§17.2),
+ *  sinon l'entretien directement. */
+async function suivreVerifier() {
+  const groupe = groupeLancement;
+  if (!groupe || !scriptsRetenus(groupe).length) return;
+  if (scriptsRetenus(groupe).some((s) => s.meta.scan)) {
+    afficherEtapeSimple(3);
+    await rendreEtapeAnalyse(groupe);
+  } else {
+    await lancerEntretien();
+  }
+}
+
+/**
+ * « Executer » sur une fiche, « Lancer ce lot » sur un lot : depuis l'Expert,
+ * on passe par les memes ecrans que le Simple, a partir de l'analyse — le
+ * choix et les reglages, l'Expert les a deja faits. Une analyse deja faite et
+ * cochee dans la fiche est reprise telle quelle.
+ */
+async function lancerDepuisExpert({ type, id }) {
+  if (course || entretienActif) return;
+  let groupe;
+  if (type === 'lot') {
+    const g = etatGroupes?.lots.find((x) => x.lot.id === id);
+    if (!g) return;
+    groupe = { ...g, expert: true };
+  } else {
+    const entree = catalogue.get(id);
+    if (!entree) return;
+    groupe = {
+      lot: { id: LOT_EXPERT, name: { [currentLang()]: A.titreAction(entree) }, icon: entree.meta.icon, pinned: false, scripts: [id] },
+      scripts: [entree],
+      missing: [],
+      expert: true,
+    };
+  }
+  if (!scriptsSimples(groupe).length) return;
+  groupeLancement = groupe;
+  exclusLancement = new Set();
+  entretienEnCours = { lotId: groupe.lot.id, total: scriptsSimples(groupe).length, resultats: [], depuisExpert: { type, id } };
+  basculerMode('simple', { etape: null });
+  if (scriptsSimples(groupe).some((s) => s.meta.scan)) {
+    afficherEtapeSimple(3);
+    await rendreEtapeAnalyse(groupe, { reprendre: true });
+  } else {
+    await lancerEntretien();
+  }
+}
+
+/** Fin d'un lancement venu de l'Expert : on y retourne, sur ce qu'on avait ouvert. */
+async function retourExpert() {
+  const origine = entretienEnCours?.depuisExpert;
+  basculerMode('expert');
+  if (origine) selection = { type: origine.type, id: origine.id };
+  await rendreLots();
+  await rendreDetail();
 }
 
 /** Etape 2 : recapitulatif, reglages replies, annonce du point de
@@ -3590,8 +3626,9 @@ function marqueSimulation(entree) {
 }
 
 async function rendreEtapeVerifier(groupe) {
-  basculerEtape2(false);
+  analyseSimple = null;
   document.getElementById('recapTitre').textContent = nomLot(groupe.lot);
+  document.getElementById('recapAide').textContent = t('simple.recap_aide');
   document.getElementById('recapBoxTitre').textContent = t('simple.recap_titre');
 
   const lignes = await Promise.all(
@@ -3603,11 +3640,18 @@ async function rendreEtapeVerifier(groupe) {
       // donc : la ligne ne montre rien de plus qu'avant tant qu'on ne la
       // deplie pas, et le chevron est la seule chose ajoutee a l'ecran.
       const reglables = reglagesSimples(s);
+      const retenu = !exclusLancement.has(s.id);
+      // Toute la ligne est la cible de la case (56 px, §3) ; le chevron des
+      // reglages reste a part.
       return `
-        <div class="rrow" data-script-recap="${esc(s.id)}">
-          <div class="ri">${icone}</div>
-          <div class="rt">${esc(titre)}${marqueSimulation(s)}</div>
-          <span class="badge">${esc(t(`duree.${s.meta.duration}`))}</span>
+        <div class="rrow${retenu ? '' : ' exclu'}" data-script-recap="${esc(s.id)}">
+          <label class="rrow-main">
+            <input type="checkbox" class="rrow-coche" data-retenir="${esc(s.id)}"${retenu ? ' checked' : ''}
+                   aria-label="${esc(t('simple.retenir', { titre }))}">
+            <div class="ri">${icone}</div>
+            <div class="rt">${esc(titre)}${marqueSimulation(s)}</div>
+            <span class="badge">${esc(t(`duree.${s.meta.duration}`))}</span>
+          </label>
           ${reglables.length
             ? `<button class="rrow-plus" type="button" data-deplier="${esc(s.id)}"
                        aria-expanded="false" aria-label="${esc(t('simple.avance'))}"
@@ -3624,9 +3668,18 @@ async function rendreEtapeVerifier(groupe) {
     })
   );
   document.getElementById('recapZone').innerHTML = lignes.join('');
+  majVerifier(groupe);
+}
+
+/** Ce qui depend des cases de « Verifier » : les annonces, le bouton, les reperes. */
+function majVerifier(groupe) {
+  const retenus = scriptsRetenus(groupe);
+  document.querySelectorAll('[data-script-recap]').forEach((l) => {
+    l.classList.toggle('exclu', exclusLancement.has(l.dataset.scriptRecap));
+  });
 
   const note = document.getElementById('restoreNote');
-  const besoinRestauration = scriptsSimples(groupe).some(pointAvant);
+  const besoinRestauration = retenus.some(pointAvant);
   note.hidden = !besoinRestauration;
   if (besoinRestauration) note.textContent = t('simple.point_restauration_annonce');
 
@@ -3634,11 +3687,15 @@ async function rendreEtapeVerifier(groupe) {
   // source est la case de la 4.2, pas `meta.reboot` : si l'utilisateur a
   // decoche, on ne lui annonce pas un redemarrage qu'il a refuse.
   const noteRedemarrage = document.getElementById('rebootNote');
-  const besoinRedemarrer = scriptsSimples(groupe).some(besoinRedemarrage);
+  const besoinRedemarrer = retenus.some(besoinRedemarrage);
   noteRedemarrage.hidden = !besoinRedemarrer;
   if (besoinRedemarrer) noteRedemarrage.textContent = t('simple.redemarrage_annonce');
 
-  document.getElementById('btnLancerEntretien').textContent = t('simple.lancer');
+  const bouton = document.getElementById('btnSuivantVerifier');
+  bouton.disabled = !retenus.length;
+  bouton.textContent = !retenus.length ? t('simple.rien_a_lancer')
+    : t(retenus.some((s) => s.meta.scan) ? 'simple.analyser' : 'simple.lancer');
+  majRepere(2);
 }
 
 /* -------------------------------------------------------------------------
@@ -3737,26 +3794,12 @@ function finirAnalyse(fin) {
   rafraichirZonesAnalyse();
 }
 
-/* --- Mode Simple : l'etape 2 devient l'analyse ------------------------- */
-
-/** Etape 2 : recapitulatif (scripts sans analyse) ou analyse (§17.2). */
-function basculerEtape2(analyse) {
-  document.getElementById('crumb2').textContent = t(analyse ? 'crumb.analyser' : 'crumb.verifier');
-  document.getElementById('analyseZone').hidden = !analyse;
-  document.getElementById('recapBox').hidden = analyse;
-  if (!analyse) {
-    analyseSimple = null;
-    const bouton = document.getElementById('btnLancerEntretien');
-    bouton.hidden = false;
-    bouton.disabled = false;
-    document.getElementById('anTotal').textContent = '';
-  }
-}
+/* --- Mode Simple : l'etape « Analyser » ----------------------------------- */
 
 /** Les scripts que l'entretien lancera : ceux du mode Simple, moins les
  *  analysables dont rien n'est coche ou dont l'analyse n'a pas abouti. */
 function scriptsALancer(groupe) {
-  return scriptsSimples(groupe).filter((s) => {
+  return scriptsRetenus(groupe).filter((s) => {
     if (!s.meta.scan) return true;
     const m = analyseValide(s);
     return !!m && m.succes && A.aFaire(m);
@@ -3766,13 +3809,12 @@ function scriptsALancer(groupe) {
 /** Les scripts de l'entretien en cours, dans l'ordre ou il les lance. */
 function scriptsEntretien(groupe) {
   const ids = entretienEnCours?.lances;
-  return ids ? ids.map((id) => catalogue.get(id)).filter(Boolean) : scriptsSimples(groupe);
+  return ids ? ids.map((id) => catalogue.get(id)).filter(Boolean) : scriptsRetenus(groupe);
 }
 
-async function rendreEtapeAnalyse(groupe) {
-  basculerEtape2(true);
-  document.getElementById('recapTitre').textContent = nomLot(groupe.lot);
-  const visibles = scriptsSimples(groupe);
+async function rendreEtapeAnalyse(groupe, { reprendre = false } = {}) {
+  document.getElementById('anLotTitre').textContent = nomLot(groupe.lot);
+  const visibles = scriptsRetenus(groupe);
   const analysables = visibles.filter((s) => s.meta.scan && !moteurManquant(s.meta));
   const jeton = Symbol('analyse');
   analyseSimple = { lotId: groupe.lot.id, ids: analysables.map((s) => s.id), echecs: [], jeton, rang: 0 };
@@ -3783,8 +3825,9 @@ async function rendreEtapeAnalyse(groupe) {
   document.getElementById('anProgression').hidden = false;
   document.getElementById('anResume').innerHTML = '';
   document.getElementById('anAutres').innerHTML = '';
-  document.getElementById('restoreNote').hidden = true;
-  document.getElementById('rebootNote').hidden = true;
+  document.getElementById('anRestoreNote').hidden = true;
+  document.getElementById('anRebootNote').hidden = true;
+  document.getElementById('anTotal').textContent = '';
   const bouton = document.getElementById('btnLancerEntretien');
   bouton.hidden = true;
   majProgressionAnalyse(null);
@@ -3793,6 +3836,8 @@ async function rendreEtapeAnalyse(groupe) {
     if (analyseSimple?.jeton !== jeton) return;
     analyseSimple.rang = i;
     majProgressionAnalyse(null);
+    // Venu de l'Expert : ce qui y a ete analyse et coche est repris tel quel.
+    if (reprendre && analyseValide(s)?.succes) continue;
     const r = await analyser(s, { simple: true });
     if (analyseSimple?.jeton !== jeton) return;
     if (!r.succes) analyseSimple.echecs.push({ id: s.id, raison: r.refus || t('an.analyse_echouee') });
@@ -3838,7 +3883,7 @@ async function arreterAnalyseSimple() {
 }
 
 function rendreResumeAnalyse(groupe) {
-  const g = groupe || etatGroupes?.lots.find((x) => x.lot.id === analyseSimple?.lotId);
+  const g = groupe || groupeLancement;
   if (!g || !analyseSimple) return;
   const modeles = analyseSimple.ids.map((id) => {
     const s = catalogue.get(id);
@@ -3853,9 +3898,9 @@ function rendreResumeAnalyse(groupe) {
     : `<div class="an-carte">${A.resume(modeles, { graphe: reglagesActuels?.analysis_chart || 'donut', ...A.etatUi() })}</div>`;
   A.poserPartiels(zone);
 
-  const visibles = scriptsSimples(g);
+  const visibles = scriptsRetenus(g);
   const telsQuels = visibles.filter((s) => !s.meta.scan);
-  const reserves = scriptsActifs(g).filter((s) => s.meta.show === 'expert');
+  const reserves = g.expert ? [] : scriptsActifs(g).filter((s) => s.meta.show === 'expert');
   const echecs = analyseSimple.echecs;
   const autres = [];
   if (telsQuels.length) {
@@ -3874,10 +3919,10 @@ function rendreResumeAnalyse(groupe) {
   document.getElementById('anAutres').innerHTML = autres.join('');
 
   const aLancer = scriptsALancer(g);
-  const note = document.getElementById('restoreNote');
+  const note = document.getElementById('anRestoreNote');
   note.hidden = !aLancer.some(pointAvant);
   if (!note.hidden) note.textContent = t('simple.point_restauration_annonce');
-  const noteRedemarrage = document.getElementById('rebootNote');
+  const noteRedemarrage = document.getElementById('anRebootNote');
   noteRedemarrage.hidden = !aLancer.some(besoinRedemarrage);
   if (!noteRedemarrage.hidden) noteRedemarrage.textContent = t('simple.redemarrage_annonce');
 
@@ -4098,7 +4143,7 @@ function noterRestauration(resultat) {
 
 async function lancerEntretien() {
   document.getElementById('riseFill')?.classList.remove('termine');
-  const groupe = etatGroupes?.lots.find((g) => g.lot.id === entretienEnCours?.lotId);
+  const groupe = groupeLancement;
   if (!groupe) return;
   entretienActif = true;
   // Le journal de l'entretien part de zero : il gardait sinon les lignes de la
@@ -4108,7 +4153,7 @@ async function lancerEntretien() {
   rendreBandeauMaj();
   rendreBandeauCatalogue();
 
-  afficherEtapeSimple(3);
+  afficherEtapeSimple(4);
   document.getElementById('s3Titre').textContent = t('s3.titre');
   document.getElementById('riseBadgeLabel').textContent = t('simple.niveau_atteint');
   document.getElementById('btnArreterEntretien').hidden = false;
@@ -4124,11 +4169,15 @@ async function lancerEntretien() {
   etapeEntretienActuelle = null;
   majProgression();
 
-  invoke('record_lot_run', {
-    lotId: groupe.lot.id,
-    lotName: nomLot(groupe.lot),
-    scriptIds: aLancer.map((s) => s.id),
-  }).catch((e) => console.error("Enregistrement de l'historique impossible :", e));
+  // Une action seule lancee depuis l'Expert n'est pas un lot : son
+  // historique est celui de l'action, rien de plus.
+  if (groupe.lot.id !== LOT_EXPERT) {
+    invoke('record_lot_run', {
+      lotId: groupe.lot.id,
+      lotName: nomLot(groupe.lot),
+      scriptIds: aLancer.map((s) => s.id),
+    }).catch((e) => console.error("Enregistrement de l'historique impossible :", e));
+  }
 
   const besoinRestauration = aLancer.some(pointAvant);
   if (besoinRestauration) {
@@ -4206,14 +4255,14 @@ function terminerEntretien() {
   document.getElementById('riseFill')?.classList.add('termine');
   document.getElementById('btnArreterEntretien').hidden = true;
   document.getElementById('btnRetourAccueil').hidden = false;
-  document.getElementById('btnRetourAccueil').textContent = t('simple.termine_retour');
+  document.getElementById('btnRetourAccueil').textContent = t(entretienEnCours?.depuisExpert ? 'simple.retour_expert' : 'simple.termine_retour');
   document.getElementById('s3Sous').textContent = t('s3.sous_fini');
   const ok = entretienEnCours.resultats.filter((r) => r.success).length;
   const total = entretienEnCours.resultats.length;
   document.getElementById('tasksBilan').hidden = false;
   document.getElementById('tasksBilan').textContent = t('simple.bilan_titre');
   const simules = entretienEnCours.resultats.filter((r) => r.simule).length;
-  document.getElementById('tasksBilanDetail').textContent = t('simple.bilan_detail', { ok, total })
+  document.getElementById('tasksBilanDetail').textContent = t(total === 1 ? 'simple.bilan_detail_un' : 'simple.bilan_detail', { ok, total })
     + (simules ? ` ${t('simulation.bilan', { n: simules })}` : '')
     + bilanLibere();
 }
@@ -4242,7 +4291,7 @@ function bilanLibere() {
  *  symbole qui pretendrait en savoir plus que ce que `derniersResultats` sait
  *  vraiment (specification §7). */
 function rendreTachesEntretien() {
-  const groupe = etatGroupes?.lots.find((g) => g.lot.id === entretienEnCours?.lotId);
+  const groupe = groupeLancement;
   if (!groupe) return;
   const lignes = scriptsEntretien(groupe).map((s, i) => {
     const tr = s.meta.translations?.[currentLang()];
@@ -4281,7 +4330,7 @@ function rendreTachesEntretien() {
 }
 
 function majProgression() {
-  const groupe = etatGroupes?.lots.find((g) => g.lot.id === entretienEnCours?.lotId);
+  const groupe = groupeLancement;
   const total = entretienEnCours?.total || 1;
   const fait = entretienEnCours?.resultats.length || 0;
   const pct = Math.round((fait / total) * 100);
@@ -4316,16 +4365,32 @@ function cablerModeEtSimple() {
     if (buoy) return void selectionnerChoix(buoy.dataset.lot);
 
     if (ev.target.closest('#btnContinuerChoix')) return void choisirLot(selectionSimpleId);
-    if (ev.target.closest('[data-s-back]')) {
+    const retour = ev.target.closest('[data-s-back]');
+    if (retour) {
       arreterAnalyseSimple();
-      return void afficherEtapeSimple(1);
+      // Venu de l'Expert, il n'y a pas d'etape « Verifier » derriere soi.
+      if (entretienEnCours?.depuisExpert) return void retourExpert();
+      return void afficherEtapeSimple(Number(retour.dataset.sBack) || 1);
     }
+    if (ev.target.closest('#btnSuivantVerifier')) return void suivreVerifier();
     // Les gestes du resume de l'analyse (§17) : cases, chevrons, interrupteurs.
     if (ev.target.closest('#anResume') && A.agir(ev, analyses)) return void rendreResumeAnalyse();
     if (ev.target.closest('#btnLancerEntretien')) return void lancerEntretien();
     if (ev.target.closest('#btnArreterEntretien')) return void arreterEntretien();
-    if (ev.target.closest('#btnRetourAccueil')) return void afficherEtapeSimple(1);
+    if (ev.target.closest('#btnRetourAccueil')) {
+      if (entretienEnCours?.depuisExpert) return void retourExpert();
+      return void afficherEtapeSimple(1);
+    }
     if (ev.target.closest('#btnDetailTechnique')) return void basculerDetailTechnique();
+  });
+
+  // « Verifier » : une case par action, pour ce lancement seulement.
+  document.getElementById('recapZone').addEventListener('change', (ev) => {
+    const caseRetenir = ev.target.closest('[data-retenir]');
+    if (!caseRetenir || !groupeLancement) return;
+    if (caseRetenir.checked) exclusLancement.delete(caseRetenir.dataset.retenir);
+    else exclusLancement.add(caseRetenir.dataset.retenir);
+    majVerifier(groupeLancement);
   });
 
   document.getElementById('anResume').addEventListener('change', (ev) => {

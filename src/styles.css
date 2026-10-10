@@ -1073,7 +1073,12 @@ body[data-mode="simple"] .titlebar { background: none; border-bottom: none; }
 .buoy[aria-current="true"] .blabel { border-color: var(--acc); }
 
 /* Etape 2 : recapitulatif, ne modifie rien. */
-.rrow { display: flex; align-items: center; gap: 12px; padding: 9px 4px; }
+.rrow { display: flex; align-items: center; gap: 12px; padding: 0 4px; }
+/* Toute la ligne coche ou decoche l'action : une cible de 56 px (§3). */
+.rrow-main { flex: 1; min-width: 0; min-height: 56px; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+.rrow-coche { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--acc); cursor: pointer; }
+.rrow.exclu .ri, .rrow.exclu .rt, .rrow.exclu .badge { opacity: .45; }
+.recap-aide { margin: -4px 0 12px; font-size: 13px; }
 .rrow .ri {
   width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
   display: grid; place-items: center; background: var(--surface-2); color: var(--text-2);

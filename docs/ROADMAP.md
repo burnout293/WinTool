@@ -18,6 +18,7 @@ d'un cran (1.1, 1.2…), une version de corrections seules prend un troisième c
 | | — catégories distinctes des lots, onglets Scripts / Lots en Expert, réglages de la 1.2 migrés sans perte (§4.1) | Fait |
 | **1.5** | Témoin des changements sensibles (voir ci-dessous) | À faire |
 | | — couleur d'accent au choix, orange par défaut (§15.4) | Fait |
+| | — mode Simple en quatre étapes : Choisir, Vérifier (une case par action), Analyser, Entretien ; depuis l'Expert, « Exécuter » et « Lancer ce lot » passent par l'analyse (§2) | Fait |
 | | — journal : filtre par famille de lignes (infos, étapes, réussites, avertissements, erreurs, analyse, canaux, texte brut) | Fait |
 | | — point de restauration : verdict indépendant de la langue de Windows, accents lisibles, message simple en Simple et détail au journal, aucun point pendant une simulation | Fait |
 | en continu | Améliorations graphiques et d'organisation | Glissées dans chaque version |

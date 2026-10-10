@@ -3,8 +3,9 @@
 Outil de maintenance Windows. Une interface, deux modes, et des scripts PowerShell que
 vous pouvez lire, modifier et ajouter vous-même.
 
-- **Mode Simple** — un assistant en trois étapes, sans un seul terme technique : choisir,
-  voir ce que WinTool a trouvé et cocher ce qu'on veut traiter, puis le laisser faire.
+- **Mode Simple** — un assistant en quatre étapes, sans un seul terme technique : choisir,
+  vérifier ce qui sera fait, voir ce que WinTool a trouvé et cocher ce qu'on veut traiter,
+  puis le laisser faire.
   Conçu pour quelqu'un qui n'a jamais ouvert un terminal.
 - **Mode Expert** — le panneau de configuration du mode Simple : vous composez les lots,
   réglez chaque script, et lisez la sortie réelle de PowerShell pendant qu'elle défile.

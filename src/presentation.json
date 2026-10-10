@@ -49,8 +49,8 @@
           "en": "Everything WinTool can do is called an action: emptying the recycle bin, speeding up startup, protecting your privacy… Behind each action is a “script”: a recipe the computer follows, step by step."
         },
         {
-          "fr": "Le mode Simple vous guide en trois étapes — choisir, vérifier, lancer — puis vous dit ce qui a été fait. Rien ne se fait sans votre accord.",
-          "en": "Simple mode guides you in three steps — choose, check, start — then tells you what was done. Nothing happens without your consent."
+          "fr": "Le mode Simple vous guide pas à pas — choisir, vérifier, voir ce que WinTool a trouvé, lancer — puis vous dit ce qui a été fait. Rien ne se fait sans votre accord.",
+          "en": "Simple mode guides you step by step — choose, review, see what WinTool found, start — then tells you what was done. Nothing happens without your consent."
         },
         {
           "fr": "Le mode Expert montre tout : les actions rangées en lots, les réglages de chacune, et ce qui se passe pendant qu’elles travaillent. C’est là qu’on prépare le mode Simple, par exemple pour un proche.",
