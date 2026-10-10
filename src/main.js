@@ -4443,7 +4443,21 @@ function basculerDetailTechnique() {
 
 function cablerModeEtSimple() {
   document.querySelectorAll('#modeSeg [data-mode-btn]').forEach((b) => {
-    b.onclick = () => basculerMode(b.dataset.modeBtn);
+    b.onclick = () => {
+      const mode = b.dataset.modeBtn;
+      // Depuis les reglages, le mode deja actif ramene a son accueil : sans
+      // cela, le bouton ne faisait rien de visible et semblait casse.
+      if (mode === modeCourant && reglagesOuverts()) {
+        fermerReglages();
+        // Un entretien en cours garde son ecran : on ne quitte que les reglages.
+        if (mode === 'simple' && !entretienActif) {
+          arreterAnalyseSimple();
+          afficherEtapeSimple(1);
+        }
+        return;
+      }
+      basculerMode(mode);
+    };
   });
 
   document.querySelector('.simple').addEventListener('click', (ev) => {

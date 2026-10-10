@@ -919,6 +919,13 @@ body:not([data-console="compact"]) .lots-journal { display: none; }
 .seg button[aria-pressed="true"] {
   background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(15, 26, 36, .12);
 }
+/* Simple / Expert, dans la barre de titre : le mode actif en couleur d'accent,
+   pour savoir d'un coup d'oeil ou l'on est. La pastille blanche s'y perdait. */
+#modeSeg button[aria-pressed="true"] {
+  background: linear-gradient(135deg, var(--acc), var(--acc-2)); color: var(--ink);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--acc) 35%, transparent);
+}
+#modeSeg button:not([aria-pressed="true"]):hover { color: var(--text); }
 
 /* ==========================================================================
    Mode Simple — assistant en trois etapes (specification 2, 3, 15)
