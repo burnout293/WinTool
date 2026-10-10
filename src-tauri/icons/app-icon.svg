@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Source des icones de l'application. Regenerer : npx tauri icon
+       src-tauri/icons/app-icon.svg -o (un dossier temporaire), puis recopier ici
+       les seuls fichiers deja presents : le generateur ajoute des icones Android
+       et iOS dont WinTool n'a pas l'usage. Le meme dessin que
+       la marque de la barre de titre (.brand-mark) : un carre arrondi au degrade
+       de l'accent par defaut (orange, specification §15.4), et le glyphe Lucide
+       « waves » (ISC) a la couleur d'encre de l'interface. Les PNG, .ico et .icns
+       en sont generes. -->
+  <defs>
+    <linearGradient id="acc" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF8A1F" />
+      <stop offset="1" stop-color="#FFB547" />
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="236" fill="url(#acc)" />
+  <g transform="translate(212 212) scale(25)" fill="none" stroke="#06121A" stroke-width="2.3"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 12q2.5 2 5 0t5 0 5 0 5 0" />
+    <path d="M2 19q2.5 2 5 0t5 0 5 0 5 0" />
+    <path d="M2 5q2.5 2 5 0t5 0 5 0 5 0" />
+  </g>
+</svg>
